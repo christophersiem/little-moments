@@ -1,3 +1,6 @@
+import styled from 'styled-components'
+import { Button } from '../components/Button'
+import { Card } from '../components/Card'
 import { useMemoryDetail } from '../features/memories/hooks'
 import { formatDateTime } from '../lib/utils'
 
@@ -6,43 +9,65 @@ interface MemoryDetailPageProps {
   navigate: (nextPath: string) => void
 }
 
+const CenterCard = styled(Card)`
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+`
+
+const DateText = styled.p`
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+  color: ${({ theme }) => theme.colors.textMuted};
+`
+
+const StatusText = styled.div`
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+  color: ${({ theme }) => theme.colors.textMuted};
+`
+
+const Transcript = styled.p`
+  white-space: pre-wrap;
+  line-height: ${({ theme }) => theme.typography.relaxedLineHeight};
+`
+
+const ErrorText = styled.p`
+  color: ${({ theme }) => theme.colors.danger};
+  line-height: ${({ theme }) => theme.typography.bodyLineHeight};
+`
+
 export function MemoryDetailPage({ memoryId, navigate }: MemoryDetailPageProps) {
   const { loading, error, memory } = useMemoryDetail(memoryId)
 
   if (loading) {
     return (
-      <section className="panel panel-center">
+      <CenterCard centered>
         <h1>Memory</h1>
         <p>Loading...</p>
-      </section>
+      </CenterCard>
     )
   }
 
   if (error || !memory) {
     return (
-      <section className="panel">
+      <Card>
         <h1>Memory</h1>
-        <p className="error">{error || 'Could not load memory.'}</p>
-        <button className="button" onClick={() => navigate('/memories')}>
-          Back to List
-        </button>
-      </section>
+        <ErrorText>{error || 'Could not load memory.'}</ErrorText>
+        <Button onClick={() => navigate('/memories')}>Back to List</Button>
+      </Card>
     )
   }
 
   return (
-    <section className="panel">
+    <Card>
       <h1>Memory</h1>
-      <p className="memory-date">{formatDateTime(memory.recordedAt || memory.createdAt)}</p>
-      <div className="detail-status">Status: {memory.status}</div>
+      <DateText>{formatDateTime(memory.recordedAt || memory.createdAt)}</DateText>
+      <StatusText>Status: {memory.status}</StatusText>
       {memory.status === 'FAILED' ? (
-        <p className="error">{memory.errorMessage || 'Transcription failed.'}</p>
+        <ErrorText>{memory.errorMessage || 'Transcription failed.'}</ErrorText>
       ) : (
-        <p className="detail-transcript">{memory.transcript || 'Transcription still processing.'}</p>
+        <Transcript>{memory.transcript || 'Transcription still processing.'}</Transcript>
       )}
-      <button className="button" onClick={() => navigate('/memories')}>
-        Back to List
-      </button>
-    </section>
+      <Button onClick={() => navigate('/memories')}>Back to List</Button>
+    </Card>
   )
 }

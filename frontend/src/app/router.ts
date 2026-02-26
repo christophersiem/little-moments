@@ -4,6 +4,8 @@ export type AppRoute =
   | { kind: 'record' }
   | { kind: 'memories' }
   | { kind: 'memory-detail'; memoryId: string }
+  | { kind: 'settings' }
+  | { kind: 'account' }
   | { kind: 'not-found' }
 
 function normalizePath(pathname: string): string {
@@ -19,6 +21,12 @@ function resolveRoute(pathname: string): AppRoute {
   }
   if (pathname === '/memories') {
     return { kind: 'memories' }
+  }
+  if (pathname === '/settings') {
+    return { kind: 'settings' }
+  }
+  if (pathname === '/settings/account') {
+    return { kind: 'account' }
   }
 
   const detailMatch = pathname.match(/^\/memories\/([0-9a-fA-F-]+)$/)

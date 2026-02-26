@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import styled from 'styled-components'
+import { Button } from '../components/Button'
+import { Card } from '../components/Card'
 import { createMemory } from '../features/memories/api'
 import {
   transitionStopDecision,
@@ -18,6 +21,136 @@ interface RecordingPayload {
   blob: Blob
   recordedAt: string
 }
+
+const Stage = styled.section`
+  width: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+`
+
+const Hero = styled.div`
+  margin-top: clamp(72px, 17vh, 150px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: ${({ theme }) => theme.space.x4};
+`
+
+const RingBase = styled.div<{ $recording: boolean }>`
+  width: 138px;
+  height: 138px;
+  border-radius: 50%;
+  border: 6px solid ${({ theme }) => theme.colors.accent};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: ${({ theme }) => theme.colors.background};
+  ${({ $recording, theme }) =>
+    $recording ? `box-shadow: 0 0 0 7px ${theme.colors.surface};` : 'box-shadow: none;'}
+`
+
+const RingButton = styled.button`
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 50%;
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
+    outline-offset: 4px;
+  }
+`
+
+const MicGlyph = styled.span`
+  width: 16px;
+  height: 22px;
+  border: 2px solid ${({ theme }) => theme.colors.accent};
+  border-radius: 10px;
+  position: relative;
+  display: inline-block;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: -8px;
+    width: 2px;
+    height: 8px;
+    transform: translateX(-50%);
+    background: ${({ theme }) => theme.colors.accent};
+  }
+`
+
+const Dot = styled.span`
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: ${({ theme }) => theme.colors.accent};
+`
+
+const Heading = styled.h2`
+  font-size: 2.875rem;
+  color: ${({ theme }) => theme.colors.text};
+  margin: 0;
+`
+
+const Timer = styled.div`
+  font-size: ${({ theme }) => theme.typography.timerSize};
+  letter-spacing: 0.08em;
+  color: ${({ theme }) => theme.colors.text};
+`
+
+const BodyText = styled.p`
+  max-width: 230px;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.bodySize};
+`
+
+const ActionBar = styled.div`
+  margin-top: auto;
+  padding-bottom: ${({ theme }) => theme.space.x6};
+`
+
+const ErrorText = styled.p`
+  color: ${({ theme }) => theme.colors.danger};
+`
+
+const Preview = styled.p`
+  line-height: ${({ theme }) => theme.typography.bodyLineHeight};
+`
+
+const Row = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.space.x3};
+`
+
+const ModalOverlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: ${({ theme }) => theme.colors.overlay};
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: ${({ theme }) => theme.space.x3};
+  z-index: 20;
+`
+
+const ModalSheet = styled.section`
+  width: min(${({ theme }) => theme.layout.maxWidth}, 100%);
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => `${theme.radii.xl} ${theme.radii.xl} ${theme.radii.md} ${theme.radii.md}`};
+  padding: ${({ theme }) => theme.space.x4};
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.x3};
+  box-shadow: ${({ theme }) => theme.shadows.sheet};
+  animation: rise-in 220ms ease-out;
+`
 
 export function RecordPage({ navigate }: RecordPageProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -158,10 +291,6 @@ export function RecordPage({ navigate }: RecordPageProps) {
       void uploadRecording(latestRecordingRef.current.blob, latestRecordingRef.current.recordedAt)
       return
     }
-
-    if (event === 'choice-dismissed') {
-      setPhase('stopped')
-    }
   }
 
   const transcriptPreview = useMemo(() => {
@@ -170,120 +299,125 @@ export function RecordPage({ navigate }: RecordPageProps) {
 
   if (phase === 'saving') {
     return (
-      <section className="panel panel-center">
-        <h1>Saving your moment...</h1>
-        <p>We are transcribing and storing your entry.</p>
-      </section>
+      <Card centered>
+        <h2>Saving your moment...</h2>
+        <BodyText>This can take a moment.</BodyText>
+      </Card>
     )
   }
 
   if (phase === 'saved' && savedResult) {
     return (
-      <section className="panel">
-        <h1>Saved</h1>
-        <p className="preview">{transcriptPreview}</p>
-        <div className="row">
-          <button className="button button-primary" onClick={() => navigate(`/memories/${savedResult.id}`)}>
+      <Card>
+        <h2>Saved</h2>
+        <Preview>{transcriptPreview}</Preview>
+        <Row>
+          <Button variant="primary" onClick={() => navigate(`/memories/${savedResult.id}`)}>
             Open Entry
-          </button>
-          <button className="button" onClick={() => navigate('/memories')}>
-            View List
-          </button>
-          <button className="button" onClick={() => setPhase('idle')}>
-            Record Another
-          </button>
-        </div>
-      </section>
+          </Button>
+          <Button onClick={() => navigate('/memories')}>View List</Button>
+          <Button onClick={() => setPhase('idle')}>Record Another</Button>
+        </Row>
+      </Card>
     )
   }
 
   if (phase === 'error') {
     return (
-      <section className="panel">
-        <h1>Could not save moment</h1>
-        <p className="error">{errorMessage}</p>
-        <div className="row">
-          <button className="button button-primary" onClick={retryUpload} disabled={!latestRecordingRef.current}>
+      <Card>
+        <h2>Could not save moment</h2>
+        <ErrorText>{errorMessage}</ErrorText>
+        <Row>
+          <Button variant="primary" onClick={retryUpload} disabled={!latestRecordingRef.current}>
             Retry Upload
-          </button>
-          <button className="button" onClick={() => setPhase('idle')}>
-            Start Over
-          </button>
-        </div>
-      </section>
+          </Button>
+          <Button onClick={() => setPhase('idle')}>Start Over</Button>
+        </Row>
+      </Card>
     )
   }
 
   if (phase === 'recording') {
     return (
-      <section className="panel panel-center">
-        <h1>Recording</h1>
-        <div className="timer">{formatDuration(elapsedSeconds)}</div>
-        <button className="button button-danger" onClick={stopRecording}>
-          Stop
-        </button>
-      </section>
+      <Stage>
+        <Hero>
+          <RingBase $recording>
+            <Dot />
+          </RingBase>
+          <Timer>{formatDuration(elapsedSeconds)}</Timer>
+          <BodyText>Speak naturally. We&apos;ll structure it for you.</BodyText>
+        </Hero>
+        <ActionBar>
+          <Button variant="primary" fullWidth onClick={stopRecording}>
+            Stop Recording
+          </Button>
+        </ActionBar>
+      </Stage>
     )
   }
 
   if (phase === 'stopped') {
     return (
       <>
-        <section className="panel panel-center">
-          <h1>Recording stopped</h1>
-          <p>Choose whether to save or discard this recording.</p>
-          <button className="button button-primary" onClick={() => setStopDecisionState('choice')}>
-            Open Save / Discard
-          </button>
-        </section>
+        <Stage>
+          <Hero>
+            <RingBase $recording={false}>
+              <Dot />
+            </RingBase>
+            <BodyText>Your recording is ready.</BodyText>
+            {stopDecisionState === 'hidden' && (
+              <Button variant="primary" onClick={() => setStopDecisionState('choice')}>
+                Open Save / Discard
+              </Button>
+            )}
+          </Hero>
+        </Stage>
 
         {stopDecisionState !== 'hidden' && (
-          <div className="modal-overlay" role="presentation">
-            <section className="modal-sheet" role="dialog" aria-modal="true">
+          <ModalOverlay role="presentation">
+            <ModalSheet role="dialog" aria-modal="true">
               {stopDecisionState === 'choice' ? (
                 <>
                   <h2>Save this recording?</h2>
-                  <p>You can save now or discard this moment.</p>
-                  <div className="row">
-                    <button className="button button-primary" onClick={() => onStopDecision('save-selected')}>
+                  <BodyText>You can save now or discard this moment.</BodyText>
+                  <Row>
+                    <Button variant="primary" onClick={() => onStopDecision('save-selected')}>
                       Save
-                    </button>
-                    <button className="button" onClick={() => onStopDecision('discard-selected')}>
-                      Discard
-                    </button>
-                    <button className="button" onClick={() => onStopDecision('choice-dismissed')}>
-                      Back
-                    </button>
-                  </div>
+                    </Button>
+                    <Button onClick={() => onStopDecision('discard-selected')}>Discard</Button>
+                    <Button onClick={() => onStopDecision('choice-dismissed')}>Back</Button>
+                  </Row>
                 </>
               ) : (
                 <>
                   <h2>Discard this recording?</h2>
-                  <p>This action cannot be undone.</p>
-                  <div className="row">
-                    <button className="button button-danger" onClick={() => onStopDecision('discard-confirmed')}>
+                  <BodyText>This action cannot be undone.</BodyText>
+                  <Row>
+                    <Button variant="danger" onClick={() => onStopDecision('discard-confirmed')}>
                       Yes, Discard
-                    </button>
-                    <button className="button" onClick={() => onStopDecision('discard-canceled')}>
-                      Cancel
-                    </button>
-                  </div>
+                    </Button>
+                    <Button onClick={() => onStopDecision('discard-canceled')}>Cancel</Button>
+                  </Row>
                 </>
               )}
-            </section>
-          </div>
+            </ModalSheet>
+          </ModalOverlay>
         )}
       </>
     )
   }
 
   return (
-    <section className="panel panel-center">
-      <h1>Record a moment</h1>
-      <p>Capture a short memory and save it as a transcript.</p>
-      <button className="button button-primary button-large" onClick={() => void startRecording()}>
-        Start Recording
-      </button>
-    </section>
+    <Stage>
+      <Hero>
+        <RingButton onClick={() => void startRecording()} aria-label="Start recording">
+          <RingBase $recording={false}>
+            <MicGlyph />
+          </RingBase>
+        </RingButton>
+        <Heading>Record Moment</Heading>
+        <BodyText>Capture today&apos;s memory in under a minute.</BodyText>
+      </Hero>
+    </Stage>
   )
 }

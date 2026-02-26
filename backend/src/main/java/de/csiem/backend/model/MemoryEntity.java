@@ -77,6 +77,7 @@ public class MemoryEntity {
 
     public void markFailed(String message) {
         this.status = MemoryStatus.FAILED;
+        this.transcript = null;
         this.errorMessage = message;
     }
 
