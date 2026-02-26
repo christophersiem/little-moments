@@ -17,6 +17,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -57,6 +58,8 @@ class MemoryControllerIntegrationTests {
             .andExpect(jsonPath("$.transcriptPreview").isNotEmpty())
             .andExpect(jsonPath("$.title").isNotEmpty())
             .andExpect(jsonPath("$.summary").isNotEmpty())
+            .andExpect(jsonPath("$.title").value(not("Today my child stacked four blocks without help.")))
+            .andExpect(jsonPath("$.summary").value(not("Today my child stacked four blocks without help.")))
             .andExpect(jsonPath("$.tags").isArray())
             .andExpect(jsonPath("$.tags", hasItem("Motor Skills")))
             .andReturn();
@@ -217,6 +220,7 @@ class MemoryControllerIntegrationTests {
             .andExpect(jsonPath("$.id").value(id))
             .andExpect(jsonPath("$.title").value("Said 'No!' for the First Time"))
             .andExpect(jsonPath("$.summary").isNotEmpty())
+            .andExpect(jsonPath("$.summary").value(not("When asked if she wanted more peas, Mila looked me in the eye and said no with confidence.")))
             .andExpect(jsonPath("$.transcript").value("When asked if she wanted more peas, Mila looked me in the eye and said no with confidence."))
             .andExpect(jsonPath("$.tags", hasItem("Language")))
             .andExpect(jsonPath("$.tags", hasItem("Milestone")));
