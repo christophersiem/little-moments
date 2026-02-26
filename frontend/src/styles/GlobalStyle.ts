@@ -19,11 +19,9 @@ export const GlobalStyle = createGlobalStyle`
     font-family: ${({ theme }) => theme.typography.bodyFamily};
     font-size: ${({ theme }) => theme.typography.bodySize};
     color: ${({ theme }) => theme.colors.text};
-    background:
-      radial-gradient(circle at 0% 0%, ${({ theme }) => theme.colors.backgroundGlowStart} 0%, transparent 45%),
-      radial-gradient(circle at 100% 100%, ${({ theme }) => theme.colors.backgroundGlowEnd} 0%, transparent 40%),
-      linear-gradient(160deg, ${({ theme }) => theme.colors.background}, ${({ theme }) => theme.colors.backgroundAlt});
-    background-attachment: fixed;
+    background: linear-gradient(180deg, ${({ theme }) => theme.colors.background}, ${({ theme }) => theme.colors.backgroundAlt});
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   h1,

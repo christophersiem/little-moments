@@ -5,6 +5,7 @@
   --space-4: 16px;
   --space-5: 24px;
   --space-6: 32px;
+  --space-7: 48px;
 
   --radius-sm: 10px;
   --radius-md: 12px;
@@ -14,34 +15,34 @@
 
   --font-family-body: "Avenir Next", "Gill Sans", "Trebuchet MS", sans-serif;
   --font-family-heading: "Iowan Old Style", "Palatino Linotype", serif;
-  --font-size-h1: 1.5rem;
+  --font-size-h1: 2rem;
   --font-size-h2: 1.0625rem;
   --font-size-body: 1rem;
   --font-size-secondary: 0.875rem;
-  --font-size-timer: 3rem;
+  --font-size-timer: 3.25rem;
   --line-height-body: 1.5;
   --line-height-relaxed: 1.6;
 
-  --color-bg: #f6efe4;
-  --color-bg-alt: #ecdfcf;
-  --color-bg-glow-start: #d8e4d7;
-  --color-bg-glow-end: #edd8bc;
-  --color-surface: rgba(255, 255, 255, 0.86);
-  --color-surface-strong: rgba(255, 255, 255, 0.94);
-  --color-border: rgba(55, 69, 61, 0.16);
-  --color-text: #23302e;
-  --color-text-muted: #596a65;
-  --color-accent: #355f50;
-  --color-accent-strong: #27473b;
-  --color-danger: #a6483e;
-  --color-on-accent: #f8f5ef;
-  --color-overlay: rgba(19, 29, 27, 0.34);
+  --color-bg: #f3f1ef;
+  --color-bg-alt: #f3f1ef;
+  --color-bg-glow-start: #f3f1ef;
+  --color-bg-glow-end: #f3f1ef;
+  --color-surface: #f8f5f2;
+  --color-surface-strong: #fbf9f7;
+  --color-border: #e7e1dc;
+  --color-text: #433931;
+  --color-text-muted: #8f8378;
+  --color-accent: #c49a76;
+  --color-accent-strong: #ad8564;
+  --color-danger: #b35c55;
+  --color-on-accent: #fff9f4;
+  --color-overlay: rgba(51, 41, 33, 0.26);
 
-  --shadow-card: 0 10px 24px rgba(28, 41, 38, 0.08);
-  --shadow-sheet: 0 16px 36px rgba(20, 33, 32, 0.16);
+  --shadow-card: 0 4px 14px rgba(48, 39, 33, 0.05);
+  --shadow-sheet: 0 14px 28px rgba(48, 39, 33, 0.13);
 
-  --layout-max-width: 560px;
+  --layout-max-width: 430px;
   --layout-min-touch-target: 44px;
   --layout-primary-button-height: 48px;
-  --layout-center-card-min-height: 360px;
+  --layout-center-card-min-height: 320px;
 }

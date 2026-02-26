@@ -9,6 +9,7 @@ declare module 'styled-components' {
       x4: string
       x5: string
       x6: string
+      x7: string
     }
     radii: {
       sm: string

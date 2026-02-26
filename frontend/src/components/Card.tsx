@@ -9,11 +9,11 @@ const CardContainer = styled.section<CardContainerProps>`
   width: 100%;
   background: ${({ theme }) => theme.colors.surface};
   border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: ${({ theme }) => theme.radii.xl};
-  padding: ${({ theme }) => theme.space.x5};
+  border-radius: ${({ theme }) => theme.radii.lg};
+  padding: ${({ theme }) => theme.space.x4};
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.space.x4};
+  gap: ${({ theme }) => theme.space.x3};
   box-shadow: ${({ theme }) => theme.shadows.card};
   animation: rise-in 240ms ease-out;
 

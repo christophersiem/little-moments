@@ -22,31 +22,104 @@ interface RecordingPayload {
   recordedAt: string
 }
 
-const CenterCard = styled(Card)`
+const Stage = styled.section`
+  width: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+`
+
+const Hero = styled.div`
+  margin-top: clamp(72px, 17vh, 150px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: ${({ theme }) => theme.space.x4};
+`
+
+const RingBase = styled.div<{ $recording: boolean }>`
+  width: 138px;
+  height: 138px;
+  border-radius: 50%;
+  border: 6px solid ${({ theme }) => theme.colors.accent};
+  display: flex;
   align-items: center;
   justify-content: center;
-  text-align: center;
+  background: ${({ theme }) => theme.colors.background};
+  ${({ $recording, theme }) =>
+    $recording ? `box-shadow: 0 0 0 7px ${theme.colors.surface};` : 'box-shadow: none;'}
+`
+
+const RingButton = styled.button`
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 50%;
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
+    outline-offset: 4px;
+  }
+`
+
+const MicGlyph = styled.span`
+  width: 16px;
+  height: 22px;
+  border: 2px solid ${({ theme }) => theme.colors.accent};
+  border-radius: 10px;
+  position: relative;
+  display: inline-block;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: -8px;
+    width: 2px;
+    height: 8px;
+    transform: translateX(-50%);
+    background: ${({ theme }) => theme.colors.accent};
+  }
+`
+
+const Dot = styled.span`
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: ${({ theme }) => theme.colors.accent};
+`
+
+const Heading = styled.h2`
+  font-size: 2.875rem;
+  color: ${({ theme }) => theme.colors.text};
+  margin: 0;
 `
 
 const Timer = styled.div`
   font-size: ${({ theme }) => theme.typography.timerSize};
-  font-weight: 700;
   letter-spacing: 0.08em;
-  color: ${({ theme }) => theme.colors.accentStrong};
+  color: ${({ theme }) => theme.colors.text};
 `
 
-const Preview = styled.p`
+const BodyText = styled.p`
+  max-width: 230px;
+  color: ${({ theme }) => theme.colors.textMuted};
   font-size: ${({ theme }) => theme.typography.bodySize};
-  line-height: ${({ theme }) => theme.typography.bodyLineHeight};
+`
+
+const ActionBar = styled.div`
+  margin-top: auto;
+  padding-bottom: ${({ theme }) => theme.space.x6};
 `
 
 const ErrorText = styled.p`
   color: ${({ theme }) => theme.colors.danger};
-  line-height: ${({ theme }) => theme.typography.bodyLineHeight};
 `
 
-const BodyText = styled.p`
-  color: ${({ theme }) => theme.colors.textMuted};
+const Preview = styled.p`
+  line-height: ${({ theme }) => theme.typography.bodyLineHeight};
 `
 
 const Row = styled.div`
@@ -218,10 +291,6 @@ export function RecordPage({ navigate }: RecordPageProps) {
       void uploadRecording(latestRecordingRef.current.blob, latestRecordingRef.current.recordedAt)
       return
     }
-
-    if (event === 'choice-dismissed') {
-      setPhase('stopped')
-    }
   }
 
   const transcriptPreview = useMemo(() => {
@@ -230,17 +299,17 @@ export function RecordPage({ navigate }: RecordPageProps) {
 
   if (phase === 'saving') {
     return (
-      <CenterCard centered>
-        <h1>Saving your moment...</h1>
-        <BodyText>We are transcribing and storing your entry.</BodyText>
-      </CenterCard>
+      <Card centered>
+        <h2>Saving your moment...</h2>
+        <BodyText>This can take a moment.</BodyText>
+      </Card>
     )
   }
 
   if (phase === 'saved' && savedResult) {
     return (
       <Card>
-        <h1>Saved</h1>
+        <h2>Saved</h2>
         <Preview>{transcriptPreview}</Preview>
         <Row>
           <Button variant="primary" onClick={() => navigate(`/memories/${savedResult.id}`)}>
@@ -256,7 +325,7 @@ export function RecordPage({ navigate }: RecordPageProps) {
   if (phase === 'error') {
     return (
       <Card>
-        <h1>Could not save moment</h1>
+        <h2>Could not save moment</h2>
         <ErrorText>{errorMessage}</ErrorText>
         <Row>
           <Button variant="primary" onClick={retryUpload} disabled={!latestRecordingRef.current}>
@@ -270,26 +339,39 @@ export function RecordPage({ navigate }: RecordPageProps) {
 
   if (phase === 'recording') {
     return (
-      <CenterCard centered>
-        <h1>Recording</h1>
-        <Timer>{formatDuration(elapsedSeconds)}</Timer>
-        <Button variant="danger" onClick={stopRecording}>
-          Stop
-        </Button>
-      </CenterCard>
+      <Stage>
+        <Hero>
+          <RingBase $recording>
+            <Dot />
+          </RingBase>
+          <Timer>{formatDuration(elapsedSeconds)}</Timer>
+          <BodyText>Speak naturally. We&apos;ll structure it for you.</BodyText>
+        </Hero>
+        <ActionBar>
+          <Button variant="primary" fullWidth onClick={stopRecording}>
+            Stop Recording
+          </Button>
+        </ActionBar>
+      </Stage>
     )
   }
 
   if (phase === 'stopped') {
     return (
       <>
-        <CenterCard centered>
-          <h1>Recording stopped</h1>
-          <BodyText>Choose whether to save or discard this recording.</BodyText>
-          <Button variant="primary" onClick={() => setStopDecisionState('choice')}>
-            Open Save / Discard
-          </Button>
-        </CenterCard>
+        <Stage>
+          <Hero>
+            <RingBase $recording={false}>
+              <Dot />
+            </RingBase>
+            <BodyText>Your recording is ready.</BodyText>
+            {stopDecisionState === 'hidden' && (
+              <Button variant="primary" onClick={() => setStopDecisionState('choice')}>
+                Open Save / Discard
+              </Button>
+            )}
+          </Hero>
+        </Stage>
 
         {stopDecisionState !== 'hidden' && (
           <ModalOverlay role="presentation">
@@ -326,12 +408,16 @@ export function RecordPage({ navigate }: RecordPageProps) {
   }
 
   return (
-    <CenterCard centered>
-      <h1>Record a moment</h1>
-      <BodyText>Capture a short memory and save it as a transcript.</BodyText>
-      <Button variant="primary" onClick={() => void startRecording()}>
-        Start Recording
-      </Button>
-    </CenterCard>
+    <Stage>
+      <Hero>
+        <RingButton onClick={() => void startRecording()} aria-label="Start recording">
+          <RingBase $recording={false}>
+            <MicGlyph />
+          </RingBase>
+        </RingButton>
+        <Heading>Record Moment</Heading>
+        <BodyText>Capture today&apos;s memory in under a minute.</BodyText>
+      </Hero>
+    </Stage>
   )
 }

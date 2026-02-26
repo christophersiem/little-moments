@@ -8,6 +8,7 @@ export const theme: DefaultTheme = {
     x4: 'var(--space-4)',
     x5: 'var(--space-5)',
     x6: 'var(--space-6)',
+    x7: 'var(--space-7)',
   },
   radii: {
     sm: 'var(--radius-sm)',
