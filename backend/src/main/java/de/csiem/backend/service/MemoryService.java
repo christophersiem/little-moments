@@ -13,10 +13,13 @@ import de.csiem.backend.model.UserEntity;
 import de.csiem.backend.repository.MemoryRepository;
 import de.csiem.backend.repository.UserRepository;
 import de.csiem.backend.service.transcription.TranscriptionService;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +29,7 @@ import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -129,16 +133,30 @@ public class MemoryService {
             }
         }
 
-        Set<MemoryTag> tagsForQuery = resolvedTags.isEmpty() ? Set.of(MemoryTag.GROWTH) : resolvedTags;
+        UUID userId = appProperties.getDefaultUserId();
+        Instant fromFilter = fromInstant;
+        Instant toFilter = toInstant;
+        Set<MemoryTag> tagFilter = Set.copyOf(resolvedTags);
 
-        Page<MemoryEntity> result = memoryRepository.findByUserWithFilters(
-            appProperties.getDefaultUserId(),
-            fromInstant,
-            toInstant,
-            tagsForQuery,
-            resolvedTags.isEmpty(),
-            pageable
-        );
+        Specification<MemoryEntity> specification = (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(criteriaBuilder.equal(root.get("user").get("id"), userId));
+
+            if (fromFilter != null) {
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("recordedAt"), fromFilter));
+            }
+            if (toFilter != null) {
+                predicates.add(criteriaBuilder.lessThan(root.get("recordedAt"), toFilter));
+            }
+            if (!tagFilter.isEmpty()) {
+                predicates.add(root.joinSet("tags", JoinType.INNER).in(tagFilter));
+                query.distinct(true);
+            }
+
+            return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
+        };
+
+        Page<MemoryEntity> result = memoryRepository.findAll(specification, pageable);
 
         List<MemoryListItemResponse> items = result.getContent().stream()
             .map(memory -> MemoryMapper.toMemoryListItemResponse(memory, snippet(memory.getTranscript())))
