@@ -1,10 +1,35 @@
 export type MemoryStatus = 'PROCESSING' | 'READY' | 'FAILED'
+export type MemoryTag =
+  | 'Language'
+  | 'Motor Skills'
+  | 'Emotional'
+  | 'Social'
+  | 'Milestone'
+  | 'Play'
+  | 'Family'
+  | 'Funny'
+  | 'Growth'
+  | 'Challenge'
+
+export const MEMORY_TAG_OPTIONS: MemoryTag[] = [
+  'Language',
+  'Motor Skills',
+  'Emotional',
+  'Social',
+  'Milestone',
+  'Play',
+  'Family',
+  'Funny',
+  'Growth',
+  'Challenge',
+]
 
 export interface CreateMemoryResponse {
   id: string
   status: MemoryStatus
   errorMessage: string | null
   transcriptPreview: string | null
+  tags: MemoryTag[]
 }
 
 export interface MemoryListItem {
@@ -13,6 +38,7 @@ export interface MemoryListItem {
   recordedAt: string
   status: MemoryStatus
   transcriptSnippet: string
+  tags: MemoryTag[]
 }
 
 export interface MemoriesListResponse {
@@ -30,4 +56,5 @@ export interface Memory {
   status: MemoryStatus
   transcript: string | null
   errorMessage: string | null
+  tags: MemoryTag[]
 }

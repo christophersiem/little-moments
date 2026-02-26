@@ -3,6 +3,7 @@ package de.csiem.backend.dto;
 import de.csiem.backend.model.MemoryStatus;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public record MemoryResponse(
@@ -11,6 +12,7 @@ public record MemoryResponse(
     Instant recordedAt,
     MemoryStatus status,
     String transcript,
-    String errorMessage
+    String errorMessage,
+    List<String> tags
 ) {
 }

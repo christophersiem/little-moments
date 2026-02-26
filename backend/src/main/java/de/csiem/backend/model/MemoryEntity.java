@@ -1,6 +1,8 @@
 package de.csiem.backend.model;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -13,6 +15,8 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -45,6 +49,12 @@ public class MemoryEntity {
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "memory_tags", joinColumns = @JoinColumn(name = "memory_id"))
+    @Column(name = "tag", nullable = false, length = 32)
+    @Enumerated(EnumType.STRING)
+    private Set<MemoryTag> tags = new LinkedHashSet<>();
+
     protected MemoryEntity() {
     }
 
@@ -69,16 +79,21 @@ public class MemoryEntity {
         updatedAt = Instant.now();
     }
 
-    public void markReady(String transcriptText) {
+    public void markReady(String transcriptText, Set<MemoryTag> detectedTags) {
         this.status = MemoryStatus.READY;
         this.transcript = transcriptText;
         this.errorMessage = null;
+        this.tags.clear();
+        if (detectedTags != null && !detectedTags.isEmpty()) {
+            this.tags.addAll(detectedTags);
+        }
     }
 
     public void markFailed(String message) {
         this.status = MemoryStatus.FAILED;
         this.transcript = null;
         this.errorMessage = message;
+        this.tags.clear();
     }
 
     public UUID getId() {
@@ -115,5 +130,9 @@ public class MemoryEntity {
 
     public String getErrorMessage() {
         return errorMessage;
+    }
+
+    public Set<MemoryTag> getTags() {
+        return tags;
     }
 }

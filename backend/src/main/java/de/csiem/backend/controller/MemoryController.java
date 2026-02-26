@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import java.util.List;
 import java.util.UUID;
 
 import static org.springframework.http.HttpStatus.CREATED;
@@ -39,9 +40,11 @@ public class MemoryController {
     @GetMapping
     public MemoryListResponse getMemories(
         @RequestParam(value = "page", defaultValue = "0") int page,
-        @RequestParam(value = "size", defaultValue = "20") int size
+        @RequestParam(value = "size", defaultValue = "20") int size,
+        @RequestParam(value = "month", required = false) String month,
+        @RequestParam(value = "tags", required = false) List<String> tags
     ) {
-        return memoryService.getMemories(page, size);
+        return memoryService.getMemories(page, size, month, tags);
     }
 
     @GetMapping("/{id}")

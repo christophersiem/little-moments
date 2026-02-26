@@ -30,6 +30,21 @@ const Transcript = styled.p`
   line-height: ${({ theme }) => theme.typography.relaxedLineHeight};
 `
 
+const TagRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.space.x2};
+`
+
+const TagChip = styled.span`
+  padding: ${({ theme }) => `${theme.space.x1} ${theme.space.x2}`};
+  border-radius: ${({ theme }) => theme.radii.pill};
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  color: ${({ theme }) => theme.colors.accentStrong};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  font-size: 0.75rem;
+`
+
 const ErrorText = styled.p`
   color: ${({ theme }) => theme.colors.danger};
   line-height: ${({ theme }) => theme.typography.bodyLineHeight};
@@ -62,6 +77,13 @@ export function MemoryDetailPage({ memoryId, navigate }: MemoryDetailPageProps) 
       <h1>Memory</h1>
       <DateText>{formatDateTime(memory.recordedAt || memory.createdAt)}</DateText>
       <StatusText>Status: {memory.status}</StatusText>
+      {memory.tags.length > 0 && (
+        <TagRow>
+          {memory.tags.map((tag) => (
+            <TagChip key={`${memory.id}-${tag}`}>{tag}</TagChip>
+          ))}
+        </TagRow>
+      )}
       {memory.status === 'FAILED' ? (
         <ErrorText>{memory.errorMessage || 'Transcription failed.'}</ErrorText>
       ) : (

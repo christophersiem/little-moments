@@ -4,6 +4,10 @@ import de.csiem.backend.dto.CreateMemoryResponse;
 import de.csiem.backend.dto.MemoryListItemResponse;
 import de.csiem.backend.dto.MemoryResponse;
 import de.csiem.backend.model.MemoryEntity;
+import de.csiem.backend.model.MemoryTag;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 final class MemoryMapper {
 
@@ -15,7 +19,8 @@ final class MemoryMapper {
             memory.getId(),
             memory.getStatus(),
             memory.getErrorMessage(),
-            transcriptPreview
+            transcriptPreview,
+            toTagLabels(memory)
         );
     }
 
@@ -25,7 +30,8 @@ final class MemoryMapper {
             memory.getCreatedAt(),
             memory.getRecordedAt(),
             memory.getStatus(),
-            transcriptSnippet
+            transcriptSnippet,
+            toTagLabels(memory)
         );
     }
 
@@ -36,7 +42,15 @@ final class MemoryMapper {
             memory.getRecordedAt(),
             memory.getStatus(),
             memory.getTranscript(),
-            memory.getErrorMessage()
+            memory.getErrorMessage(),
+            toTagLabels(memory)
         );
+    }
+
+    private static List<String> toTagLabels(MemoryEntity memory) {
+        return memory.getTags().stream()
+            .sorted()
+            .map(MemoryTag::label)
+            .collect(Collectors.toList());
     }
 }
