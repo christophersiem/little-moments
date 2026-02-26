@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createMemory } from '../features/memories/api'
+import {
+  transitionStopDecision,
+  type StopDecisionEvent,
+  type StopDecisionState,
+} from '../features/memories/stopDecisionMachine'
 import type { CreateMemoryResponse } from '../features/memories/types'
 import { formatDuration } from '../lib/utils'
 
@@ -7,7 +12,7 @@ interface RecordPageProps {
   navigate: (nextPath: string) => void
 }
 
-type RecordPhase = 'idle' | 'recording' | 'saving' | 'saved' | 'error'
+type RecordPhase = 'idle' | 'recording' | 'stopped' | 'saving' | 'saved' | 'error'
 
 interface RecordingPayload {
   blob: Blob
@@ -22,6 +27,7 @@ export function RecordPage({ navigate }: RecordPageProps) {
   const intervalRef = useRef<number | null>(null)
 
   const [phase, setPhase] = useState<RecordPhase>('idle')
+  const [stopDecisionState, setStopDecisionState] = useState<StopDecisionState>('hidden')
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [errorMessage, setErrorMessage] = useState('')
   const [savedResult, setSavedResult] = useState<CreateMemoryResponse | null>(null)
@@ -73,7 +79,6 @@ export function RecordPage({ navigate }: RecordPageProps) {
       return
     }
     stopTimer()
-    setPhase('saving')
     recorder.stop()
   }
 
@@ -107,7 +112,8 @@ export function RecordPage({ navigate }: RecordPageProps) {
         const recordingEndedAt = new Date().toISOString()
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' })
         latestRecordingRef.current = { blob, recordedAt: recordingEndedAt }
-        void uploadRecording(blob, recordingEndedAt)
+        setPhase('stopped')
+        setStopDecisionState(transitionStopDecision('hidden', 'recording-stopped').state)
       }
 
       recorder.start(300)
@@ -128,6 +134,34 @@ export function RecordPage({ navigate }: RecordPageProps) {
       return
     }
     void uploadRecording(latestRecordingRef.current.blob, latestRecordingRef.current.recordedAt)
+  }
+
+  const onStopDecision = (event: StopDecisionEvent) => {
+    const transition = transitionStopDecision(stopDecisionState, event)
+    setStopDecisionState(transition.state)
+
+    if (transition.shouldDeleteLocalAudio) {
+      latestRecordingRef.current = null
+      chunksRef.current = []
+      setPhase('idle')
+      setElapsedSeconds(0)
+      setErrorMessage('')
+      return
+    }
+
+    if (transition.shouldUpload) {
+      if (!latestRecordingRef.current) {
+        setErrorMessage('No recording found to save.')
+        setPhase('error')
+        return
+      }
+      void uploadRecording(latestRecordingRef.current.blob, latestRecordingRef.current.recordedAt)
+      return
+    }
+
+    if (event === 'choice-dismissed') {
+      setPhase('stopped')
+    }
   }
 
   const transcriptPreview = useMemo(() => {
@@ -189,6 +223,57 @@ export function RecordPage({ navigate }: RecordPageProps) {
           Stop
         </button>
       </section>
+    )
+  }
+
+  if (phase === 'stopped') {
+    return (
+      <>
+        <section className="panel panel-center">
+          <h1>Recording stopped</h1>
+          <p>Choose whether to save or discard this recording.</p>
+          <button className="button button-primary" onClick={() => setStopDecisionState('choice')}>
+            Open Save / Discard
+          </button>
+        </section>
+
+        {stopDecisionState !== 'hidden' && (
+          <div className="modal-overlay" role="presentation">
+            <section className="modal-sheet" role="dialog" aria-modal="true">
+              {stopDecisionState === 'choice' ? (
+                <>
+                  <h2>Save this recording?</h2>
+                  <p>You can save now or discard this moment.</p>
+                  <div className="row">
+                    <button className="button button-primary" onClick={() => onStopDecision('save-selected')}>
+                      Save
+                    </button>
+                    <button className="button" onClick={() => onStopDecision('discard-selected')}>
+                      Discard
+                    </button>
+                    <button className="button" onClick={() => onStopDecision('choice-dismissed')}>
+                      Back
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h2>Discard this recording?</h2>
+                  <p>This action cannot be undone.</p>
+                  <div className="row">
+                    <button className="button button-danger" onClick={() => onStopDecision('discard-confirmed')}>
+                      Yes, Discard
+                    </button>
+                    <button className="button" onClick={() => onStopDecision('discard-canceled')}>
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              )}
+            </section>
+          </div>
+        )}
+      </>
     )
   }
 
