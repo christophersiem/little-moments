@@ -16,10 +16,11 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -54,6 +55,8 @@ class MemoryControllerIntegrationTests {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.status").value("READY"))
             .andExpect(jsonPath("$.transcriptPreview").isNotEmpty())
+            .andExpect(jsonPath("$.title").isNotEmpty())
+            .andExpect(jsonPath("$.summary").isNotEmpty())
             .andExpect(jsonPath("$.tags").isArray())
             .andExpect(jsonPath("$.tags", hasItem("Motor Skills")))
             .andReturn();
@@ -64,12 +67,15 @@ class MemoryControllerIntegrationTests {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.items[0].id").value(id))
             .andExpect(jsonPath("$.items[0].status").value("READY"))
+            .andExpect(jsonPath("$.items[0].title").isNotEmpty())
             .andExpect(jsonPath("$.items[0].tags", hasItem("Motor Skills")));
 
         mockMvc.perform(get("/api/memories/{id}", id))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.id").value(id))
             .andExpect(jsonPath("$.status").value("READY"))
+            .andExpect(jsonPath("$.title").isNotEmpty())
+            .andExpect(jsonPath("$.summary").isNotEmpty())
             .andExpect(jsonPath("$.transcript").value("Today my child stacked four blocks without help."))
             .andExpect(jsonPath("$.tags", hasItem("Motor Skills")));
     }
@@ -89,6 +95,8 @@ class MemoryControllerIntegrationTests {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.status").value("FAILED"))
             .andExpect(jsonPath("$.errorMessage").value("Provider unavailable"))
+            .andExpect(jsonPath("$.title").value(nullValue()))
+            .andExpect(jsonPath("$.summary").value(nullValue()))
             .andExpect(jsonPath("$.tags").isArray())
             .andExpect(jsonPath("$.tags").isEmpty())
             .andReturn();
@@ -98,6 +106,8 @@ class MemoryControllerIntegrationTests {
         mockMvc.perform(get("/api/memories/{id}", id))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("FAILED"))
+            .andExpect(jsonPath("$.title").value(nullValue()))
+            .andExpect(jsonPath("$.summary").value(nullValue()))
             .andExpect(jsonPath("$.transcript").value(nullValue()))
             .andExpect(jsonPath("$.errorMessage").value("Provider unavailable"))
             .andExpect(jsonPath("$.tags").isArray())
@@ -107,6 +117,7 @@ class MemoryControllerIntegrationTests {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.items[0].id").value(id))
             .andExpect(jsonPath("$.items[0].status").value("FAILED"))
+            .andExpect(jsonPath("$.items[0].title").value(nullValue()))
             .andExpect(jsonPath("$.items[0].transcriptSnippet").value(""))
             .andExpect(jsonPath("$.items[0].tags").isArray())
             .andExpect(jsonPath("$.items[0].tags").isEmpty());
@@ -166,6 +177,49 @@ class MemoryControllerIntegrationTests {
         mockMvc.perform(get("/api/memories/{id}", janId))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.id").value(janId));
+    }
+
+    @Test
+    void updatesTitleTranscriptAndTagsAndRegeneratesSummary() throws Exception {
+        stubTranscriptionService.setFailure(null);
+        stubTranscriptionService.setTranscript("She said no with confidence.");
+
+        MockMultipartFile audioFile = new MockMultipartFile(
+            "audio",
+            "moment.webm",
+            "audio/webm",
+            "fake-audio".getBytes()
+        );
+
+        MvcResult createResult = mockMvc.perform(
+                multipart("/api/memories")
+                    .file(audioFile)
+                    .param("recordedAt", "2026-01-30T10:00:00Z")
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+            )
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        String id = extractId(createResult.getResponse().getContentAsString());
+
+        mockMvc.perform(
+                patch("/api/memories/{id}", id)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "title": "Said 'No!' for the First Time",
+                          "transcript": "When asked if she wanted more peas, Mila looked me in the eye and said no with confidence.",
+                          "tags": ["Language", "Milestone"]
+                        }
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value(id))
+            .andExpect(jsonPath("$.title").value("Said 'No!' for the First Time"))
+            .andExpect(jsonPath("$.summary").isNotEmpty())
+            .andExpect(jsonPath("$.transcript").value("When asked if she wanted more peas, Mila looked me in the eye and said no with confidence."))
+            .andExpect(jsonPath("$.tags", hasItem("Language")))
+            .andExpect(jsonPath("$.tags", hasItem("Milestone")));
     }
 
     @TestConfiguration

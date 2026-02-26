@@ -11,6 +11,8 @@ public record MemoryResponse(
     Instant createdAt,
     Instant recordedAt,
     MemoryStatus status,
+    String title,
+    String summary,
     String transcript,
     String errorMessage,
     List<String> tags

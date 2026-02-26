@@ -42,6 +42,12 @@ public class MemoryEntity {
     @Column(name = "transcript", columnDefinition = "TEXT")
     private String transcript;
 
+    @Column(name = "title", length = 255)
+    private String title;
+
+    @Column(name = "summary", columnDefinition = "TEXT")
+    private String summary;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private MemoryStatus status;
@@ -79,9 +85,16 @@ public class MemoryEntity {
         updatedAt = Instant.now();
     }
 
-    public void markReady(String transcriptText, Set<MemoryTag> detectedTags) {
+    public void markReady(
+        String transcriptText,
+        Set<MemoryTag> detectedTags,
+        String generatedTitle,
+        String generatedSummary
+    ) {
         this.status = MemoryStatus.READY;
         this.transcript = transcriptText;
+        this.title = generatedTitle;
+        this.summary = generatedSummary;
         this.errorMessage = null;
         this.tags.clear();
         if (detectedTags != null && !detectedTags.isEmpty()) {
@@ -92,8 +105,26 @@ public class MemoryEntity {
     public void markFailed(String message) {
         this.status = MemoryStatus.FAILED;
         this.transcript = null;
+        this.title = null;
+        this.summary = null;
         this.errorMessage = message;
         this.tags.clear();
+    }
+
+    public void updateTitle(String nextTitle) {
+        this.title = nextTitle;
+    }
+
+    public void updateTranscriptAndSummary(String nextTranscript, String nextSummary) {
+        this.transcript = nextTranscript;
+        this.summary = nextSummary;
+    }
+
+    public void replaceTags(Set<MemoryTag> nextTags) {
+        this.tags.clear();
+        if (nextTags != null && !nextTags.isEmpty()) {
+            this.tags.addAll(nextTags);
+        }
     }
 
     public UUID getId() {
@@ -122,6 +153,14 @@ public class MemoryEntity {
 
     public String getTranscript() {
         return transcript;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public String getSummary() {
+        return summary;
     }
 
     public MemoryStatus getStatus() {

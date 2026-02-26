@@ -102,7 +102,7 @@ const TagChip = styled.span`
 
 export function MemoryListItemCard({ item, isLastInGroup, onOpen }: MemoryListItemCardProps) {
   const eventDate = item.recordedAt || item.createdAt
-  const title = item.transcriptSnippet || (item.status === 'FAILED' ? 'Transcription failed' : 'Processing...')
+  const title = item.title || item.transcriptSnippet || (item.status === 'FAILED' ? 'Transcription failed' : 'Processing...')
 
   return (
     <RowButton onClick={() => onOpen(item.id)}>

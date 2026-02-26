@@ -11,6 +11,7 @@ public record MemoryListItemResponse(
     Instant createdAt,
     Instant recordedAt,
     MemoryStatus status,
+    String title,
     String transcriptSnippet,
     List<String> tags
 ) {

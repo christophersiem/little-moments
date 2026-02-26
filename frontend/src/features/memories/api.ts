@@ -1,5 +1,5 @@
 import { API_BASE, getApiErrorMessage, parseJsonSafe } from '../../lib/apiClient'
-import type { CreateMemoryResponse, MemoriesListResponse, Memory } from './types'
+import type { CreateMemoryResponse, MemoriesListResponse, Memory, UpdateMemoryRequest } from './types'
 
 export async function createMemory(audioBlob: Blob, recordedAtIso: string): Promise<CreateMemoryResponse> {
   const extension = audioBlob.type.includes('mp4') ? 'm4a' : 'webm'
@@ -49,6 +49,26 @@ export async function getMemory(memoryId: string): Promise<Memory> {
   }
   if (!payload) {
     throw new Error('Memory details were empty.')
+  }
+
+  return payload
+}
+
+export async function updateMemory(memoryId: string, request: UpdateMemoryRequest): Promise<Memory> {
+  const response = await fetch(`${API_BASE}/memories/${memoryId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  })
+
+  const payload = await parseJsonSafe<Memory>(response)
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(payload) ?? `Update failed (${response.status})`)
+  }
+  if (!payload) {
+    throw new Error('Memory update returned an empty response.')
   }
 
   return payload

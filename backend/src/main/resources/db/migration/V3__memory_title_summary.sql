@@ -1,0 +1,5 @@
+ALTER TABLE memories
+    ADD COLUMN IF NOT EXISTS title VARCHAR(255);
+
+ALTER TABLE memories
+    ADD COLUMN IF NOT EXISTS summary TEXT;

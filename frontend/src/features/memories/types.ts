@@ -29,6 +29,8 @@ export interface CreateMemoryResponse {
   status: MemoryStatus
   errorMessage: string | null
   transcriptPreview: string | null
+  title: string | null
+  summary: string | null
   tags: MemoryTag[]
 }
 
@@ -37,6 +39,7 @@ export interface MemoryListItem {
   createdAt: string
   recordedAt: string
   status: MemoryStatus
+  title: string | null
   transcriptSnippet: string
   tags: MemoryTag[]
 }
@@ -54,7 +57,15 @@ export interface Memory {
   createdAt: string
   recordedAt: string
   status: MemoryStatus
+  title: string | null
+  summary: string | null
   transcript: string | null
   errorMessage: string | null
   tags: MemoryTag[]
+}
+
+export interface UpdateMemoryRequest {
+  title?: string
+  transcript?: string
+  tags?: MemoryTag[]
 }

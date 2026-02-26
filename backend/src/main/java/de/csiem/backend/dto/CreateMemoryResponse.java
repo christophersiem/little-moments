@@ -10,6 +10,8 @@ public record CreateMemoryResponse(
     MemoryStatus status,
     String errorMessage,
     String transcriptPreview,
+    String title,
+    String summary,
     List<String> tags
 ) {
 }

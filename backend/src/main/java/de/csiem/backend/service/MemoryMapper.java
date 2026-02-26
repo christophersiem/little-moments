@@ -20,6 +20,8 @@ final class MemoryMapper {
             memory.getStatus(),
             memory.getErrorMessage(),
             transcriptPreview,
+            memory.getTitle(),
+            memory.getSummary(),
             toTagLabels(memory)
         );
     }
@@ -30,6 +32,7 @@ final class MemoryMapper {
             memory.getCreatedAt(),
             memory.getRecordedAt(),
             memory.getStatus(),
+            memory.getTitle(),
             transcriptSnippet,
             toTagLabels(memory)
         );
@@ -41,6 +44,8 @@ final class MemoryMapper {
             memory.getCreatedAt(),
             memory.getRecordedAt(),
             memory.getStatus(),
+            memory.getTitle(),
+            memory.getSummary(),
             memory.getTranscript(),
             memory.getErrorMessage(),
             toTagLabels(memory)

@@ -6,6 +6,7 @@ import de.csiem.backend.dto.CreateMemoryResponse;
 import de.csiem.backend.dto.MemoryListItemResponse;
 import de.csiem.backend.dto.MemoryListResponse;
 import de.csiem.backend.dto.MemoryResponse;
+import de.csiem.backend.dto.UpdateMemoryRequest;
 import de.csiem.backend.model.MemoryEntity;
 import de.csiem.backend.model.MemoryStatus;
 import de.csiem.backend.model.MemoryTag;
@@ -49,6 +50,7 @@ public class MemoryService {
     private final UserRepository userRepository;
     private final TranscriptionService transcriptionService;
     private final MemoryTaggingService memoryTaggingService;
+    private final MemoryInsightsService memoryInsightsService;
     private final AppProperties appProperties;
 
     public MemoryService(
@@ -56,12 +58,14 @@ public class MemoryService {
         UserRepository userRepository,
         TranscriptionService transcriptionService,
         MemoryTaggingService memoryTaggingService,
+        MemoryInsightsService memoryInsightsService,
         AppProperties appProperties
     ) {
         this.memoryRepository = memoryRepository;
         this.userRepository = userRepository;
         this.transcriptionService = transcriptionService;
         this.memoryTaggingService = memoryTaggingService;
+        this.memoryInsightsService = memoryInsightsService;
         this.appProperties = appProperties;
     }
 
@@ -88,7 +92,13 @@ public class MemoryService {
                 Optional.ofNullable(audio.getOriginalFilename()).orElse("recording.webm"),
                 Optional.ofNullable(audio.getContentType()).orElse(MediaType.APPLICATION_OCTET_STREAM_VALUE)
             );
-            memory.markReady(transcript, memoryTaggingService.detectTags(transcript));
+            MemoryInsightsService.MemoryInsights insights = memoryInsightsService.generate(transcript);
+            memory.markReady(
+                transcript,
+                memoryTaggingService.detectTags(transcript),
+                insights.title(),
+                insights.summary()
+            );
         } catch (Exception ex) {
             memory.markFailed(buildErrorMessage(ex));
         }
@@ -178,6 +188,39 @@ public class MemoryService {
         return MemoryMapper.toMemoryResponse(memory);
     }
 
+    @Transactional
+    public MemoryResponse updateMemory(UUID id, UpdateMemoryRequest request) {
+        MemoryEntity memory = memoryRepository.findByIdAndUser_Id(id, appProperties.getDefaultUserId())
+            .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Memory not found"));
+
+        if (request.title() != null) {
+            memory.updateTitle(normalizeTitle(request.title()));
+        }
+
+        if (request.tags() != null) {
+            memory.replaceTags(resolveTags(request.tags()));
+        }
+
+        if (request.transcript() != null) {
+            String nextTranscript = normalizeTranscript(request.transcript());
+            MemoryInsightsService.MemoryInsights insights = memoryInsightsService.generate(nextTranscript);
+            memory.updateTranscriptAndSummary(nextTranscript, insights.summary());
+
+            if (request.title() == null || request.title().isBlank()) {
+                if (memory.getTitle() == null || memory.getTitle().isBlank()) {
+                    memory.updateTitle(insights.title());
+                }
+            }
+
+            if (request.tags() == null) {
+                memory.replaceTags(memoryTaggingService.detectTags(nextTranscript));
+            }
+        }
+
+        MemoryEntity saved = memoryRepository.save(memory);
+        return MemoryMapper.toMemoryResponse(saved);
+    }
+
     private UserEntity getOrCreateDefaultUser() {
         UUID defaultUserId = appProperties.getDefaultUserId();
         return userRepository.findById(defaultUserId)
@@ -204,5 +247,27 @@ public class MemoryService {
             return message;
         }
         return message.substring(0, MAX_ERROR_LENGTH);
+    }
+
+    private Set<MemoryTag> resolveTags(List<String> tags) {
+        Set<MemoryTag> resolved = new LinkedHashSet<>();
+        for (String value : tags) {
+            MemoryTag tag = MemoryTag.fromLabel(value)
+                .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "Invalid tag: " + value));
+            resolved.add(tag);
+        }
+        return resolved;
+    }
+
+    private String normalizeTitle(String value) {
+        return value == null ? null : value.trim();
+    }
+
+    private String normalizeTranscript(String value) {
+        String normalized = value == null ? "" : value.trim().replaceAll("\\s+", " ");
+        if (normalized.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, "Transcript must not be empty");
+        }
+        return normalized;
     }
 }

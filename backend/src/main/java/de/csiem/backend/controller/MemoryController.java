@@ -4,14 +4,17 @@ import de.csiem.backend.dto.CreateMemoryRequest;
 import de.csiem.backend.dto.CreateMemoryResponse;
 import de.csiem.backend.dto.MemoryListResponse;
 import de.csiem.backend.dto.MemoryResponse;
+import de.csiem.backend.dto.UpdateMemoryRequest;
 import de.csiem.backend.service.MemoryService;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -50,5 +53,13 @@ public class MemoryController {
     @GetMapping("/{id}")
     public MemoryResponse getMemory(@PathVariable("id") UUID id) {
         return memoryService.getMemory(id);
+    }
+
+    @PatchMapping("/{id}")
+    public MemoryResponse updateMemory(
+        @PathVariable("id") UUID id,
+        @RequestBody UpdateMemoryRequest request
+    ) {
+        return memoryService.updateMemory(id, request);
     }
 }
