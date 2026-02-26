@@ -18,6 +18,7 @@ import java.util.regex.Pattern;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -79,10 +80,25 @@ class MemoryControllerIntegrationTests {
             "fake-audio".getBytes()
         );
 
-        mockMvc.perform(multipart("/api/memories").file(audioFile))
+        MvcResult createResult = mockMvc.perform(multipart("/api/memories").file(audioFile))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.status").value("FAILED"))
+            .andExpect(jsonPath("$.errorMessage").value("Provider unavailable"))
+            .andReturn();
+
+        String id = extractId(createResult.getResponse().getContentAsString());
+
+        mockMvc.perform(get("/api/memories/{id}", id))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("FAILED"))
+            .andExpect(jsonPath("$.transcript").value(nullValue()))
             .andExpect(jsonPath("$.errorMessage").value("Provider unavailable"));
+
+        mockMvc.perform(get("/api/memories"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].id").value(id))
+            .andExpect(jsonPath("$.items[0].status").value("FAILED"))
+            .andExpect(jsonPath("$.items[0].transcriptSnippet").value(""));
     }
 
     @TestConfiguration
