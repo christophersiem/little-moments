@@ -385,7 +385,6 @@ export function RecordPage({ navigate }: RecordPageProps) {
                       Save
                     </Button>
                     <Button onClick={() => onStopDecision('discard-selected')}>Discard</Button>
-                    <Button onClick={() => onStopDecision('choice-dismissed')}>Back</Button>
                   </Row>
                 </>
               ) : (

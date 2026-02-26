@@ -6,7 +6,6 @@ export type StopDecisionEvent =
   | 'discard-selected'
   | 'discard-canceled'
   | 'discard-confirmed'
-  | 'choice-dismissed'
 
 export interface StopDecisionTransition {
   state: StopDecisionState
@@ -28,10 +27,6 @@ export function transitionStopDecision(
 
   if (state === 'choice' && event === 'discard-selected') {
     return { state: 'confirm-discard', shouldUpload: false, shouldDeleteLocalAudio: false }
-  }
-
-  if (state === 'choice' && event === 'choice-dismissed') {
-    return { state: 'hidden', shouldUpload: false, shouldDeleteLocalAudio: false }
   }
 
   if (state === 'confirm-discard' && event === 'discard-canceled') {
