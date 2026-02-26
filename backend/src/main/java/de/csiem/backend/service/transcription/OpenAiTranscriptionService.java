@@ -1,4 +1,4 @@
-package de.csiem.backend.memory.transcription;
+package de.csiem.backend.service.transcription;
 
 import de.csiem.backend.config.AppProperties;
 import org.springframework.core.io.ByteArrayResource;

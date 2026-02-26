@@ -1,4 +1,4 @@
-package de.csiem.backend.memory.transcription;
+package de.csiem.backend.service.transcription;
 
 public interface TranscriptionService {
 

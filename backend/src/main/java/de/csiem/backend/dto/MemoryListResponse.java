@@ -1,4 +1,4 @@
-package de.csiem.backend.memory.api;
+package de.csiem.backend.dto;
 
 import java.util.List;
 

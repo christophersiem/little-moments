@@ -1,4 +1,6 @@
-package de.csiem.backend.memory;
+package de.csiem.backend.repository;
+
+import de.csiem.backend.model.MemoryEntity;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

@@ -1,6 +1,6 @@
-package de.csiem.backend.memory;
+package de.csiem.backend.controller;
 
-import de.csiem.backend.memory.transcription.TranscriptionService;
+import de.csiem.backend.service.transcription.TranscriptionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

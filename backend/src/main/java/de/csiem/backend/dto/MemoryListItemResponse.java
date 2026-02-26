@@ -1,6 +1,6 @@
-package de.csiem.backend.memory.api;
+package de.csiem.backend.dto;
 
-import de.csiem.backend.memory.MemoryStatus;
+import de.csiem.backend.model.MemoryStatus;
 
 import java.time.Instant;
 import java.util.UUID;
