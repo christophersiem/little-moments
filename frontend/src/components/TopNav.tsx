@@ -44,7 +44,7 @@ export function TopNav({ pathname, navigate }: TopNavProps) {
     <Nav>
       <Button variant="nav" active={pathname.startsWith('/record')} onClick={() => navigate('/record')}>
         <NavItem>
-          <NavGlyph>R</NavGlyph>
+          <NavGlyph>H</NavGlyph>
           <NavLabel>Home</NavLabel>
         </NavItem>
       </Button>
@@ -54,7 +54,7 @@ export function TopNav({ pathname, navigate }: TopNavProps) {
           <NavLabel>Memories</NavLabel>
         </NavItem>
       </Button>
-      <Button variant="nav" disabled>
+      <Button variant="nav" active={pathname.startsWith('/settings')} onClick={() => navigate('/settings')}>
         <NavItem>
           <NavGlyph>S</NavGlyph>
           <NavLabel>Settings</NavLabel>

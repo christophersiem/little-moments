@@ -2,9 +2,11 @@ import type { ReactNode } from 'react'
 import styled from 'styled-components'
 import { RouteNotFound } from '../components/RouteNotFound'
 import { TopNav } from '../components/TopNav'
+import { AccountPage } from '../pages/AccountPage'
 import { MemoriesPage } from '../pages/MemoriesPage'
 import { MemoryDetailPage } from '../pages/MemoryDetailPage'
 import { RecordPage } from '../pages/RecordPage'
+import { SettingsPage } from '../pages/SettingsPage'
 import { useAppRouter } from './router'
 
 const Shell = styled.div`
@@ -59,6 +61,10 @@ export default function App() {
     content = <MemoriesPage navigate={navigate} />
   } else if (route.kind === 'memory-detail') {
     content = <MemoryDetailPage memoryId={route.memoryId} navigate={navigate} />
+  } else if (route.kind === 'settings') {
+    content = <SettingsPage navigate={navigate} />
+  } else if (route.kind === 'account') {
+    content = <AccountPage navigate={navigate} />
   } else {
     content = <RouteNotFound navigate={navigate} />
   }
