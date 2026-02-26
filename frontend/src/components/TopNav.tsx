@@ -1,23 +1,25 @@
+import styled from 'styled-components'
+import { Button } from './Button'
+
 interface TopNavProps {
   pathname: string
   navigate: (nextPath: string) => void
 }
 
+const Nav = styled.nav`
+  display: flex;
+  gap: ${({ theme }) => theme.space.x2};
+`
+
 export function TopNav({ pathname, navigate }: TopNavProps) {
   return (
-    <div className="topbar-nav">
-      <button
-        className={`button button-nav ${pathname.startsWith('/record') ? 'button-nav-active' : ''}`}
-        onClick={() => navigate('/record')}
-      >
+    <Nav>
+      <Button variant="nav" active={pathname.startsWith('/record')} onClick={() => navigate('/record')}>
         Record
-      </button>
-      <button
-        className={`button button-nav ${pathname.startsWith('/memories') ? 'button-nav-active' : ''}`}
-        onClick={() => navigate('/memories')}
-      >
+      </Button>
+      <Button variant="nav" active={pathname.startsWith('/memories')} onClick={() => navigate('/memories')}>
         Memories
-      </button>
-    </div>
+      </Button>
+    </Nav>
   )
 }

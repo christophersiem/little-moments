@@ -1,0 +1,56 @@
+import type { DefaultTheme } from 'styled-components'
+
+export const theme: DefaultTheme = {
+  space: {
+    x1: 'var(--space-1)',
+    x2: 'var(--space-2)',
+    x3: 'var(--space-3)',
+    x4: 'var(--space-4)',
+    x5: 'var(--space-5)',
+    x6: 'var(--space-6)',
+  },
+  radii: {
+    sm: 'var(--radius-sm)',
+    md: 'var(--radius-md)',
+    lg: 'var(--radius-lg)',
+    xl: 'var(--radius-xl)',
+    pill: 'var(--radius-pill)',
+  },
+  typography: {
+    bodyFamily: 'var(--font-family-body)',
+    headingFamily: 'var(--font-family-heading)',
+    h1Size: 'var(--font-size-h1)',
+    h2Size: 'var(--font-size-h2)',
+    bodySize: 'var(--font-size-body)',
+    secondarySize: 'var(--font-size-secondary)',
+    timerSize: 'var(--font-size-timer)',
+    bodyLineHeight: 'var(--line-height-body)',
+    relaxedLineHeight: 'var(--line-height-relaxed)',
+  },
+  colors: {
+    background: 'var(--color-bg)',
+    backgroundAlt: 'var(--color-bg-alt)',
+    backgroundGlowStart: 'var(--color-bg-glow-start)',
+    backgroundGlowEnd: 'var(--color-bg-glow-end)',
+    surface: 'var(--color-surface)',
+    surfaceStrong: 'var(--color-surface-strong)',
+    border: 'var(--color-border)',
+    text: 'var(--color-text)',
+    textMuted: 'var(--color-text-muted)',
+    accent: 'var(--color-accent)',
+    accentStrong: 'var(--color-accent-strong)',
+    danger: 'var(--color-danger)',
+    onAccent: 'var(--color-on-accent)',
+    overlay: 'var(--color-overlay)',
+  },
+  shadows: {
+    card: 'var(--shadow-card)',
+    sheet: 'var(--shadow-sheet)',
+  },
+  layout: {
+    maxWidth: 'var(--layout-max-width)',
+    minTouchTarget: 'var(--layout-min-touch-target)',
+    primaryButtonHeight: 'var(--layout-primary-button-height)',
+    centerCardMinHeight: 'var(--layout-center-card-min-height)',
+  },
+}

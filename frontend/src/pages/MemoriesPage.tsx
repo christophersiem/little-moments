@@ -1,3 +1,5 @@
+import styled from 'styled-components'
+import { Card } from '../components/Card'
 import { MemoryListItemCard } from '../features/memories/components/MemoryListItemCard'
 import { useMemoriesList } from '../features/memories/hooks'
 
@@ -5,39 +7,59 @@ interface MemoriesPageProps {
   navigate: (nextPath: string) => void
 }
 
+const CenterCard = styled(Card)`
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+`
+
+const ErrorText = styled.p`
+  color: ${({ theme }) => theme.colors.danger};
+`
+
+const List = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.x3};
+`
+
+const EmptyText = styled.p`
+  color: ${({ theme }) => theme.colors.textMuted};
+`
+
 export function MemoriesPage({ navigate }: MemoriesPageProps) {
   const { loading, error, items } = useMemoriesList()
 
   if (loading) {
     return (
-      <section className="panel panel-center">
+      <CenterCard centered>
         <h1>Memories</h1>
         <p>Loading...</p>
-      </section>
+      </CenterCard>
     )
   }
 
   if (error) {
     return (
-      <section className="panel">
+      <Card>
         <h1>Memories</h1>
-        <p className="error">{error}</p>
-      </section>
+        <ErrorText>{error}</ErrorText>
+      </Card>
     )
   }
 
   return (
-    <section className="panel">
+    <Card>
       <h1>Memories</h1>
       {items.length === 0 ? (
-        <p>No memories yet. Record your first one.</p>
+        <EmptyText>No memories yet. Record your first one.</EmptyText>
       ) : (
-        <div className="list">
+        <List>
           {items.map((item) => (
             <MemoryListItemCard key={item.id} item={item} onOpen={(id) => navigate(`/memories/${id}`)} />
           ))}
-        </div>
+        </List>
       )}
-    </section>
+    </Card>
   )
 }
