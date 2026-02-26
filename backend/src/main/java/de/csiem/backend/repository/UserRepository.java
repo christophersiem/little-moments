@@ -1,4 +1,6 @@
-package de.csiem.backend.memory;
+package de.csiem.backend.repository;
+
+import de.csiem.backend.model.UserEntity;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 

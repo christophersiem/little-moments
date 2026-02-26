@@ -1,4 +1,4 @@
-package de.csiem.backend.memory;
+package de.csiem.backend.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

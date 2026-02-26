@@ -1,11 +1,17 @@
-package de.csiem.backend.memory;
+package de.csiem.backend.service;
 
 import de.csiem.backend.config.AppProperties;
-import de.csiem.backend.memory.api.CreateMemoryResponse;
-import de.csiem.backend.memory.api.MemoryDetailResponse;
-import de.csiem.backend.memory.api.MemoryListItemResponse;
-import de.csiem.backend.memory.api.MemoryListResponse;
-import de.csiem.backend.memory.transcription.TranscriptionService;
+import de.csiem.backend.dto.CreateMemoryRequest;
+import de.csiem.backend.dto.CreateMemoryResponse;
+import de.csiem.backend.dto.MemoryListItemResponse;
+import de.csiem.backend.dto.MemoryListResponse;
+import de.csiem.backend.dto.MemoryResponse;
+import de.csiem.backend.model.MemoryEntity;
+import de.csiem.backend.model.MemoryStatus;
+import de.csiem.backend.model.UserEntity;
+import de.csiem.backend.repository.MemoryRepository;
+import de.csiem.backend.repository.UserRepository;
+import de.csiem.backend.service.transcription.TranscriptionService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -13,7 +19,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -48,7 +53,9 @@ public class MemoryService {
     }
 
     @Transactional
-    public CreateMemoryResponse createMemory(MultipartFile audio, Instant recordedAt) {
+    public CreateMemoryResponse createMemory(CreateMemoryRequest request) {
+        var audio = request.audio();
+        var recordedAt = request.recordedAt();
         if (audio == null || audio.isEmpty()) {
             throw new ResponseStatusException(BAD_REQUEST, "Audio file is required");
         }
@@ -74,12 +81,7 @@ public class MemoryService {
         }
 
         MemoryEntity saved = memoryRepository.save(memory);
-        return new CreateMemoryResponse(
-            saved.getId(),
-            saved.getStatus(),
-            saved.getErrorMessage(),
-            snippet(saved.getTranscript())
-        );
+        return MemoryMapper.toCreateMemoryResponse(saved, snippet(saved.getTranscript()));
     }
 
     @Transactional(readOnly = true)
@@ -97,13 +99,7 @@ public class MemoryService {
         );
 
         List<MemoryListItemResponse> items = result.getContent().stream()
-            .map(memory -> new MemoryListItemResponse(
-                memory.getId(),
-                memory.getCreatedAt(),
-                memory.getRecordedAt(),
-                memory.getStatus(),
-                snippet(memory.getTranscript())
-            ))
+            .map(memory -> MemoryMapper.toMemoryListItemResponse(memory, snippet(memory.getTranscript())))
             .toList();
 
         return new MemoryListResponse(
@@ -116,27 +112,16 @@ public class MemoryService {
     }
 
     @Transactional(readOnly = true)
-    public MemoryDetailResponse getMemory(UUID id) {
+    public MemoryResponse getMemory(UUID id) {
         MemoryEntity memory = memoryRepository.findByIdAndUser_Id(id, appProperties.getDefaultUserId())
             .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Memory not found"));
-        return toDetail(memory);
+        return MemoryMapper.toMemoryResponse(memory);
     }
 
     private UserEntity getOrCreateDefaultUser() {
         UUID defaultUserId = appProperties.getDefaultUserId();
         return userRepository.findById(defaultUserId)
             .orElseGet(() -> userRepository.save(new UserEntity(defaultUserId, null)));
-    }
-
-    private MemoryDetailResponse toDetail(MemoryEntity memory) {
-        return new MemoryDetailResponse(
-            memory.getId(),
-            memory.getCreatedAt(),
-            memory.getRecordedAt(),
-            memory.getStatus(),
-            memory.getTranscript(),
-            memory.getErrorMessage()
-        );
     }
 
     private String snippet(String transcript) {

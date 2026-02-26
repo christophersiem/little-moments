@@ -1,4 +1,4 @@
-package de.csiem.backend.memory;
+package de.csiem.backend.model;
 
 public enum MemoryStatus {
     PROCESSING,
