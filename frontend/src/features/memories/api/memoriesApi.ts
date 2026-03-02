@@ -1,5 +1,35 @@
-import { API_BASE, getApiErrorMessage, parseJsonSafe } from '../../lib/apiClient'
-import type { CreateMemoryResponse, MemoriesListResponse, Memory, UpdateMemoryRequest } from './types'
+import { API_BASE, getApiErrorMessage, parseJsonSafe } from '../../../lib/apiClient'
+import type {
+  CreateMemoryResponse,
+  MemoriesListResponse,
+  Memory,
+  MemoryTag,
+  UpdateMemoryRequest,
+} from '../types'
+
+interface ListMemoriesParams {
+  page?: number
+  size?: number
+  month?: string
+  tags?: MemoryTag[]
+}
+
+function buildListMemoriesQuery({ page = 0, size = 5, month, tags = [] }: ListMemoriesParams): string {
+  const query = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+  })
+
+  if (month && month.trim().length > 0) {
+    query.set('month', month)
+  }
+
+  for (const tag of tags) {
+    query.append('tags', tag)
+  }
+
+  return query.toString()
+}
 
 export async function createMemory(audioBlob: Blob, recordedAtIso: string): Promise<CreateMemoryResponse> {
   const extension = audioBlob.type.includes('mp4') ? 'm4a' : 'webm'
@@ -19,12 +49,23 @@ export async function createMemory(audioBlob: Blob, recordedAtIso: string): Prom
   if (!payload) {
     throw new Error('Upload completed without a response body.')
   }
-
-  return payload
+  const ids = Array.isArray(payload.ids) && payload.ids.length > 0 ? payload.ids : payload.id ? [payload.id] : []
+  return {
+    ...payload,
+    id: payload.id ?? ids[0] ?? '',
+    ids,
+    count: typeof payload.count === 'number' ? payload.count : ids.length,
+  }
 }
 
-export async function listMemories(page = 0, size = 50): Promise<MemoriesListResponse> {
-  const response = await fetch(`${API_BASE}/memories?page=${page}&size=${size}`)
+export async function listMemories({
+  page = 0,
+  size = 5,
+  month,
+  tags = [],
+}: ListMemoriesParams = {}): Promise<MemoriesListResponse> {
+  const query = buildListMemoriesQuery({ page, size, month, tags })
+  const response = await fetch(`${API_BASE}/memories?${query}`)
   const payload = await parseJsonSafe<MemoriesListResponse>(response)
 
   if (!response.ok) {
@@ -72,4 +113,15 @@ export async function updateMemory(memoryId: string, request: UpdateMemoryReques
   }
 
   return payload
+}
+
+export async function deleteMemory(memoryId: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/memories/${memoryId}`, {
+    method: 'DELETE',
+  })
+
+  const payload = await parseJsonSafe<unknown>(response)
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(payload) ?? `Delete failed (${response.status})`)
+  }
 }

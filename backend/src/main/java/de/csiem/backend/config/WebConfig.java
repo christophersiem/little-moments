@@ -20,7 +20,7 @@ public class WebConfig implements WebMvcConfigurer {
         List<String> origins = appProperties.getCorsOriginsAsList();
         registry.addMapping("/api/**")
             .allowedOrigins(origins.toArray(new String[0]))
-            .allowedMethods("GET", "POST")
+            .allowedMethods("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS")
             .allowedHeaders("*");
     }
 }

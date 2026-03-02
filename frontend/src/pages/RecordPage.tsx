@@ -1,26 +1,29 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
-import { createMemory } from '../features/memories/api'
+import { RecordButton } from '../components/RecordButton'
+import { startMemoryUpload } from '../features/memories/hooks/uploadSessionStore'
 import {
   transitionStopDecision,
   type StopDecisionEvent,
   type StopDecisionState,
 } from '../features/memories/stopDecisionMachine'
-import type { CreateMemoryResponse } from '../features/memories/types'
 import { formatDuration } from '../lib/utils'
 
 interface RecordPageProps {
   navigate: (nextPath: string) => void
+  onNavigationLockChange?: (locked: boolean) => void
 }
 
-type RecordPhase = 'idle' | 'recording' | 'stopped' | 'saving' | 'saved' | 'error'
+type RecordPhase = 'idle' | 'recording' | 'stopped' | 'error'
 
 interface RecordingPayload {
   blob: Blob
   recordedAt: string
 }
+
+const NOOP = () => undefined
 
 const Stage = styled.section`
   width: 100%;
@@ -29,8 +32,12 @@ const Stage = styled.section`
   flex-direction: column;
 `
 
+const CenterStage = styled(Stage)`
+  justify-content: center;
+`
+
 const Hero = styled.div`
-  margin-top: clamp(72px, 17vh, 150px);
+  margin-top: clamp(56px, 14vh, 120px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -38,63 +45,31 @@ const Hero = styled.div`
   gap: ${({ theme }) => theme.space.x4};
 `
 
-const RingBase = styled.div<{ $recording: boolean }>`
-  width: 138px;
-  height: 138px;
-  border-radius: 50%;
-  border: 6px solid ${({ theme }) => theme.colors.accent};
+const CenterHero = styled.div`
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: ${({ theme }) => theme.colors.background};
-  ${({ $recording, theme }) =>
-    $recording ? `box-shadow: 0 0 0 7px ${theme.colors.surface};` : 'box-shadow: none;'}
+  padding-bottom: calc(${({ theme }) => theme.layout.bottomNavHeight} + ${({ theme }) => theme.space.x2});
 `
 
-const RingButton = styled.button`
-  padding: 0;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  border-radius: 50%;
-
-  &:focus-visible {
-    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
-    outline-offset: 4px;
-  }
-`
-
-const MicGlyph = styled.span`
-  width: 16px;
-  height: 22px;
-  border: 2px solid ${({ theme }) => theme.colors.accent};
-  border-radius: 10px;
+const RecordAnchor = styled.div`
   position: relative;
-  display: inline-block;
-
-  &::before {
-    content: '';
-    position: absolute;
-    left: 50%;
-    bottom: -8px;
-    width: 2px;
-    height: 8px;
-    transform: translateX(-50%);
-    background: ${({ theme }) => theme.colors.accent};
-  }
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
 `
 
-const Dot = styled.span`
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: ${({ theme }) => theme.colors.accent};
-`
-
-const Heading = styled.h2`
-  font-size: 2.875rem;
-  color: ${({ theme }) => theme.colors.text};
-  margin: 0;
+const RecordingMeta = styled.div`
+  position: absolute;
+  top: calc(100% + ${({ theme }) => theme.space.x4});
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(320px, calc(100vw - 48px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.x2};
 `
 
 const Timer = styled.div`
@@ -104,28 +79,26 @@ const Timer = styled.div`
 `
 
 const BodyText = styled.p`
-  max-width: 230px;
+  max-width: 280px;
   color: ${({ theme }) => theme.colors.textMuted};
   font-size: ${({ theme }) => theme.typography.bodySize};
 `
 
-const ActionBar = styled.div`
-  margin-top: auto;
-  padding-bottom: ${({ theme }) => theme.space.x6};
+const PrivacyText = styled.p`
+  max-width: 320px;
+  color: ${({ theme }) => theme.colors.textMuted};
+  text-align: center;
+  font-size: ${({ theme }) => theme.typography.secondarySize};
 `
 
 const ErrorText = styled.p`
   color: ${({ theme }) => theme.colors.danger};
 `
 
-const Preview = styled.p`
-  line-height: ${({ theme }) => theme.typography.bodyLineHeight};
-`
-
-const Row = styled.div`
+const Stack = styled.div`
   display: flex;
-  flex-wrap: wrap;
-  gap: ${({ theme }) => theme.space.x3};
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.x2};
 `
 
 const ModalOverlay = styled.div`
@@ -135,7 +108,8 @@ const ModalOverlay = styled.div`
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: ${({ theme }) => theme.space.x3};
+  padding: ${({ theme }) =>
+    `${theme.space.x3} ${theme.space.x3} calc(${theme.layout.bottomNavHeight} + ${theme.space.x3} + env(safe-area-inset-bottom, 0px))`};
   z-index: 20;
 `
 
@@ -152,7 +126,21 @@ const ModalSheet = styled.section`
   animation: rise-in 220ms ease-out;
 `
 
-export function RecordPage({ navigate }: RecordPageProps) {
+const SheetHandle = styled.div`
+  align-self: center;
+  width: 40px;
+  height: 4px;
+  border-radius: ${({ theme }) => theme.radii.pill};
+  background: ${({ theme }) => theme.colors.border};
+`
+
+const SheetActions = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.x2};
+`
+
+export function RecordPage({ navigate, onNavigationLockChange }: RecordPageProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -163,7 +151,6 @@ export function RecordPage({ navigate }: RecordPageProps) {
   const [stopDecisionState, setStopDecisionState] = useState<StopDecisionState>('hidden')
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [errorMessage, setErrorMessage] = useState('')
-  const [savedResult, setSavedResult] = useState<CreateMemoryResponse | null>(null)
 
   const cleanupStream = () => {
     if (streamRef.current) {
@@ -186,25 +173,24 @@ export function RecordPage({ navigate }: RecordPageProps) {
     }
   }, [])
 
-  const uploadRecording = async (audioBlob: Blob, recordedAtIso: string) => {
-    setPhase('saving')
-    setErrorMessage('')
+  useEffect(() => {
+    onNavigationLockChange?.(phase === 'recording')
+  }, [onNavigationLockChange, phase])
 
-    try {
-      const payload = await createMemory(audioBlob, recordedAtIso)
-      if (payload.status === 'FAILED') {
-        setErrorMessage(payload.errorMessage || 'Transcription failed.')
-        setPhase('error')
-        return
-      }
-      setSavedResult(payload)
-      setPhase('saved')
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not save your moment.'
-      setErrorMessage(message)
-      setPhase('error')
+  useEffect(() => {
+    if (phase !== 'stopped' || stopDecisionState === 'hidden') {
+      return
     }
-  }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && stopDecisionState === 'confirm-discard') {
+        onStopDecision('discard-canceled')
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [phase, stopDecisionState])
 
   const stopRecording = () => {
     const recorder = mediaRecorderRef.current
@@ -223,8 +209,8 @@ export function RecordPage({ navigate }: RecordPageProps) {
     }
 
     setErrorMessage('')
-    setSavedResult(null)
     setElapsedSeconds(0)
+    setStopDecisionState('hidden')
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -254,19 +240,11 @@ export function RecordPage({ navigate }: RecordPageProps) {
       intervalRef.current = window.setInterval(() => {
         setElapsedSeconds((current) => current + 1)
       }, 1000)
-    } catch (error) {
+    } catch {
       cleanupStream()
-      const message = error instanceof Error ? error.message : 'Microphone access was denied.'
-      setErrorMessage(message)
+      setErrorMessage('Microphone access is needed to record a moment.')
       setPhase('error')
     }
-  }
-
-  const retryUpload = () => {
-    if (!latestRecordingRef.current) {
-      return
-    }
-    void uploadRecording(latestRecordingRef.current.blob, latestRecordingRef.current.recordedAt)
   }
 
   const onStopDecision = (event: StopDecisionEvent) => {
@@ -288,71 +266,52 @@ export function RecordPage({ navigate }: RecordPageProps) {
         setPhase('error')
         return
       }
-      void uploadRecording(latestRecordingRef.current.blob, latestRecordingRef.current.recordedAt)
-      return
+
+      const session = startMemoryUpload(latestRecordingRef.current.blob, latestRecordingRef.current.recordedAt)
+      latestRecordingRef.current = null
+      chunksRef.current = []
+      setStopDecisionState('hidden')
+      setPhase('idle')
+      setElapsedSeconds(0)
+      navigate('/memories')
+      window.history.replaceState({}, '', `/memories?pending=${encodeURIComponent(session.clientId)}`)
     }
-  }
-
-  const transcriptPreview = useMemo(() => {
-    return savedResult?.transcriptPreview || 'Your transcript was saved.'
-  }, [savedResult])
-
-  if (phase === 'saving') {
-    return (
-      <Card centered>
-        <h2>Saving your moment...</h2>
-        <BodyText>This can take a moment.</BodyText>
-      </Card>
-    )
-  }
-
-  if (phase === 'saved' && savedResult) {
-    return (
-      <Card>
-        <h2>Saved</h2>
-        <Preview>{transcriptPreview}</Preview>
-        <Row>
-          <Button variant="primary" onClick={() => navigate(`/memories/${savedResult.id}`)}>
-            Open Entry
-          </Button>
-          <Button onClick={() => navigate('/memories')}>View List</Button>
-          <Button onClick={() => setPhase('idle')}>Record Another</Button>
-        </Row>
-      </Card>
-    )
   }
 
   if (phase === 'error') {
     return (
       <Card>
-        <h2>Could not save moment</h2>
+        <h2>Could not continue.</h2>
         <ErrorText>{errorMessage}</ErrorText>
-        <Row>
-          <Button variant="primary" onClick={retryUpload} disabled={!latestRecordingRef.current}>
-            Retry Upload
+        <Stack>
+          <Button variant="primary" fullWidth onClick={() => setPhase('idle')}>
+            Start over
           </Button>
-          <Button onClick={() => setPhase('idle')}>Start Over</Button>
-        </Row>
+        </Stack>
       </Card>
     )
   }
 
   if (phase === 'recording') {
     return (
-      <Stage>
-        <Hero>
-          <RingBase $recording>
-            <Dot />
-          </RingBase>
-          <Timer>{formatDuration(elapsedSeconds)}</Timer>
-          <BodyText>Speak naturally. We&apos;ll structure it for you.</BodyText>
-        </Hero>
-        <ActionBar>
-          <Button variant="primary" fullWidth onClick={stopRecording}>
-            Stop Recording
-          </Button>
-        </ActionBar>
-      </Stage>
+      <CenterStage>
+        <CenterHero>
+          <RecordAnchor>
+            <RecordButton
+              status="recording"
+              elapsedSec={elapsedSeconds}
+              maxDurationSec={60}
+              onStart={NOOP}
+              onStop={stopRecording}
+              diameter={188}
+            />
+            <RecordingMeta>
+              <Timer>{formatDuration(elapsedSeconds)}</Timer>
+              <BodyText>Speak naturally. We will structure this moment for you.</BodyText>
+            </RecordingMeta>
+          </RecordAnchor>
+        </CenterHero>
+      </CenterStage>
     )
   }
 
@@ -361,42 +320,48 @@ export function RecordPage({ navigate }: RecordPageProps) {
       <>
         <Stage>
           <Hero>
-            <RingBase $recording={false}>
-              <Dot />
-            </RingBase>
-            <BodyText>Your recording is ready.</BodyText>
-            {stopDecisionState === 'hidden' && (
-              <Button variant="primary" onClick={() => setStopDecisionState('choice')}>
-                Open Save / Discard
-              </Button>
-            )}
+            <RecordButton
+              status="stopped"
+              elapsedSec={elapsedSeconds}
+              maxDurationSec={60}
+              onStart={NOOP}
+              onStop={NOOP}
+              diameter={96}
+            />
+            <BodyText>Your recording is ready to save.</BodyText>
           </Hero>
         </Stage>
 
         {stopDecisionState !== 'hidden' && (
           <ModalOverlay role="presentation">
-            <ModalSheet role="dialog" aria-modal="true">
+            <ModalSheet role="dialog" aria-modal="true" aria-label="Save or discard recording">
+              <SheetHandle aria-hidden />
               {stopDecisionState === 'choice' ? (
                 <>
                   <h2>Save this recording?</h2>
-                  <BodyText>You can save now or discard this moment.</BodyText>
-                  <Row>
-                    <Button variant="primary" onClick={() => onStopDecision('save-selected')}>
-                      Save
+                  <BodyText>Save now, or discard this moment.</BodyText>
+                  <PrivacyText>Audio is transcribed to text and not stored as audio.</PrivacyText>
+                  <SheetActions>
+                    <Button variant="primary" fullWidth autoFocus onClick={() => onStopDecision('save-selected')}>
+                      Save recording
                     </Button>
-                    <Button onClick={() => onStopDecision('discard-selected')}>Discard</Button>
-                  </Row>
+                    <Button fullWidth onClick={() => onStopDecision('discard-selected')}>
+                      Discard recording
+                    </Button>
+                  </SheetActions>
                 </>
               ) : (
                 <>
                   <h2>Discard this recording?</h2>
                   <BodyText>This action cannot be undone.</BodyText>
-                  <Row>
-                    <Button variant="danger" onClick={() => onStopDecision('discard-confirmed')}>
-                      Yes, Discard
+                  <SheetActions>
+                    <Button variant="danger" fullWidth autoFocus onClick={() => onStopDecision('discard-confirmed')}>
+                      Yes, discard recording
                     </Button>
-                    <Button onClick={() => onStopDecision('discard-canceled')}>Cancel</Button>
-                  </Row>
+                    <Button fullWidth onClick={() => onStopDecision('discard-canceled')}>
+                      Keep recording
+                    </Button>
+                  </SheetActions>
                 </>
               )}
             </ModalSheet>
@@ -407,16 +372,17 @@ export function RecordPage({ navigate }: RecordPageProps) {
   }
 
   return (
-    <Stage>
-      <Hero>
-        <RingButton onClick={() => void startRecording()} aria-label="Start recording">
-          <RingBase $recording={false}>
-            <MicGlyph />
-          </RingBase>
-        </RingButton>
-        <Heading>Record Moment</Heading>
-        <BodyText>Capture today&apos;s memory in under a minute.</BodyText>
-      </Hero>
-    </Stage>
+    <CenterStage>
+      <CenterHero>
+        <RecordButton
+          status="idle"
+          elapsedSec={0}
+          maxDurationSec={60}
+          onStart={() => void startRecording()}
+          onStop={NOOP}
+          diameter={188}
+        />
+      </CenterHero>
+    </CenterStage>
   )
 }

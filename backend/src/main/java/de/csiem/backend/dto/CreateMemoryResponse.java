@@ -7,6 +7,8 @@ import java.util.UUID;
 
 public record CreateMemoryResponse(
     UUID id,
+    List<UUID> ids,
+    int count,
     MemoryStatus status,
     String errorMessage,
     String transcriptPreview,

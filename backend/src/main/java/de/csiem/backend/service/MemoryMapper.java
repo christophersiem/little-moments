@@ -17,6 +17,8 @@ final class MemoryMapper {
     static CreateMemoryResponse toCreateMemoryResponse(MemoryEntity memory, String transcriptPreview) {
         return new CreateMemoryResponse(
             memory.getId(),
+            List.of(memory.getId()),
+            1,
             memory.getStatus(),
             memory.getErrorMessage(),
             transcriptPreview,
@@ -52,7 +54,7 @@ final class MemoryMapper {
         );
     }
 
-    private static List<String> toTagLabels(MemoryEntity memory) {
+    static List<String> toTagLabels(MemoryEntity memory) {
         return memory.getTags().stream()
             .sorted()
             .map(MemoryTag::label)

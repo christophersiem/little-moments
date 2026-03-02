@@ -30,6 +30,10 @@ public class MemoryEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private UserEntity user;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_memory_id")
+    private MemoryEntity parentMemory;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -47,6 +51,12 @@ public class MemoryEntity {
 
     @Column(name = "summary", columnDefinition = "TEXT")
     private String summary;
+
+    @Column(name = "source_transcript", columnDefinition = "TEXT")
+    private String sourceTranscript;
+
+    @Column(name = "is_parent", nullable = false)
+    private boolean isParent;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
@@ -69,6 +79,7 @@ public class MemoryEntity {
         this.user = user;
         this.recordedAt = recordedAt;
         this.status = status;
+        this.isParent = false;
     }
 
     @PrePersist
@@ -95,6 +106,8 @@ public class MemoryEntity {
         this.transcript = transcriptText;
         this.title = generatedTitle;
         this.summary = generatedSummary;
+        this.sourceTranscript = null;
+        this.isParent = false;
         this.errorMessage = null;
         this.tags.clear();
         if (detectedTags != null && !detectedTags.isEmpty()) {
@@ -102,11 +115,24 @@ public class MemoryEntity {
         }
     }
 
+    public void markReadyAsParent(String fullTranscript) {
+        this.status = MemoryStatus.READY;
+        this.transcript = null;
+        this.title = null;
+        this.summary = null;
+        this.sourceTranscript = fullTranscript;
+        this.isParent = true;
+        this.errorMessage = null;
+        this.tags.clear();
+    }
+
     public void markFailed(String message) {
         this.status = MemoryStatus.FAILED;
         this.transcript = null;
         this.title = null;
         this.summary = null;
+        this.sourceTranscript = null;
+        this.isParent = false;
         this.errorMessage = message;
         this.tags.clear();
     }
@@ -135,6 +161,14 @@ public class MemoryEntity {
         return user;
     }
 
+    public MemoryEntity getParentMemory() {
+        return parentMemory;
+    }
+
+    public void setParentMemory(MemoryEntity parentMemory) {
+        this.parentMemory = parentMemory;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -161,6 +195,14 @@ public class MemoryEntity {
 
     public String getSummary() {
         return summary;
+    }
+
+    public String getSourceTranscript() {
+        return sourceTranscript;
+    }
+
+    public boolean isParent() {
+        return isParent;
     }
 
     public MemoryStatus getStatus() {

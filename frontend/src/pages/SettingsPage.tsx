@@ -87,7 +87,7 @@ export function SettingsPage({ navigate }: SettingsPageProps) {
     <Section>
       <Heading>Settings</Heading>
       <List>
-        <Item $interactive onClick={() => navigate('/settings/account')}>
+        <Item type="button" $interactive onClick={() => navigate('/settings/account')}>
           <ItemIcon>◌</ItemIcon>
           <ItemText>
             <ItemTitle>Account</ItemTitle>
@@ -105,11 +105,11 @@ export function SettingsPage({ navigate }: SettingsPageProps) {
           <Chevron>›</Chevron>
         </Item>
 
-        <Item $interactive={false} type="button" aria-disabled>
+        <Item type="button" $interactive onClick={() => navigate('/settings/privacy')}>
           <ItemIcon>◍</ItemIcon>
           <ItemText>
             <ItemTitle>Privacy</ItemTitle>
-            <ItemSubtitle>Data & permissions</ItemSubtitle>
+            <ItemSubtitle>Privacy & data protection</ItemSubtitle>
           </ItemText>
           <Chevron>›</Chevron>
         </Item>

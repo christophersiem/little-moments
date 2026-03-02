@@ -53,5 +53,6 @@ export const theme: DefaultTheme = {
     minTouchTarget: 'var(--layout-min-touch-target)',
     primaryButtonHeight: 'var(--layout-primary-button-height)',
     centerCardMinHeight: 'var(--layout-center-card-min-height)',
+    bottomNavHeight: 'var(--layout-bottom-nav-height)',
   },
 }

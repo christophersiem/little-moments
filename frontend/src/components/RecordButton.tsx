@@ -22,11 +22,61 @@ type VisualState = 'idle' | 'recording' | 'stopped'
 const RECORDING_TAP_DEBOUNCE_MS = 300
 
 const idleButtonBreath = keyframes`
-  0%, 100% {
+  0% {
+    transform: scale(1);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  30% {
+    transform: scale(1.045);
+    animation-timing-function: linear;
+  }
+  40% {
+    transform: scale(1.045);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  70% {
+    transform: scale(1);
+    animation-timing-function: linear;
+  }
+  100% {
     transform: scale(1);
   }
-  50% {
-    transform: scale(1.02);
+`
+
+const idleHaloBreath = keyframes`
+  0% {
+    opacity: 0.26;
+    box-shadow:
+      0 0 0 7px color-mix(in srgb, var(--lm-accent) 10%, transparent),
+      0 10px 18px rgba(var(--lm-shadow-rgb), 0.11);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  30% {
+    opacity: 0.58;
+    box-shadow:
+      0 0 0 17px color-mix(in srgb, var(--lm-accent) 18%, transparent),
+      0 12px 22px rgba(var(--lm-shadow-rgb), 0.17);
+    animation-timing-function: linear;
+  }
+  40% {
+    opacity: 0.58;
+    box-shadow:
+      0 0 0 17px color-mix(in srgb, var(--lm-accent) 18%, transparent),
+      0 12px 22px rgba(var(--lm-shadow-rgb), 0.17);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  70% {
+    opacity: 0.26;
+    box-shadow:
+      0 0 0 7px color-mix(in srgb, var(--lm-accent) 10%, transparent),
+      0 10px 18px rgba(var(--lm-shadow-rgb), 0.11);
+    animation-timing-function: linear;
+  }
+  100% {
+    opacity: 0.26;
+    box-shadow:
+      0 0 0 7px color-mix(in srgb, var(--lm-accent) 10%, transparent),
+      0 10px 18px rgba(var(--lm-shadow-rgb), 0.11);
   }
 `
 
@@ -36,17 +86,6 @@ const recordingHaloPulse = keyframes`
   }
   50% {
     opacity: 0.5;
-  }
-`
-
-const rippleExpand = keyframes`
-  0% {
-    transform: scale(0.92);
-    opacity: 0.34;
-  }
-  100% {
-    transform: scale(1.5);
-    opacity: 0;
   }
 `
 
@@ -114,7 +153,9 @@ const Visual = styled.span<{ $diameter: number; $state: VisualState }>`
   ${({ $state }) =>
     $state === 'idle' &&
     css`
-      animation: ${idleButtonBreath} 7s ease-in-out infinite;
+      transform-origin: center;
+      animation: ${idleButtonBreath} 8s infinite;
+      will-change: transform;
     `}
 
   @media (prefers-reduced-motion: reduce) {
@@ -133,10 +174,8 @@ const Halo = styled.span<{ $state: VisualState }>`
   ${({ $state }) =>
     $state === 'idle' &&
     css`
-      opacity: 0.36;
-      box-shadow:
-        0 0 0 9px color-mix(in srgb, var(--lm-accent) 9%, transparent),
-        0 10px 18px rgba(var(--lm-shadow-rgb), 0.12);
+      transform-origin: center;
+      animation: ${idleHaloBreath} 8s infinite;
     `}
 
   ${({ $state }) =>
@@ -167,22 +206,6 @@ const Halo = styled.span<{ $state: VisualState }>`
 
   @media (prefers-reduced-motion: reduce) {
     animation: none;
-  }
-`
-
-const RippleRing = styled.span<{ $delayMs: number }>`
-  position: absolute;
-  inset: -6px;
-  border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--lm-accent) 42%, transparent);
-  pointer-events: none;
-  animation: ${rippleExpand} 1.8s linear infinite;
-  animation-delay: ${({ $delayMs }) => `${$delayMs}ms`};
-  will-change: transform, opacity;
-
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-    opacity: 0;
   }
 `
 
@@ -329,15 +352,13 @@ export function RecordButton({
       >
         <Visual $diameter={diameter} $state={visualState}>
           <Halo $state={visualState} />
-          {isRecording && (
-            <>
-              <RippleRing $delayMs={0} />
-              <RippleRing $delayMs={900} />
-            </>
-          )}
           <SoftOuterRing $state={visualState} />
           <Core $state={visualState} $disabled={disabled}>
-            <LogoMark $size={logoSize} $state={visualState} />
+            <LogoMark
+              $size={logoSize}
+              $state={visualState}
+              animate={isRecording ? 'recording' : visualState === 'stopped' ? 'stopped' : 'idle'}
+            />
           </Core>
         </Visual>
       </TapTarget>

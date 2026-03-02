@@ -1,7 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
+import { Button } from '../components/Button'
+import { PageContainer } from '../components/PageContainer'
+import { StatusBanner } from '../components/StatusBanner'
 import { MemoryListItemCard } from '../features/memories/components/MemoryListItemCard'
-import { useMemoriesList } from '../features/memories/hooks'
+import { setActiveUploadStatusFromPolling, retryActiveMemoryUpload, useActiveMemoryUpload } from '../features/memories/hooks/uploadSessionStore'
+import { usePaginatedMemories } from '../features/memories/hooks/usePaginatedMemories'
+import { useProcessingMemory } from '../features/memories/hooks/useProcessingMemory'
 import { MEMORY_TAG_OPTIONS, type MemoryListItem, type MemoryTag } from '../features/memories/types'
 import { formatMonthYear } from '../lib/utils'
 
@@ -25,7 +30,7 @@ const Section = styled.section`
   padding-top: ${({ theme }) => theme.space.x3};
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.space.x4};
+  gap: ${({ theme }) => theme.space.x5};
 `
 
 const HeadingRow = styled.div`
@@ -37,37 +42,76 @@ const HeadingRow = styled.div`
 
 const Heading = styled.h2`
   margin: 0;
-  font-size: 2rem;
+  font-size: ${({ theme }) => theme.typography.h1Size};
   color: ${({ theme }) => theme.colors.text};
 `
 
 const FilterToggle = styled.button`
-  border: none;
-  background: transparent;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  background: ${({ theme }) => theme.colors.surfaceStrong};
   color: ${({ theme }) => theme.colors.textMuted};
-  font-size: 1.1rem;
+  border-radius: 50%;
   cursor: pointer;
   min-height: ${({ theme }) => theme.layout.minTouchTarget};
   min-width: ${({ theme }) => theme.layout.minTouchTarget};
+  width: ${({ theme }) => theme.layout.minTouchTarget};
+  height: ${({ theme }) => theme.layout.minTouchTarget};
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 
   &:focus-visible {
     outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
     outline-offset: 2px;
-    border-radius: ${({ theme }) => theme.radii.sm};
   }
+`
+
+const FilterIcon = styled.svg`
+  width: 18px;
+  height: 18px;
+  display: block;
+`
+
+const ActiveFilters = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.x2};
+`
+
+const ActiveFilterChip = styled.button`
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.pill};
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  color: ${({ theme }) => theme.colors.accentStrong};
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  padding: ${({ theme }) => `0 ${theme.space.x3}`};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+  cursor: pointer;
+`
+
+const ClearFilters = styled.button`
+  border: none;
+  background: transparent;
+  color: ${({ theme }) => theme.colors.textMuted};
+  cursor: pointer;
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  padding: 0 ${({ theme }) => theme.space.x1};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
 `
 
 const FiltersPanel = styled.div`
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: ${({ theme }) => theme.radii.lg};
   background: ${({ theme }) => theme.colors.surfaceStrong};
-  padding: ${({ theme }) => theme.space.x3};
+  padding: ${({ theme }) => theme.space.x4};
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.space.x3};
 `
 
-const FilterLabel = styled.label`
+const FilterLabel = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.space.x2};
@@ -75,13 +119,22 @@ const FilterLabel = styled.label`
   font-size: ${({ theme }) => theme.typography.secondarySize};
 `
 
-const MonthSelect = styled.select`
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  background: ${({ theme }) => theme.colors.surface};
-  color: ${({ theme }) => theme.colors.text};
-  border-radius: ${({ theme }) => theme.radii.md};
-  min-height: 44px;
-  padding: 0 ${({ theme }) => theme.space.x3};
+const MonthGrid = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.space.x2};
+`
+
+const MonthFilterButton = styled.button<{ $active: boolean }>`
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  padding: ${({ theme }) => `0 ${theme.space.x3}`};
+  border-radius: ${({ theme }) => theme.radii.pill};
+  border: 1px solid ${({ theme, $active }) => ($active ? theme.colors.accent : theme.colors.border)};
+  background: ${({ theme, $active }) => ($active ? theme.colors.surface : theme.colors.surfaceStrong)};
+  color: ${({ theme, $active }) => ($active ? theme.colors.accentStrong : theme.colors.text)};
+  font-size: ${({ theme }) => theme.typography.bodySize};
+  line-height: ${({ theme }) => theme.typography.bodyLineHeight};
+  cursor: pointer;
 `
 
 const TagGrid = styled.div`
@@ -91,8 +144,8 @@ const TagGrid = styled.div`
 `
 
 const TagFilterButton = styled.button<{ $active: boolean }>`
-  min-height: 36px;
-  padding: ${({ theme }) => `${theme.space.x1} ${theme.space.x2}`};
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  padding: ${({ theme }) => `0 ${theme.space.x3}`};
   border-radius: ${({ theme }) => theme.radii.pill};
   border: 1px solid ${({ theme, $active }) => ($active ? theme.colors.accent : theme.colors.border)};
   background: ${({ theme, $active }) => ($active ? theme.colors.surface : theme.colors.surfaceStrong)};
@@ -108,11 +161,27 @@ const Group = styled.div`
 
 const GroupTitle = styled.h3`
   margin: 0;
-  padding: ${({ theme }) => `${theme.space.x2} 0`};
+  padding: ${({ theme }) => `${theme.space.x1} 0 ${theme.space.x2}`};
   color: ${({ theme }) => theme.colors.text};
   font-family: ${({ theme }) => theme.typography.headingFamily};
-  font-size: 1.35rem;
+  font-size: ${({ theme }) => theme.typography.h2Size};
   font-weight: 500;
+`
+
+const Groups = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.x5};
+`
+
+const EmptyState = styled.div`
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.lg};
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  padding: ${({ theme }) => theme.space.x4};
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.x3};
 `
 
 const EmptyText = styled.p`
@@ -122,6 +191,45 @@ const EmptyText = styled.p`
 const ErrorText = styled.p`
   color: ${({ theme }) => theme.colors.danger};
 `
+
+const LoadingSkeleton = styled.div`
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.lg};
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  min-height: 96px;
+  opacity: 0.7;
+`
+
+const FooterArea = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.x2};
+  padding: ${({ theme }) => `${theme.space.x2} 0 ${theme.space.x3}`};
+`
+
+const FooterText = styled.p`
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+`
+
+const RetryLoadMoreButton = styled.button`
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.pill};
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  color: ${({ theme }) => theme.colors.accentStrong};
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  padding: ${({ theme }) => `0 ${theme.space.x3}`};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+  cursor: pointer;
+`
+
+const ScrollSentinel = styled.div`
+  width: 100%;
+  height: 1px;
+`
+
+const PENDING_MEMORY_PREFIX = 'pending-memory-'
 
 function getEventDate(item: MemoryListItem): string {
   return item.recordedAt || item.createdAt
@@ -166,27 +274,76 @@ function groupByMonth(items: MemoryListItem[]): MonthGroup[] {
 }
 
 export function MemoriesPage({ navigate }: MemoriesPageProps) {
-  const { loading, error, items } = useMemoriesList()
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState('all')
   const [selectedTags, setSelectedTags] = useState<MemoryTag[]>([])
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null)
+  const hasShownLoadMoreHintRef = useRef(false)
+  const [nearListEnd, setNearListEnd] = useState(false)
+  const [showLoadMoreHint, setShowLoadMoreHint] = useState(false)
+  const lastSettledUploadRef = useRef('')
+  const activeUpload = useActiveMemoryUpload()
+  const processingMemoryId = activeUpload?.status === 'processing' ? activeUpload.memoryId : undefined
+  const {
+    status: processingStatus,
+    error: processingError,
+    isPolling: isProcessingPolling,
+    startPolling,
+    stopPolling,
+  } = useProcessingMemory({ memoryId: processingMemoryId, pollIntervalMs: 2500, timeoutMs: 60000 })
 
-  const monthOptions = useMemo(() => collectMonthOptions(items), [items])
+  const monthFilter = selectedMonth !== 'all' ? selectedMonth : undefined
+  const {
+    items,
+    loadingInitial,
+    loadingMore,
+    error,
+    loadMoreError,
+    hasMore,
+    loadMore,
+    retryLoadMore,
+    reload,
+  } = usePaginatedMemories({
+    month: monthFilter,
+    tags: selectedTags,
+    pageSize: 5,
+  })
 
-  const filteredItems = useMemo(() => {
-    return items.filter((item) => {
-      const eventDate = getEventDate(item)
-      if (selectedMonth !== 'all' && monthKey(eventDate) !== selectedMonth) {
-        return false
-      }
-      if (selectedTags.length > 0 && !item.tags.some((tag) => selectedTags.includes(tag))) {
-        return false
-      }
-      return true
-    })
-  }, [items, selectedMonth, selectedTags])
+  const displayItems = useMemo(() => {
+    if (!activeUpload || (activeUpload.status !== 'uploading' && activeUpload.status !== 'processing')) {
+      return items
+    }
 
-  const groups = useMemo(() => groupByMonth(filteredItems), [filteredItems])
+    const existingById = new Set(items.map((item) => item.id))
+    if (activeUpload.memoryId && existingById.has(activeUpload.memoryId)) {
+      return items
+    }
+
+    const pendingItem: MemoryListItem = {
+      id: activeUpload.memoryId ?? `${PENDING_MEMORY_PREFIX}${activeUpload.clientId}`,
+      createdAt: activeUpload.startedAt,
+      recordedAt: activeUpload.recordedAt,
+      status: 'PROCESSING',
+      title: null,
+      transcriptSnippet: 'Saving your moment…',
+      tags: [],
+    }
+
+    return [pendingItem, ...items]
+  }, [activeUpload, items])
+
+  const monthOptions = useMemo(() => collectMonthOptions(displayItems), [displayItems])
+
+  const selectedMonthLabel = useMemo(() => {
+    if (selectedMonth === 'all') {
+      return ''
+    }
+    return monthOptions.find((option) => option.key === selectedMonth)?.label || selectedMonth
+  }, [monthOptions, selectedMonth])
+
+  const groups = useMemo(() => groupByMonth(displayItems), [displayItems])
+
+  const hasActiveFilters = selectedMonth !== 'all' || selectedTags.length > 0
 
   const toggleTag = (tag: MemoryTag) => {
     setSelectedTags((current) =>
@@ -194,77 +351,341 @@ export function MemoriesPage({ navigate }: MemoriesPageProps) {
     )
   }
 
-  if (loading) {
+  const clearFilters = () => {
+    setSelectedMonth('all')
+    setSelectedTags([])
+  }
+
+  useEffect(() => {
+    hasShownLoadMoreHintRef.current = false
+    setShowLoadMoreHint(false)
+  }, [monthFilter, selectedTags])
+
+  useEffect(() => {
+    if (!activeUpload || activeUpload.status !== 'processing' || !activeUpload.memoryId) {
+      stopPolling()
+      return
+    }
+
+    startPolling(activeUpload.memoryId)
+    return () => stopPolling()
+  }, [activeUpload, startPolling, stopPolling])
+
+  useEffect(() => {
+    if (!activeUpload || activeUpload.status !== 'processing') {
+      return
+    }
+
+    if (processingStatus === 'READY') {
+      setActiveUploadStatusFromPolling('READY')
+      void reload()
+      return
+    }
+
+    if (processingStatus === 'FAILED') {
+      setActiveUploadStatusFromPolling('FAILED', processingError)
+      void reload()
+    }
+  }, [activeUpload, processingError, processingStatus, reload])
+
+  useEffect(() => {
+    if (!activeUpload) {
+      return
+    }
+    if (activeUpload.status !== 'ready' && activeUpload.status !== 'failed') {
+      return
+    }
+
+    const marker = `${activeUpload.clientId}:${activeUpload.status}`
+    if (lastSettledUploadRef.current === marker) {
+      return
+    }
+    lastSettledUploadRef.current = marker
+    void reload()
+  }, [activeUpload, reload])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (!params.has('pending')) {
+      return
+    }
+
+    if (activeUpload && (activeUpload.status === 'uploading' || activeUpload.status === 'processing')) {
+      return
+    }
+
+    window.history.replaceState({}, '', '/memories')
+  }, [activeUpload])
+
+  useEffect(() => {
+    const node = loadMoreSentinelRef.current
+    if (!node) {
+      return undefined
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        setNearListEnd(Boolean(entries[0]?.isIntersecting))
+      },
+      {
+        root: null,
+        rootMargin: '0px 0px 220px 0px',
+        threshold: 0,
+      },
+    )
+
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [groups.length, hasMore])
+
+  useEffect(() => {
+    if (!nearListEnd || !hasMore || loadingInitial || loadingMore || loadMoreError) {
+      return
+    }
+    void loadMore()
+  }, [hasMore, loadMore, loadMoreError, loadingInitial, loadingMore, nearListEnd])
+
+  useEffect(() => {
+    if (!nearListEnd || !hasMore || loadingInitial || loadingMore || hasShownLoadMoreHintRef.current) {
+      return
+    }
+    hasShownLoadMoreHintRef.current = true
+    setShowLoadMoreHint(true)
+    const timer = window.setTimeout(() => setShowLoadMoreHint(false), 2200)
+    return () => window.clearTimeout(timer)
+  }, [hasMore, loadingInitial, loadingMore, nearListEnd])
+
+  const onRetryProcessing = () => {
+    if (activeUpload?.status === 'failed' && retryActiveMemoryUpload()) {
+      return
+    }
+
+    if (activeUpload?.memoryId) {
+      startPolling(activeUpload.memoryId)
+    }
+    void reload()
+  }
+
+  const processingBanner = (() => {
+    if (!activeUpload) {
+      return null
+    }
+
+    if (activeUpload.status === 'uploading') {
+      return (
+        <StatusBanner
+          title="Saving your moment… It will appear here shortly."
+          detail="You can keep scrolling."
+        />
+      )
+    }
+
+    if (activeUpload.status === 'processing') {
+      if (processingStatus === 'TIMEOUT') {
+        return (
+          <StatusBanner
+            title="Still saving your moment."
+            detail="This is taking longer than usual. You can keep using the app."
+            actionLabel="Refresh"
+            onAction={onRetryProcessing}
+          />
+        )
+      }
+
+      return (
+        <StatusBanner
+          title="Saving your moment… It will appear here shortly."
+          detail={isProcessingPolling ? 'You can keep scrolling.' : undefined}
+        />
+      )
+    }
+
+    if (activeUpload.status === 'failed') {
+      return (
+        <StatusBanner
+          tone="error"
+          title="We couldn’t finish saving this moment."
+          detail={activeUpload.errorMessage || processingError || 'Please try again.'}
+          actionLabel="Try again"
+          onAction={onRetryProcessing}
+        />
+      )
+    }
+
+    return null
+  })()
+
+  if (loadingInitial) {
     return (
-      <Section>
-        <Heading>Memories</Heading>
-        <EmptyText>Loading...</EmptyText>
-      </Section>
+      <PageContainer>
+        <Section>
+          <Heading>Memories</Heading>
+          {processingBanner}
+          <EmptyText>Loading your moments...</EmptyText>
+          <LoadingSkeleton />
+          <LoadingSkeleton />
+          <LoadingSkeleton />
+          <LoadingSkeleton />
+          <LoadingSkeleton />
+        </Section>
+      </PageContainer>
     )
   }
 
-  if (error) {
+  if (error && items.length === 0) {
     return (
-      <Section>
-        <Heading>Memories</Heading>
-        <ErrorText>{error}</ErrorText>
-      </Section>
+      <PageContainer>
+        <Section>
+          <Heading>Memories</Heading>
+          {processingBanner}
+          <ErrorText>{error}</ErrorText>
+          <Button variant="primary" onClick={reload}>
+            Try again
+          </Button>
+        </Section>
+      </PageContainer>
     )
   }
 
   return (
-    <Section>
-      <HeadingRow>
-        <Heading>Memories</Heading>
-        <FilterToggle onClick={() => setFiltersOpen((open) => !open)} aria-label="Toggle filters">
-          ⌄
-        </FilterToggle>
-      </HeadingRow>
-
-      {filtersOpen && (
-        <FiltersPanel>
-          <FilterLabel>
-            Month
-            <MonthSelect value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)}>
-              <option value="all">All months</option>
-              {monthOptions.map((option) => (
-                <option key={option.key} value={option.key}>
-                  {option.label}
-                </option>
-              ))}
-            </MonthSelect>
-          </FilterLabel>
-
-          <FilterLabel>
-            Tags
-            <TagGrid>
-              {MEMORY_TAG_OPTIONS.map((tag) => (
-                <TagFilterButton key={tag} $active={selectedTags.includes(tag)} onClick={() => toggleTag(tag)}>
-                  {tag}
-                </TagFilterButton>
-              ))}
-            </TagGrid>
-          </FilterLabel>
-        </FiltersPanel>
-      )}
-
-      {groups.length === 0 ? (
-        <EmptyText>No memories match the current filters.</EmptyText>
-      ) : (
-        groups.map((group) => (
-          <Group key={group.key}>
-            <GroupTitle>{group.label}</GroupTitle>
-            {group.items.map((item, index) => (
-              <MemoryListItemCard
-                key={item.id}
-                item={item}
-                isLastInGroup={index === group.items.length - 1}
-                onOpen={(id) => navigate(`/memories/${id}`)}
+    <PageContainer>
+      <Section>
+        <HeadingRow>
+          <Heading>Memories</Heading>
+          <FilterToggle
+            type="button"
+            onClick={() => setFiltersOpen((open) => !open)}
+            aria-label={filtersOpen ? 'Hide filters' : 'Show filters'}
+            aria-expanded={filtersOpen}
+          >
+            <FilterIcon viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path
+                d="M4 6H20L14 13V18L10 20V13L4 6Z"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               />
+            </FilterIcon>
+          </FilterToggle>
+        </HeadingRow>
+
+        {processingBanner}
+
+        {hasActiveFilters && (
+          <ActiveFilters>
+            {selectedMonth !== 'all' && (
+              <ActiveFilterChip type="button" onClick={() => setSelectedMonth('all')}>
+                Month: {selectedMonthLabel} ×
+              </ActiveFilterChip>
+            )}
+            {selectedTags.map((tag) => (
+              <ActiveFilterChip key={`active-${tag}`} type="button" onClick={() => toggleTag(tag)}>
+                {tag} ×
+              </ActiveFilterChip>
             ))}
-          </Group>
-        ))
-      )}
-    </Section>
+            <ClearFilters type="button" onClick={clearFilters}>
+              Clear all
+            </ClearFilters>
+          </ActiveFilters>
+        )}
+
+        {filtersOpen && (
+          <FiltersPanel>
+            <FilterLabel>
+              Month
+              <MonthGrid>
+                <MonthFilterButton
+                  type="button"
+                  $active={selectedMonth === 'all'}
+                  onClick={() => setSelectedMonth('all')}
+                >
+                  All months
+                </MonthFilterButton>
+                {monthOptions.map((option) => (
+                  <MonthFilterButton
+                    key={option.key}
+                    type="button"
+                    $active={selectedMonth === option.key}
+                    onClick={() => setSelectedMonth(option.key)}
+                  >
+                    {option.label}
+                  </MonthFilterButton>
+                ))}
+              </MonthGrid>
+            </FilterLabel>
+
+            <FilterLabel>
+              Tags
+              <TagGrid>
+                {MEMORY_TAG_OPTIONS.map((tag) => (
+                  <TagFilterButton
+                    key={tag}
+                    type="button"
+                    $active={selectedTags.includes(tag)}
+                    onClick={() => toggleTag(tag)}
+                  >
+                    {tag}
+                  </TagFilterButton>
+                ))}
+              </TagGrid>
+            </FilterLabel>
+          </FiltersPanel>
+        )}
+
+        {groups.length === 0 ? (
+          <EmptyState>
+            <EmptyText>No moments match these filters.</EmptyText>
+            <Button variant="primary" onClick={() => navigate('/record')}>
+              Record moment
+            </Button>
+          </EmptyState>
+        ) : (
+          <>
+            <Groups>
+              {groups.map((group) => (
+                <Group key={group.key}>
+                  <GroupTitle>{group.label}</GroupTitle>
+                  {group.items.map((item, index) => (
+                    <MemoryListItemCard
+                      key={item.id}
+                      item={item}
+                      isLastInGroup={index === group.items.length - 1}
+                      onOpen={(id) => {
+                        if (id.startsWith(PENDING_MEMORY_PREFIX)) {
+                          return
+                        }
+                        navigate(`/memories/${id}`)
+                      }}
+                    />
+                  ))}
+                </Group>
+              ))}
+            </Groups>
+
+            <FooterArea aria-live="polite">
+              {showLoadMoreHint && hasMore && !loadingMore && !loadMoreError && (
+                <FooterText>Scroll to load more</FooterText>
+              )}
+
+              {loadingMore && <FooterText>Loading more...</FooterText>}
+
+              {!loadingMore && loadMoreError && (
+                <>
+                  <FooterText>{loadMoreError}</FooterText>
+                  <RetryLoadMoreButton type="button" onClick={retryLoadMore}>
+                    Retry
+                  </RetryLoadMoreButton>
+                </>
+              )}
+
+              {!hasMore && !loadingMore && <FooterText>You&apos;re all caught up.</FooterText>}
+
+              <ScrollSentinel ref={loadMoreSentinelRef} aria-hidden />
+            </FooterArea>
+          </>
+        )}
+      </Section>
+    </PageContainer>
   )
 }

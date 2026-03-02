@@ -54,6 +54,7 @@ declare module 'styled-components' {
       minTouchTarget: string
       primaryButtonHeight: string
       centerCardMinHeight: string
+      bottomNavHeight: string
     }
   }
 }

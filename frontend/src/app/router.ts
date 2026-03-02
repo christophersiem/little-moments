@@ -6,13 +6,23 @@ export type AppRoute =
   | { kind: 'memory-detail'; memoryId: string }
   | { kind: 'settings' }
   | { kind: 'account' }
+  | { kind: 'privacy' }
   | { kind: 'not-found' }
 
 function normalizePath(pathname: string): string {
-  if (pathname === '/') {
+  const trimmed = pathname.trim()
+  const basePath = trimmed.length === 0 ? '/' : trimmed
+  const normalizedSlashes = basePath.replace(/\/{2,}/g, '/')
+  const withoutTrailingSlash =
+    normalizedSlashes.length > 1 && normalizedSlashes.endsWith('/')
+      ? normalizedSlashes.slice(0, -1)
+      : normalizedSlashes
+  const normalized = withoutTrailingSlash.toLowerCase()
+
+  if (normalized === '/') {
     return '/record'
   }
-  return pathname
+  return normalized
 }
 
 function resolveRoute(pathname: string): AppRoute {
@@ -28,8 +38,11 @@ function resolveRoute(pathname: string): AppRoute {
   if (pathname === '/settings/account') {
     return { kind: 'account' }
   }
+  if (pathname === '/settings/privacy') {
+    return { kind: 'privacy' }
+  }
 
-  const detailMatch = pathname.match(/^\/memories\/([0-9a-fA-F-]+)$/)
+  const detailMatch = pathname.match(/^\/memories\/([0-9a-f-]+)$/)
   if (detailMatch) {
     return { kind: 'memory-detail', memoryId: detailMatch[1] }
   }
@@ -58,11 +71,13 @@ export function useAppRouter() {
   const route = useMemo(() => resolveRoute(pathname), [pathname])
 
   const navigate = (nextPath: string) => {
-    if (nextPath === window.location.pathname) {
+    const normalizedNextPath = normalizePath(nextPath)
+    const normalizedCurrentPath = normalizePath(window.location.pathname)
+    if (normalizedNextPath === normalizedCurrentPath) {
       return
     }
-    window.history.pushState({}, '', nextPath)
-    setPathname(nextPath)
+    window.history.pushState({}, '', normalizedNextPath)
+    setPathname(normalizedNextPath)
   }
 
   return { pathname, route, navigate }

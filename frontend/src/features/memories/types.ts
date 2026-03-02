@@ -26,6 +26,8 @@ export const MEMORY_TAG_OPTIONS: MemoryTag[] = [
 
 export interface CreateMemoryResponse {
   id: string
+  ids: string[]
+  count: number
   status: MemoryStatus
   errorMessage: string | null
   transcriptPreview: string | null

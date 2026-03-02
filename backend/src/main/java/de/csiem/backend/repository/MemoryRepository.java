@@ -15,4 +15,8 @@ public interface MemoryRepository extends JpaRepository<MemoryEntity, UUID>, Jpa
     Page<MemoryEntity> findByUser_Id(UUID userId, Pageable pageable);
 
     Optional<MemoryEntity> findByIdAndUser_Id(UUID id, UUID userId);
+
+    Optional<MemoryEntity> findByIdAndUser_IdAndIsParentFalse(UUID id, UUID userId);
+
+    long countByParentMemory_Id(UUID parentMemoryId);
 }

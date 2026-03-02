@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { getMemory, listMemories } from './api'
 import type { Memory, MemoryListItem } from './types'
 
@@ -6,18 +6,25 @@ export interface MemoriesListState {
   loading: boolean
   error: string
   items: MemoryListItem[]
+  reload: () => void
 }
 
 export interface MemoryDetailState {
   loading: boolean
   error: string
   memory: Memory | null
+  reload: () => void
 }
 
 export function useMemoriesList(): MemoriesListState {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [items, setItems] = useState<MemoryListItem[]>([])
+  const [reloadIndex, setReloadIndex] = useState(0)
+
+  const reload = useCallback(() => {
+    setReloadIndex((current) => current + 1)
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -26,7 +33,7 @@ export function useMemoriesList(): MemoriesListState {
       setLoading(true)
       setError('')
       try {
-        const payload = await listMemories(0, 50)
+        const payload = await listMemories({ page: 0, size: 50 })
         if (isMounted) {
           setItems(payload.items)
         }
@@ -47,15 +54,20 @@ export function useMemoriesList(): MemoriesListState {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [reloadIndex])
 
-  return { loading, error, items }
+  return { loading, error, items, reload }
 }
 
 export function useMemoryDetail(memoryId: string): MemoryDetailState {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [memory, setMemory] = useState<Memory | null>(null)
+  const [reloadIndex, setReloadIndex] = useState(0)
+
+  const reload = useCallback(() => {
+    setReloadIndex((current) => current + 1)
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -85,7 +97,7 @@ export function useMemoryDetail(memoryId: string): MemoryDetailState {
     return () => {
       isMounted = false
     }
-  }, [memoryId])
+  }, [memoryId, reloadIndex])
 
-  return { loading, error, memory }
+  return { loading, error, memory, reload }
 }

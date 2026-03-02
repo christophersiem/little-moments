@@ -13,6 +13,7 @@ public class AppProperties {
     private String corsAllowedOrigins = "http://localhost:5173";
     private final Transcription transcription = new Transcription();
     private final Insights insights = new Insights();
+    private final Splitter splitter = new Splitter();
 
     public UUID getDefaultUserId() {
         return defaultUserId;
@@ -36,6 +37,10 @@ public class AppProperties {
 
     public Insights getInsights() {
         return insights;
+    }
+
+    public Splitter getSplitter() {
+        return splitter;
     }
 
     public List<String> getCorsOriginsAsList() {
@@ -111,6 +116,63 @@ public class AppProperties {
 
         public void setOpenaiApiKey(String openaiApiKey) {
             this.openaiApiKey = openaiApiKey;
+        }
+    }
+
+    public static class Splitter {
+        private boolean enabled = true;
+        private String openaiBaseUrl = "https://api.openai.com";
+        private String openaiModel = "gpt-4o-mini";
+        private String openaiApiKey;
+        private int maxMemories = 5;
+        private int minExcerptChars = 20;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getOpenaiBaseUrl() {
+            return openaiBaseUrl;
+        }
+
+        public void setOpenaiBaseUrl(String openaiBaseUrl) {
+            this.openaiBaseUrl = openaiBaseUrl;
+        }
+
+        public String getOpenaiModel() {
+            return openaiModel;
+        }
+
+        public void setOpenaiModel(String openaiModel) {
+            this.openaiModel = openaiModel;
+        }
+
+        public String getOpenaiApiKey() {
+            return openaiApiKey;
+        }
+
+        public void setOpenaiApiKey(String openaiApiKey) {
+            this.openaiApiKey = openaiApiKey;
+        }
+
+        public int getMaxMemories() {
+            return maxMemories;
+        }
+
+        public void setMaxMemories(int maxMemories) {
+            this.maxMemories = maxMemories;
+        }
+
+        public int getMinExcerptChars() {
+            return minExcerptChars;
+        }
+
+        public void setMinExcerptChars(int minExcerptChars) {
+            this.minExcerptChars = minExcerptChars;
         }
     }
 }

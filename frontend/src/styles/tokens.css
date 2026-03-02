@@ -41,8 +41,15 @@
   --shadow-card: 0 4px 14px rgba(48, 39, 33, 0.05);
   --shadow-sheet: 0 14px 28px rgba(48, 39, 33, 0.13);
 
+  --lm-accent: var(--color-accent);
+  --lm-surface: var(--color-surface-strong);
+  --lm-text: var(--color-text);
+  --lm-muted: var(--color-text-muted);
+  --lm-shadow: 67, 57, 49;
+
   --layout-max-width: 430px;
   --layout-min-touch-target: 44px;
   --layout-primary-button-height: 48px;
   --layout-center-card-min-height: 320px;
+  --layout-bottom-nav-height: 78px;
 }

@@ -19,12 +19,25 @@ public class MemoryInsightsService {
     private static final Pattern JSON_TITLE_PATTERN = Pattern.compile("\"title\"\\s*:\\s*\"((?:\\\\.|[^\\\"])*)\"", Pattern.CASE_INSENSITIVE);
     private static final Pattern JSON_SUMMARY_PATTERN = Pattern.compile("\"summary\"\\s*:\\s*\"((?:\\\\.|[^\\\"])*)\"", Pattern.CASE_INSENSITIVE);
 
-    private static final Set<String> STOP_WORDS = Set.of(
+    private static final Set<String> STOP_WORDS_EN = Set.of(
         "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "had", "has", "have",
         "he", "her", "hers", "him", "his", "i", "if", "in", "is", "it", "its", "me", "my", "of",
         "on", "or", "our", "she", "that", "the", "their", "them", "they", "this", "to", "was", "we",
         "were", "with", "you", "your"
     );
+    private static final Set<String> STOP_WORDS_DE = Set.of(
+        "aber", "als", "am", "an", "auch", "auf", "aus", "bei", "bin", "bis", "da", "dann", "das",
+        "dem", "den", "der", "des", "die", "doch", "du", "ein", "eine", "einem", "einer", "eines",
+        "er", "es", "für", "hat", "habe", "haben", "ich", "im", "in", "ist", "mit", "nach", "nicht",
+        "oder", "sie", "so", "und", "uns", "unser", "war", "waren", "wie", "wir", "zu", "zum", "zur"
+    );
+    private static final Set<String> LANGUAGE_MARKERS_DE = Set.of(
+        "der", "die", "das", "und", "nicht", "ein", "eine", "wir", "heute", "gestern", "woche", "kind"
+    );
+    private static final Set<String> LANGUAGE_MARKERS_EN = Set.of(
+        "the", "and", "not", "a", "an", "we", "today", "yesterday", "week", "child"
+    );
+    private static final Pattern UMLAUT_PATTERN = Pattern.compile("[äöüßÄÖÜ]");
 
     private final AppProperties appProperties;
 
@@ -51,6 +64,7 @@ public class MemoryInsightsService {
         if (!insights.isEnabled()) {
             return null;
         }
+        DetectedLanguage transcriptLanguage = detectLanguage(transcript);
 
         String apiKey = firstNonBlank(insights.getOpenaiApiKey(), appProperties.getTranscription().getOpenaiApiKey());
         if (apiKey == null || apiKey.isBlank()) {
@@ -102,6 +116,9 @@ public class MemoryInsightsService {
             if (title.isBlank() || summary.isBlank()) {
                 return null;
             }
+            if (!matchesLanguage(title, transcriptLanguage) || !matchesLanguage(summary, transcriptLanguage)) {
+                return null;
+            }
 
             return new MemoryInsights(title, summary);
         } catch (Exception ignored) {
@@ -127,9 +144,10 @@ public class MemoryInsightsService {
     }
 
     private MemoryInsights generateFallback(String transcript) {
+        DetectedLanguage language = detectLanguage(transcript);
         List<String> words = tokenize(transcript);
-        String title = buildFallbackTitle(transcript, words);
-        String summary = buildFallbackSummary(title);
+        String title = buildFallbackTitle(transcript, words, language);
+        String summary = buildFallbackSummary(title, language);
         return new MemoryInsights(title, summary);
     }
 
@@ -141,7 +159,7 @@ public class MemoryInsightsService {
     }
 
     private List<String> tokenize(String text) {
-        String cleaned = text.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9' ]", " ");
+        String cleaned = text.toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N}' ]", " ");
         String[] split = cleaned.trim().split("\\s+");
 
         List<String> words = new ArrayList<>();
@@ -153,15 +171,16 @@ public class MemoryInsightsService {
         return words;
     }
 
-    private String buildFallbackTitle(String transcript, List<String> words) {
-        String quoted = tryQuotedPhraseTitle(transcript);
+    private String buildFallbackTitle(String transcript, List<String> words, DetectedLanguage language) {
+        String quoted = tryQuotedPhraseTitle(transcript, language);
         if (!quoted.isBlank()) {
             return quoted;
         }
 
+        Set<String> stopWords = language == DetectedLanguage.GERMAN ? STOP_WORDS_DE : STOP_WORDS_EN;
         List<String> selected = new ArrayList<>();
         for (String word : words) {
-            if (!STOP_WORDS.contains(word)) {
+            if (!stopWords.contains(word)) {
                 selected.add(word);
             }
             if (selected.size() == 5) {
@@ -170,7 +189,7 @@ public class MemoryInsightsService {
         }
 
         if (selected.isEmpty()) {
-            return "Untitled Memory";
+            return defaultTitle(language);
         }
 
         String title = toTitleCase(String.join(" ", selected));
@@ -180,7 +199,7 @@ public class MemoryInsightsService {
         return title;
     }
 
-    private String tryQuotedPhraseTitle(String transcript) {
+    private String tryQuotedPhraseTitle(String transcript, DetectedLanguage language) {
         Matcher matcher = QUOTED_TEXT_PATTERN.matcher(transcript);
         if (!matcher.find()) {
             return "";
@@ -197,13 +216,22 @@ public class MemoryInsightsService {
         }
 
         String normalized = toTitleCase(phrase);
-        if (transcript.toLowerCase(Locale.ROOT).contains("first")) {
+        if (language == DetectedLanguage.GERMAN && transcript.toLowerCase(Locale.ROOT).contains("erste")) {
+            return "Erstes Mal: '" + normalized + "'";
+        }
+        if (language != DetectedLanguage.GERMAN && transcript.toLowerCase(Locale.ROOT).contains("first")) {
             return "First Time Saying '" + normalized + "'";
         }
         return normalized;
     }
 
-    private String buildFallbackSummary(String title) {
+    private String buildFallbackSummary(String title, DetectedLanguage language) {
+        if (language == DetectedLanguage.GERMAN) {
+            if (title == null || title.isBlank()) {
+                return "Ein besonderer Moment wurde festgehalten.";
+            }
+            return "Ein besonderer Moment zu " + lowerFirst(title) + " wurde festgehalten.";
+        }
         if (title == null || title.isBlank()) {
             return "A meaningful moment was captured and saved.";
         }
@@ -216,7 +244,6 @@ public class MemoryInsightsService {
             return "";
         }
 
-        title = toTitleCase(title);
         if (title.length() > MAX_TITLE_LENGTH) {
             title = title.substring(0, MAX_TITLE_LENGTH - 3).trim() + "...";
         }
@@ -291,7 +318,61 @@ public class MemoryInsightsService {
         return second;
     }
 
+    private String defaultTitle(DetectedLanguage language) {
+        if (language == DetectedLanguage.GERMAN) {
+            return "Unbenannter Moment";
+        }
+        return "Untitled Memory";
+    }
+
+    private boolean matchesLanguage(String text, DetectedLanguage expected) {
+        if (expected == DetectedLanguage.UNKNOWN) {
+            return true;
+        }
+        DetectedLanguage actual = detectLanguage(text);
+        if (actual == DetectedLanguage.UNKNOWN) {
+            return true;
+        }
+        return actual == expected;
+    }
+
+    private DetectedLanguage detectLanguage(String text) {
+        String normalized = normalize(text).toLowerCase(Locale.ROOT);
+        if (normalized.isBlank()) {
+            return DetectedLanguage.UNKNOWN;
+        }
+        if (UMLAUT_PATTERN.matcher(normalized).find()) {
+            return DetectedLanguage.GERMAN;
+        }
+
+        List<String> words = tokenize(normalized);
+        int deScore = 0;
+        int enScore = 0;
+        for (String word : words) {
+            if (LANGUAGE_MARKERS_DE.contains(word) || STOP_WORDS_DE.contains(word)) {
+                deScore++;
+            }
+            if (LANGUAGE_MARKERS_EN.contains(word) || STOP_WORDS_EN.contains(word)) {
+                enScore++;
+            }
+        }
+
+        if (deScore == 0 && enScore == 0) {
+            return DetectedLanguage.UNKNOWN;
+        }
+        if (deScore == enScore) {
+            return DetectedLanguage.UNKNOWN;
+        }
+        return deScore > enScore ? DetectedLanguage.GERMAN : DetectedLanguage.ENGLISH;
+    }
+
     public record MemoryInsights(String title, String summary) {
+    }
+
+    private enum DetectedLanguage {
+        GERMAN,
+        ENGLISH,
+        UNKNOWN
     }
 
     private record ChatCompletionsRequest(

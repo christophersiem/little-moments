@@ -49,6 +49,7 @@ public class MemoryService {
     private final MemoryRepository memoryRepository;
     private final UserRepository userRepository;
     private final TranscriptionService transcriptionService;
+    private final MemorySplittingService memorySplittingService;
     private final MemoryTaggingService memoryTaggingService;
     private final MemoryInsightsService memoryInsightsService;
     private final AppProperties appProperties;
@@ -57,6 +58,7 @@ public class MemoryService {
         MemoryRepository memoryRepository,
         UserRepository userRepository,
         TranscriptionService transcriptionService,
+        MemorySplittingService memorySplittingService,
         MemoryTaggingService memoryTaggingService,
         MemoryInsightsService memoryInsightsService,
         AppProperties appProperties
@@ -64,6 +66,7 @@ public class MemoryService {
         this.memoryRepository = memoryRepository;
         this.userRepository = userRepository;
         this.transcriptionService = transcriptionService;
+        this.memorySplittingService = memorySplittingService;
         this.memoryTaggingService = memoryTaggingService;
         this.memoryInsightsService = memoryInsightsService;
         this.appProperties = appProperties;
@@ -72,7 +75,7 @@ public class MemoryService {
     @Transactional
     public CreateMemoryResponse createMemory(CreateMemoryRequest request) {
         var audio = request.audio();
-        var recordedAt = request.recordedAt();
+        Instant uploadTimestamp = request.recordedAt() != null ? request.recordedAt() : Instant.now();
         if (audio == null || audio.isEmpty()) {
             throw new ResponseStatusException(BAD_REQUEST, "Audio file is required");
         }
@@ -81,7 +84,7 @@ public class MemoryService {
         MemoryEntity memory = new MemoryEntity(
             UUID.randomUUID(),
             user,
-            recordedAt != null ? recordedAt : Instant.now(),
+            uploadTimestamp,
             MemoryStatus.PROCESSING
         );
         memoryRepository.save(memory);
@@ -92,19 +95,31 @@ public class MemoryService {
                 Optional.ofNullable(audio.getOriginalFilename()).orElse("recording.webm"),
                 Optional.ofNullable(audio.getContentType()).orElse(MediaType.APPLICATION_OCTET_STREAM_VALUE)
             );
-            MemoryInsightsService.MemoryInsights insights = memoryInsightsService.generate(transcript);
-            memory.markReady(
-                transcript,
-                memoryTaggingService.detectTags(transcript),
-                insights.title(),
-                insights.summary()
-            );
+
+            List<SplitMemory> splitMemories = memorySplittingService.split(transcript, uploadTimestamp);
+            if (splitMemories.size() <= 1) {
+                SplitMemory single = splitMemories.isEmpty()
+                    ? new SplitMemory(transcript, uploadTimestamp, 1.0)
+                    : splitMemories.getFirst();
+                return persistSingleMemory(memory, single);
+            }
+
+            return persistSplitMemories(memory, transcript, splitMemories, user);
         } catch (Exception ex) {
             memory.markFailed(buildErrorMessage(ex));
+            MemoryEntity failed = memoryRepository.save(memory);
+            return new CreateMemoryResponse(
+                failed.getId(),
+                List.of(),
+                0,
+                failed.getStatus(),
+                failed.getErrorMessage(),
+                null,
+                null,
+                null,
+                List.of()
+            );
         }
-
-        MemoryEntity saved = memoryRepository.save(memory);
-        return MemoryMapper.toCreateMemoryResponse(saved, snippet(saved.getTranscript()));
     }
 
     @Transactional(readOnly = true)
@@ -119,7 +134,10 @@ public class MemoryService {
         Pageable pageable = PageRequest.of(
             safePage,
             safeSize,
-            Sort.by(Sort.Direction.DESC, "createdAt")
+            Sort.by(
+                Sort.Order.desc("recordedAt").nullsLast(),
+                Sort.Order.desc("createdAt")
+            )
         );
 
         Instant fromInstant = null;
@@ -151,6 +169,7 @@ public class MemoryService {
         Specification<MemoryEntity> specification = (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(criteriaBuilder.equal(root.get("user").get("id"), userId));
+            predicates.add(criteriaBuilder.isFalse(root.get("isParent")));
 
             if (fromFilter != null) {
                 predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("recordedAt"), fromFilter));
@@ -183,14 +202,14 @@ public class MemoryService {
 
     @Transactional(readOnly = true)
     public MemoryResponse getMemory(UUID id) {
-        MemoryEntity memory = memoryRepository.findByIdAndUser_Id(id, appProperties.getDefaultUserId())
+        MemoryEntity memory = memoryRepository.findByIdAndUser_IdAndIsParentFalse(id, appProperties.getDefaultUserId())
             .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Memory not found"));
         return MemoryMapper.toMemoryResponse(memory);
     }
 
     @Transactional
     public MemoryResponse updateMemory(UUID id, UpdateMemoryRequest request) {
-        MemoryEntity memory = memoryRepository.findByIdAndUser_Id(id, appProperties.getDefaultUserId())
+        MemoryEntity memory = memoryRepository.findByIdAndUser_IdAndIsParentFalse(id, appProperties.getDefaultUserId())
             .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Memory not found"));
 
         if (request.title() != null) {
@@ -219,6 +238,85 @@ public class MemoryService {
 
         MemoryEntity saved = memoryRepository.save(memory);
         return MemoryMapper.toMemoryResponse(saved);
+    }
+
+    @Transactional
+    public void deleteMemory(UUID id) {
+        MemoryEntity memory = memoryRepository.findByIdAndUser_IdAndIsParentFalse(id, appProperties.getDefaultUserId())
+            .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Memory not found"));
+        memoryRepository.delete(memory);
+    }
+
+    private CreateMemoryResponse persistSingleMemory(MemoryEntity memory, SplitMemory splitMemory) {
+        String excerpt = normalizeTranscript(splitMemory.excerpt());
+        MemoryInsightsService.MemoryInsights insights = memoryInsightsService.generate(excerpt);
+        memory.setRecordedAt(splitMemory.recordedAt());
+        memory.markReady(
+            excerpt,
+            memoryTaggingService.detectTags(excerpt),
+            insights.title(),
+            insights.summary()
+        );
+
+        MemoryEntity saved = memoryRepository.save(memory);
+        return new CreateMemoryResponse(
+            saved.getId(),
+            List.of(saved.getId()),
+            1,
+            saved.getStatus(),
+            saved.getErrorMessage(),
+            snippet(saved.getTranscript()),
+            saved.getTitle(),
+            saved.getSummary(),
+            MemoryMapper.toTagLabels(saved)
+        );
+    }
+
+    private CreateMemoryResponse persistSplitMemories(
+        MemoryEntity parentMemory,
+        String fullTranscript,
+        List<SplitMemory> splitMemories,
+        UserEntity user
+    ) {
+        parentMemory.markReadyAsParent(fullTranscript);
+        MemoryEntity parentSaved = memoryRepository.save(parentMemory);
+
+        List<MemoryEntity> children = new ArrayList<>();
+        for (SplitMemory splitMemory : splitMemories) {
+            String excerpt = normalizeTranscript(splitMemory.excerpt());
+            MemoryInsightsService.MemoryInsights insights = memoryInsightsService.generate(excerpt);
+
+            MemoryEntity child = new MemoryEntity(
+                UUID.randomUUID(),
+                user,
+                splitMemory.recordedAt(),
+                MemoryStatus.READY
+            );
+            child.setParentMemory(parentSaved);
+            child.markReady(
+                excerpt,
+                memoryTaggingService.detectTags(excerpt),
+                insights.title(),
+                insights.summary()
+            );
+            children.add(child);
+        }
+
+        List<MemoryEntity> savedChildren = memoryRepository.saveAll(children);
+        MemoryEntity first = savedChildren.getFirst();
+        List<UUID> ids = savedChildren.stream().map(MemoryEntity::getId).toList();
+
+        return new CreateMemoryResponse(
+            first.getId(),
+            ids,
+            ids.size(),
+            MemoryStatus.READY,
+            null,
+            snippet(first.getTranscript()),
+            first.getTitle(),
+            first.getSummary(),
+            MemoryMapper.toTagLabels(first)
+        );
     }
 
     private UserEntity getOrCreateDefaultUser() {

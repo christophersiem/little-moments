@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "node -e \"require('esbuild').buildSync({entryPoints:['src/features/memories/stopDecisionMachine.test.ts'],bundle:true,platform:'node',format:'cjs',outfile:'.tmp-stop-decision.test.cjs',logLevel:'silent'})\" && node .tmp-stop-decision.test.cjs && rm -f .tmp-stop-decision.test.cjs",
+    "test": "node -e \"require('esbuild').buildSync({entryPoints:['src/tests.ts'],bundle:true,platform:'node',format:'cjs',outfile:'.tmp-tests.cjs',logLevel:'silent'})\" && node .tmp-tests.cjs && rm -f .tmp-tests.cjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },
