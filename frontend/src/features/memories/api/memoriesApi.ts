@@ -118,6 +118,26 @@ function mapMemory(payload: MemoryApiResponse): Memory {
   }
 }
 
+function inferAudioFileName(mimeType: string): string {
+  const normalized = mimeType.toLowerCase()
+  if (normalized.includes('audio/mp4')) {
+    return 'recording.mp4'
+  }
+  if (normalized.includes('audio/m4a')) {
+    return 'recording.m4a'
+  }
+  if (normalized.includes('audio/ogg') || normalized.includes('audio/opus')) {
+    return 'recording.ogg'
+  }
+  if (normalized.includes('audio/wav') || normalized.includes('audio/x-wav')) {
+    return 'recording.wav'
+  }
+  if (normalized.includes('audio/webm')) {
+    return 'recording.webm'
+  }
+  return 'recording.bin'
+}
+
 export async function createMemory(
   audioBlob: Blob,
   recordedAtIso: string,
@@ -126,7 +146,7 @@ export async function createMemory(
   durationSeconds: number,
 ): Promise<CreateMemoryResponse> {
   const formData = new FormData()
-  formData.append('audio', audioBlob, 'recording.webm')
+  formData.append('audio', audioBlob, inferAudioFileName(audioBlob.type || ''))
   formData.append('recordedAt', recordedAtIso)
   formData.append('childId', childId)
   formData.append('keepAudio', keepAudio ? 'true' : 'false')

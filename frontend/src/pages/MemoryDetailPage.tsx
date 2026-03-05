@@ -306,6 +306,7 @@ function toIsoFromLocalDateTime(value: string): string | null {
 export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }: MemoryDetailPageProps) {
   const { loading, error, memory, reload } = useMemoryDetail(memoryId)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const audioObjectUrlRef = useRef('')
 
   const [currentMemory, setCurrentMemory] = useState<Memory | null>(null)
   const [saveError, setSaveError] = useState('')
@@ -348,6 +349,10 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
       audioRef.current.pause()
       audioRef.current.src = ''
     }
+    if (audioObjectUrlRef.current) {
+      URL.revokeObjectURL(audioObjectUrlRef.current)
+      audioObjectUrlRef.current = ''
+    }
   }, [memory])
 
   useEffect(() => {
@@ -355,6 +360,10 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
       if (audioRef.current) {
         audioRef.current.pause()
         audioRef.current.src = ''
+      }
+      if (audioObjectUrlRef.current) {
+        URL.revokeObjectURL(audioObjectUrlRef.current)
+        audioObjectUrlRef.current = ''
       }
     }
   }, [])
@@ -477,13 +486,31 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
     if (!element) {
       throw new Error('Audio player is not available.')
     }
-    element.src = url
+    const response = await fetch(url)
+    if (!response.ok) {
+      throw new Error('Could not load audio.')
+    }
+    const blob = await response.blob()
+    if (audioObjectUrlRef.current) {
+      URL.revokeObjectURL(audioObjectUrlRef.current)
+    }
+    audioObjectUrlRef.current = URL.createObjectURL(blob)
+    element.src = audioObjectUrlRef.current
     try {
       await element.play()
       setAudioPlaying(true)
     } catch {
       const refreshedUrl = await fetchAudioUrl()
-      element.src = refreshedUrl
+      const refreshedResponse = await fetch(refreshedUrl)
+      if (!refreshedResponse.ok) {
+        throw new Error('Could not load audio.')
+      }
+      const refreshedBlob = await refreshedResponse.blob()
+      if (audioObjectUrlRef.current) {
+        URL.revokeObjectURL(audioObjectUrlRef.current)
+      }
+      audioObjectUrlRef.current = URL.createObjectURL(refreshedBlob)
+      element.src = audioObjectUrlRef.current
       await element.play()
       setAudioPlaying(true)
     }

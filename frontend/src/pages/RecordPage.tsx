@@ -33,6 +33,15 @@ const SHORT_RECORDING_HINT = 'Recording too short. Please speak at least 5 words
 const SHORT_HINT_DISPLAY_MS = 5200
 const MAX_DURATION_HINT = `Max ${MAX_RECORDING_SECONDS}s`
 
+const RECORDER_MIME_PREFERENCES = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus']
+
+function pickRecorderMimeType(): string | undefined {
+  if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
+    return undefined
+  }
+  return RECORDER_MIME_PREFERENCES.find((value) => MediaRecorder.isTypeSupported(value))
+}
+
 function isLikelyTooShort(blob: Blob, elapsedSeconds: number): boolean {
   return elapsedSeconds < MIN_RECORDING_SECONDS || blob.size < MIN_RECORDING_BYTES
 }
@@ -298,7 +307,8 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
 
-      const recorder = new MediaRecorder(stream)
+      const preferredMimeType = pickRecorderMimeType()
+      const recorder = preferredMimeType ? new MediaRecorder(stream, { mimeType: preferredMimeType }) : new MediaRecorder(stream)
       mediaRecorderRef.current = recorder
       chunksRef.current = []
 

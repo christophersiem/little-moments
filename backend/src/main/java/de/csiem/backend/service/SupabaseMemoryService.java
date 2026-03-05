@@ -423,6 +423,25 @@ public class SupabaseMemoryService {
     }
 
     private String extensionFor(String fileName, String mimeType) {
+        if (mimeType != null) {
+            String normalizedMime = mimeType.toLowerCase();
+            if (normalizedMime.contains("audio/mp4")) {
+                return "mp4";
+            }
+            if (normalizedMime.contains("audio/m4a")) {
+                return "m4a";
+            }
+            if (normalizedMime.contains("audio/ogg") || normalizedMime.contains("audio/opus")) {
+                return "ogg";
+            }
+            if (normalizedMime.contains("audio/wav") || normalizedMime.contains("audio/x-wav")) {
+                return "wav";
+            }
+            if (normalizedMime.contains("audio/webm")) {
+                return "webm";
+            }
+        }
+
         if (StringUtils.hasText(fileName)) {
             int dotIndex = fileName.lastIndexOf('.');
             if (dotIndex > -1 && dotIndex < fileName.length() - 1) {
@@ -433,16 +452,7 @@ public class SupabaseMemoryService {
             }
         }
 
-        if (mimeType == null) {
-            return "webm";
-        }
-        return switch (mimeType.toLowerCase()) {
-            case "audio/mp4" -> "mp4";
-            case "audio/m4a" -> "m4a";
-            case "audio/ogg", "audio/opus" -> "ogg";
-            case "audio/wav", "audio/x-wav" -> "wav";
-            default -> "webm";
-        };
+        return "webm";
     }
 
     private MemoryStatus toStatus(String value) {
