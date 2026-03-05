@@ -3,7 +3,9 @@ import styled from 'styled-components'
 import { Button } from '../components/Button'
 import { PageContainer } from '../components/PageContainer'
 import { StatusBanner } from '../components/StatusBanner'
+import { FilterSheet } from '../features/memories/components/FilterSheet'
 import { MemoryListItemCard } from '../features/memories/components/MemoryListItemCard'
+import { buildFilterSummary, getActiveFilterCount } from '../features/memories/filterSummary'
 import { setActiveUploadStatusFromPolling, retryActiveMemoryUpload, useActiveMemoryUpload } from '../features/memories/hooks/uploadSessionStore'
 import { usePaginatedMemories } from '../features/memories/hooks/usePaginatedMemories'
 import { useProcessingMemory } from '../features/memories/hooks/useProcessingMemory'
@@ -12,6 +14,7 @@ import { formatMonthYear } from '../lib/utils'
 
 interface MemoriesPageProps {
   navigate: (nextPath: string) => void
+  familyId: string | null
 }
 
 interface MonthOption {
@@ -33,6 +36,11 @@ const Section = styled.section`
   gap: ${({ theme }) => theme.space.x5};
 `
 
+const PageShell = styled.div`
+  position: relative;
+  min-height: 100vh;
+`
+
 const HeadingRow = styled.div`
   display: flex;
   align-items: center;
@@ -47,8 +55,9 @@ const Heading = styled.h2`
 `
 
 const FilterToggle = styled.button`
+  position: relative;
   border: 1px solid ${({ theme }) => theme.colors.border};
-  background: ${({ theme }) => theme.colors.surfaceStrong};
+  background: ${({ theme }) => theme.colors.surface};
   color: ${({ theme }) => theme.colors.textMuted};
   border-radius: 50%;
   cursor: pointer;
@@ -73,84 +82,45 @@ const FilterIcon = styled.svg`
   display: block;
 `
 
-const ActiveFilters = styled.div`
+const FilterSummaryRow = styled.div`
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: ${({ theme }) => theme.space.x2};
+  margin-top: calc(${({ theme }) => theme.space.x2} * -1);
 `
 
-const ActiveFilterChip = styled.button`
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: ${({ theme }) => theme.radii.pill};
-  background: ${({ theme }) => theme.colors.surfaceStrong};
-  color: ${({ theme }) => theme.colors.accentStrong};
-  min-height: ${({ theme }) => theme.layout.minTouchTarget};
-  padding: ${({ theme }) => `0 ${theme.space.x3}`};
+const FilterSummaryText = styled.p`
+  margin: 0;
   font-size: ${({ theme }) => theme.typography.secondarySize};
-  cursor: pointer;
+  color: ${({ theme }) => theme.colors.textMuted};
+`
+
+const FilterToggleBadge = styled.span`
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: ${({ theme }) => theme.colors.accentStrong};
+  color: ${({ theme }) => theme.colors.onAccent};
+  font-size: 0.65rem;
+  line-height: 1;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 `
 
 const ClearFilters = styled.button`
   border: none;
   background: transparent;
-  color: ${({ theme }) => theme.colors.textMuted};
+  color: ${({ theme }) => theme.colors.accentStrong};
   cursor: pointer;
-  min-height: ${({ theme }) => theme.layout.minTouchTarget};
-  padding: 0 ${({ theme }) => theme.space.x1};
+  min-height: 32px;
+  padding: 0;
   font-size: ${({ theme }) => theme.typography.secondarySize};
-`
-
-const FiltersPanel = styled.div`
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: ${({ theme }) => theme.radii.lg};
-  background: ${({ theme }) => theme.colors.surfaceStrong};
-  padding: ${({ theme }) => theme.space.x4};
-  display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.space.x3};
-`
-
-const FilterLabel = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.space.x2};
-  color: ${({ theme }) => theme.colors.textMuted};
-  font-size: ${({ theme }) => theme.typography.secondarySize};
-`
-
-const MonthGrid = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: ${({ theme }) => theme.space.x2};
-`
-
-const MonthFilterButton = styled.button<{ $active: boolean }>`
-  min-height: ${({ theme }) => theme.layout.minTouchTarget};
-  padding: ${({ theme }) => `0 ${theme.space.x3}`};
-  border-radius: ${({ theme }) => theme.radii.pill};
-  border: 1px solid ${({ theme, $active }) => ($active ? theme.colors.accent : theme.colors.border)};
-  background: ${({ theme, $active }) => ($active ? theme.colors.surface : theme.colors.surfaceStrong)};
-  color: ${({ theme, $active }) => ($active ? theme.colors.accentStrong : theme.colors.text)};
-  font-size: ${({ theme }) => theme.typography.bodySize};
-  line-height: ${({ theme }) => theme.typography.bodyLineHeight};
-  cursor: pointer;
-`
-
-const TagGrid = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: ${({ theme }) => theme.space.x2};
-`
-
-const TagFilterButton = styled.button<{ $active: boolean }>`
-  min-height: ${({ theme }) => theme.layout.minTouchTarget};
-  padding: ${({ theme }) => `0 ${theme.space.x3}`};
-  border-radius: ${({ theme }) => theme.radii.pill};
-  border: 1px solid ${({ theme, $active }) => ($active ? theme.colors.accent : theme.colors.border)};
-  background: ${({ theme, $active }) => ($active ? theme.colors.surface : theme.colors.surfaceStrong)};
-  color: ${({ theme, $active }) => ($active ? theme.colors.accentStrong : theme.colors.textMuted)};
-  cursor: pointer;
 `
 
 const Group = styled.div`
@@ -273,7 +243,7 @@ function groupByMonth(items: MemoryListItem[]): MonthGroup[] {
   return groups
 }
 
-export function MemoriesPage({ navigate }: MemoriesPageProps) {
+export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState('all')
   const [selectedTags, setSelectedTags] = useState<MemoryTag[]>([])
@@ -304,6 +274,7 @@ export function MemoriesPage({ navigate }: MemoriesPageProps) {
     retryLoadMore,
     reload,
   } = usePaginatedMemories({
+    familyId: familyId ?? undefined,
     month: monthFilter,
     tags: selectedTags,
     pageSize: 5,
@@ -336,7 +307,7 @@ export function MemoriesPage({ navigate }: MemoriesPageProps) {
 
   const selectedMonthLabel = useMemo(() => {
     if (selectedMonth === 'all') {
-      return ''
+      return 'All months'
     }
     return monthOptions.find((option) => option.key === selectedMonth)?.label || selectedMonth
   }, [monthOptions, selectedMonth])
@@ -344,12 +315,14 @@ export function MemoriesPage({ navigate }: MemoriesPageProps) {
   const groups = useMemo(() => groupByMonth(displayItems), [displayItems])
 
   const hasActiveFilters = selectedMonth !== 'all' || selectedTags.length > 0
-
-  const toggleTag = (tag: MemoryTag) => {
-    setSelectedTags((current) =>
-      current.includes(tag) ? current.filter((value) => value !== tag) : [...current, tag],
-    )
-  }
+  const activeFilterCount = useMemo(
+    () => getActiveFilterCount(selectedMonth, selectedTags),
+    [selectedMonth, selectedTags],
+  )
+  const filterSummary = useMemo(
+    () => buildFilterSummary(selectedMonth, selectedMonthLabel, selectedTags),
+    [selectedMonth, selectedMonthLabel, selectedTags],
+  )
 
   const clearFilters = () => {
     setSelectedMonth('all')
@@ -549,13 +522,14 @@ export function MemoriesPage({ navigate }: MemoriesPageProps) {
 
   return (
     <PageContainer>
-      <Section>
+      <PageShell>
+        <Section>
         <HeadingRow>
           <Heading>Memories</Heading>
           <FilterToggle
             type="button"
-            onClick={() => setFiltersOpen((open) => !open)}
-            aria-label={filtersOpen ? 'Hide filters' : 'Show filters'}
+            onClick={() => setFiltersOpen(true)}
+            aria-label="Open filters"
             aria-expanded={filtersOpen}
           >
             <FilterIcon viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -567,71 +541,21 @@ export function MemoriesPage({ navigate }: MemoriesPageProps) {
                 strokeLinejoin="round"
               />
             </FilterIcon>
+            {activeFilterCount > 0 && (
+              <FilterToggleBadge aria-hidden>{activeFilterCount > 9 ? '9+' : activeFilterCount}</FilterToggleBadge>
+            )}
           </FilterToggle>
         </HeadingRow>
+        <FilterSummaryRow>
+          <FilterSummaryText>{filterSummary}</FilterSummaryText>
+          {hasActiveFilters && (
+            <ClearFilters type="button" onClick={clearFilters}>
+              Clear
+            </ClearFilters>
+          )}
+        </FilterSummaryRow>
 
         {processingBanner}
-
-        {hasActiveFilters && (
-          <ActiveFilters>
-            {selectedMonth !== 'all' && (
-              <ActiveFilterChip type="button" onClick={() => setSelectedMonth('all')}>
-                Month: {selectedMonthLabel} ×
-              </ActiveFilterChip>
-            )}
-            {selectedTags.map((tag) => (
-              <ActiveFilterChip key={`active-${tag}`} type="button" onClick={() => toggleTag(tag)}>
-                {tag} ×
-              </ActiveFilterChip>
-            ))}
-            <ClearFilters type="button" onClick={clearFilters}>
-              Clear all
-            </ClearFilters>
-          </ActiveFilters>
-        )}
-
-        {filtersOpen && (
-          <FiltersPanel>
-            <FilterLabel>
-              Month
-              <MonthGrid>
-                <MonthFilterButton
-                  type="button"
-                  $active={selectedMonth === 'all'}
-                  onClick={() => setSelectedMonth('all')}
-                >
-                  All months
-                </MonthFilterButton>
-                {monthOptions.map((option) => (
-                  <MonthFilterButton
-                    key={option.key}
-                    type="button"
-                    $active={selectedMonth === option.key}
-                    onClick={() => setSelectedMonth(option.key)}
-                  >
-                    {option.label}
-                  </MonthFilterButton>
-                ))}
-              </MonthGrid>
-            </FilterLabel>
-
-            <FilterLabel>
-              Tags
-              <TagGrid>
-                {MEMORY_TAG_OPTIONS.map((tag) => (
-                  <TagFilterButton
-                    key={tag}
-                    type="button"
-                    $active={selectedTags.includes(tag)}
-                    onClick={() => toggleTag(tag)}
-                  >
-                    {tag}
-                  </TagFilterButton>
-                ))}
-              </TagGrid>
-            </FilterLabel>
-          </FiltersPanel>
-        )}
 
         {groups.length === 0 ? (
           <EmptyState>
@@ -685,7 +609,19 @@ export function MemoriesPage({ navigate }: MemoriesPageProps) {
             </FooterArea>
           </>
         )}
-      </Section>
+        </Section>
+        <FilterSheet
+          open={filtersOpen}
+          monthOptions={monthOptions}
+          selectedMonth={selectedMonth}
+          selectedTags={selectedTags}
+          onApply={(month, tags) => {
+            setSelectedMonth(month)
+            setSelectedTags(tags)
+          }}
+          onClose={() => setFiltersOpen(false)}
+        />
+      </PageShell>
     </PageContainer>
   )
 }

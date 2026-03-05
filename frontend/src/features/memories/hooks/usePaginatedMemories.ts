@@ -6,6 +6,7 @@ import { appendMemoriesPage, type PaginationState } from './paginationState'
 const DEFAULT_PAGE_SIZE = 5
 
 interface PaginatedMemoriesQuery {
+  familyId?: string
   month?: string
   tags?: MemoryTag[]
   pageSize?: number
@@ -32,6 +33,7 @@ function toErrorMessage(error: unknown): string {
 }
 
 export function usePaginatedMemories({
+  familyId,
   month,
   tags = [],
   pageSize = DEFAULT_PAGE_SIZE,
@@ -51,10 +53,11 @@ export function usePaginatedMemories({
   const itemsRef = useRef<MemoryListItem[]>([])
 
   const normalizedTags = useMemo(() => normalizeTags(tags), [tags])
+  const normalizedFamilyId = familyId?.trim() || undefined
   const normalizedMonth = month && month !== 'all' ? month : undefined
   const queryKey = useMemo(
-    () => `${normalizedMonth ?? ''}::${normalizedTags.join('|')}::${pageSize}`,
-    [normalizedMonth, normalizedTags, pageSize],
+    () => `${normalizedFamilyId ?? ''}::${normalizedMonth ?? ''}::${normalizedTags.join('|')}::${pageSize}`,
+    [normalizedFamilyId, normalizedMonth, normalizedTags, pageSize],
   )
 
   useEffect(() => {
@@ -86,6 +89,7 @@ export function usePaginatedMemories({
       const payload = await listMemories({
         page: 0,
         size: pageSize,
+        familyId: normalizedFamilyId,
         month: normalizedMonth,
         tags: normalizedTags,
       })
@@ -114,7 +118,7 @@ export function usePaginatedMemories({
         setLoadingInitial(false)
       }
     }
-  }, [normalizedMonth, normalizedTags, pageSize])
+  }, [normalizedFamilyId, normalizedMonth, normalizedTags, pageSize])
 
   const loadMore = useCallback(async () => {
     if (loadingInitial || loadingMoreRef.current || !hasMoreRef.current) {
@@ -130,6 +134,7 @@ export function usePaginatedMemories({
       const payload = await listMemories({
         page: nextPageRef.current,
         size: pageSize,
+        familyId: normalizedFamilyId,
         month: normalizedMonth,
         tags: normalizedTags,
       })
@@ -162,7 +167,7 @@ export function usePaginatedMemories({
         setLoadingMore(false)
       }
     }
-  }, [loadingInitial, normalizedMonth, normalizedTags, pageSize])
+  }, [loadingInitial, normalizedFamilyId, normalizedMonth, normalizedTags, pageSize])
 
   const retryLoadMore = useCallback(() => {
     void loadMore()

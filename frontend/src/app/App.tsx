@@ -6,10 +6,21 @@ import { RippleLogo } from '../components/RippleLogo'
 import { TopNav } from '../components/TopNav'
 import { AuthGate } from '../features/auth/AuthGate'
 import {
+  acceptInvitation,
   createFamilyWithOwner,
   ensureDefaultChildForFamily,
   getFirstChildIdForFamily,
+  listMyFamilies,
+  type FamilySummary,
 } from '../features/families/api'
+import {
+  clearActiveFamilyId,
+  clearPendingInviteToken,
+  getActiveFamilyId,
+  getPendingInviteToken,
+  setActiveFamilyId as persistActiveFamilyId,
+  setPendingInviteToken,
+} from '../features/families/localState'
 import { ensureOwnProfileForSession } from '../features/profiles/api'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { AccountPage } from '../pages/AccountPage'
@@ -17,6 +28,7 @@ import { AcceptInvitePage } from '../pages/AcceptInvitePage'
 import { FamilyPage } from '../pages/FamilyPage'
 import { MemoriesPage } from '../pages/MemoriesPage'
 import { MemoryDetailPage } from '../pages/MemoryDetailPage'
+import { OnboardingPage } from '../pages/OnboardingPage'
 import { PrivacyPage } from '../pages/PrivacyPage'
 import { RecordPage } from '../pages/RecordPage'
 import { SettingsPage } from '../pages/SettingsPage'
@@ -111,6 +123,25 @@ function toErrorMessage(error: unknown): string {
   return 'Could not complete family onboarding.'
 }
 
+function parseInviteTokenFromUrl(): string | null {
+  const params = new URLSearchParams(window.location.search)
+  const token = params.get('token')?.trim() ?? ''
+  return token.length > 0 ? token : null
+}
+
+function resolveActiveFamily(memberships: FamilySummary[], preferredFamilyId?: string | null): string | null {
+  if (memberships.length === 0) {
+    return null
+  }
+
+  const preferred = preferredFamilyId?.trim() || getActiveFamilyId()
+  if (preferred && memberships.some((membership) => membership.familyId === preferred)) {
+    return preferred
+  }
+
+  return memberships[0].familyId
+}
+
 export default function App() {
   const { pathname, route, navigate } = useAppRouter()
   const [navigationLocked, setNavigationLocked] = useState(false)
@@ -122,11 +153,25 @@ export default function App() {
   const [childId, setChildId] = useState<string | null>(null)
   const [familyReady, setFamilyReady] = useState(false)
   const [familyError, setFamilyError] = useState('')
+  const [canRecord, setCanRecord] = useState(true)
+  const [needsOnboarding, setNeedsOnboarding] = useState(false)
+  const [families, setFamilies] = useState<FamilySummary[]>([])
+  const [bootstrapTick, setBootstrapTick] = useState(0)
 
   useEffect(() => {
     if (route.kind !== 'record') {
       setNavigationLocked(false)
       setShowNavigationHint(false)
+    }
+  }, [route.kind])
+
+  useEffect(() => {
+    if (route.kind !== 'invite-accept') {
+      return
+    }
+    const token = parseInviteTokenFromUrl()
+    if (token) {
+      setPendingInviteToken(token)
     }
   }, [route.kind])
 
@@ -162,10 +207,14 @@ export default function App() {
 
   useEffect(() => {
     if (!session) {
+      setFamilies([])
       setFamilyId(null)
       setChildId(null)
       setFamilyReady(false)
       setFamilyError('')
+      setCanRecord(false)
+      setNeedsOnboarding(false)
+      clearActiveFamilyId()
       return
     }
 
@@ -173,30 +222,67 @@ export default function App() {
     setFamilyReady(false)
     setFamilyError('')
 
-    const runOnboarding = async () => {
+    const bootstrapFamilyContext = async () => {
       try {
-        // Best-effort profile bootstrap for email-confirmation flows.
         try {
           await ensureOwnProfileForSession(session.user)
         } catch {
-          // Continue with app onboarding even if profile sync is temporarily unavailable.
+          // Keep onboarding robust if profile sync is temporarily unavailable.
         }
 
-        // Idempotent RPC: creates family/owner/child for first-time users and returns existing family otherwise.
-        const currentFamilyId = await createFamilyWithOwner('My Family')
-        let currentChildId = await getFirstChildIdForFamily(currentFamilyId)
-        if (!currentChildId) {
-          currentChildId = await ensureDefaultChildForFamily(currentFamilyId)
+        let acceptedFamilyId: string | null = null
+        const pendingInviteToken = getPendingInviteToken()
+        if (pendingInviteToken) {
+          try {
+            acceptedFamilyId = await acceptInvitation(pendingInviteToken)
+            clearPendingInviteToken()
+          } catch (inviteError) {
+            const message = toErrorMessage(inviteError).toLowerCase()
+            if (message.includes('already accepted')) {
+              clearPendingInviteToken()
+            }
+          }
         }
-        if (!currentChildId) {
+
+        const memberships = await listMyFamilies()
+        if (disposed) {
+          return
+        }
+        setFamilies(memberships)
+
+        if (memberships.length === 0) {
+          setNeedsOnboarding(true)
+          setFamilyId(null)
+          setChildId(null)
+          setCanRecord(false)
+          setFamilyReady(true)
+          return
+        }
+
+        const resolvedFamilyId = resolveActiveFamily(memberships, acceptedFamilyId)
+        if (!resolvedFamilyId) {
+          throw new Error('No family could be selected.')
+        }
+        persistActiveFamilyId(resolvedFamilyId)
+
+        let resolvedChildId = await getFirstChildIdForFamily(resolvedFamilyId)
+        if (!resolvedChildId) {
+          resolvedChildId = await ensureDefaultChildForFamily(resolvedFamilyId)
+        }
+        if (!resolvedChildId) {
           throw new Error('No child exists for this family. Please ask the family owner to create one.')
         }
+
+        const currentRole = memberships.find((membership) => membership.familyId === resolvedFamilyId)?.role
+        const allowRecording = currentRole === 'OWNER'
 
         if (disposed) {
           return
         }
-        setFamilyId(currentFamilyId)
-        setChildId(currentChildId)
+        setNeedsOnboarding(false)
+        setFamilyId(resolvedFamilyId)
+        setChildId(resolvedChildId)
+        setCanRecord(allowRecording)
         setFamilyReady(true)
       } catch (error) {
         if (disposed) {
@@ -207,12 +293,34 @@ export default function App() {
       }
     }
 
-    void runOnboarding()
+    void bootstrapFamilyContext()
 
     return () => {
       disposed = true
     }
-  }, [session])
+  }, [bootstrapTick, session])
+
+  useEffect(() => {
+    if (!familyReady || familyError) {
+      return
+    }
+
+    if (needsOnboarding) {
+      if (route.kind !== 'onboarding' && route.kind !== 'invite-accept') {
+        navigate('/onboarding')
+      }
+      return
+    }
+
+    if (route.kind === 'onboarding') {
+      navigate(canRecord ? '/record' : '/memories')
+      return
+    }
+
+    if (!canRecord && route.kind === 'record') {
+      navigate('/memories')
+    }
+  }, [canRecord, familyError, familyReady, navigate, needsOnboarding, route.kind])
 
   const onLockedNavigationAttempt = () => {
     setShowNavigationHint(true)
@@ -229,6 +337,38 @@ export default function App() {
     } else {
       setAuthError('')
     }
+  }
+
+  const rerunFamilyBootstrap = () => {
+    setBootstrapTick((current) => current + 1)
+  }
+
+  const onCreateFamily = async (name: string) => {
+    const createdFamilyId = await createFamilyWithOwner(name)
+    persistActiveFamilyId(createdFamilyId)
+    rerunFamilyBootstrap()
+  }
+
+  const onJoinPendingInvite = async () => {
+    const token = getPendingInviteToken()
+    if (!token) {
+      throw new Error('No pending invite token found.')
+    }
+    const invitedFamilyId = await acceptInvitation(token)
+    clearPendingInviteToken()
+    persistActiveFamilyId(invitedFamilyId)
+    rerunFamilyBootstrap()
+  }
+
+  const onActiveFamilyChange = (nextFamilyId: string) => {
+    persistActiveFamilyId(nextFamilyId)
+    rerunFamilyBootstrap()
+  }
+
+  const onInviteAccepted = (acceptedFamilyId: string) => {
+    clearPendingInviteToken()
+    persistActiveFamilyId(acceptedFamilyId)
+    rerunFamilyBootstrap()
   }
 
   if (!isSupabaseConfigured) {
@@ -311,18 +451,33 @@ export default function App() {
   }
 
   let content: ReactNode
-  if (route.kind === 'record') {
+  if (route.kind === 'onboarding') {
+    content = (
+      <OnboardingPage
+        hasPendingInvite={Boolean(getPendingInviteToken())}
+        onCreateFamily={onCreateFamily}
+        onJoinPendingInvite={onJoinPendingInvite}
+      />
+    )
+  } else if (route.kind === 'record') {
     content = <RecordPage navigate={navigate} childId={childId ?? ''} onNavigationLockChange={setNavigationLocked} />
   } else if (route.kind === 'memories') {
-    content = <MemoriesPage navigate={navigate} />
+    content = <MemoriesPage navigate={navigate} familyId={familyId} />
   } else if (route.kind === 'invite-accept') {
-    content = <AcceptInvitePage navigate={navigate} />
+    content = <AcceptInvitePage navigate={navigate} onAccepted={onInviteAccepted} />
   } else if (route.kind === 'memory-detail') {
-    content = <MemoryDetailPage memoryId={route.memoryId} navigate={navigate} />
+    content = <MemoryDetailPage memoryId={route.memoryId} navigate={navigate} canManageMemory={canRecord} />
   } else if (route.kind === 'settings') {
     content = <SettingsPage navigate={navigate} onLogout={() => void onLogout()} />
   } else if (route.kind === 'family') {
-    content = <FamilyPage familyId={familyId} navigate={navigate} />
+    content = (
+      <FamilyPage
+        familyId={familyId}
+        families={families}
+        navigate={navigate}
+        onActiveFamilyChange={onActiveFamilyChange}
+      />
+    )
   } else if (route.kind === 'account') {
     content = <AccountPage navigate={navigate} />
   } else if (route.kind === 'privacy') {
@@ -346,6 +501,7 @@ export default function App() {
         <TopNav
           pathname={pathname}
           navigate={navigate}
+          canRecord={canRecord}
           navigationLocked={navigationLocked}
           onLockedNavigationAttempt={onLockedNavigationAttempt}
         />

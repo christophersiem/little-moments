@@ -7,6 +7,7 @@ import org.springframework.web.client.RestClient;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -15,9 +16,69 @@ import java.util.regex.Pattern;
 public class MemoryInsightsService {
 
     private static final int MAX_TITLE_LENGTH = 72;
+    private static final int MAX_TITLE_WORDS = 10;
+    private static final int MAX_SUMMARY_WORDS = 22;
     private static final Pattern QUOTED_TEXT_PATTERN = Pattern.compile("\"([^\"]+)\"");
     private static final Pattern JSON_TITLE_PATTERN = Pattern.compile("\"title\"\\s*:\\s*\"((?:\\\\.|[^\\\"])*)\"", Pattern.CASE_INSENSITIVE);
     private static final Pattern JSON_SUMMARY_PATTERN = Pattern.compile("\"summary\"\\s*:\\s*\"((?:\\\\.|[^\\\"])*)\"", Pattern.CASE_INSENSITIVE);
+    private static final Pattern LEADING_LIST_PATTERN = Pattern.compile("^(?:[-*]|\\d+[.)])\\s*");
+    private static final Pattern FIRST_SENTENCE_PATTERN = Pattern.compile("^(.+?[.!?])(?:\\s+.*)?$");
+
+    // Title/Summary generation rules for Reduced MVP:
+    // - title: specific, timeline-friendly, max 10 words, avoid generic filler terms
+    // - summary: exactly one warm sentence, max 22 words, adds meaning beyond title
+    // - both: strict JSON contract with deterministic post-processing and retry guards
+    private static final String METADATA_SYSTEM_PROMPT =
+        "You write concise, warm, timeline-friendly titles and summaries for parents' short memories. Output JSON only.";
+    private static final String METADATA_USER_PROMPT_TEMPLATE = """
+        TRANSCRIPT:
+        <<<
+        %s
+        >>>
+
+        TASK:
+        Return valid JSON ONLY with keys "title" and "summary".
+
+        RULES:
+        - Title: 3-7 words preferred, max 10 words. Make it specific and scannable.
+          - Describe the concrete moment (what happened).
+          - Avoid generic words like "moment", "memory", "today".
+          - Avoid clinical language.
+        - Summary: exactly 1 sentence, max 22 words, warm and reflective.
+          - Include what happened + why it mattered emotionally/developmentally, based strictly on the transcript.
+          - Avoid repeating the transcript verbatim.
+          - No advice, diagnosis, or speculation.
+
+        EXAMPLES:
+        Input transcript:
+        "At breakfast, he asked for more apples and said the full sentence without prompting... he clapped for himself."
+        Output:
+        {"title":"First full sentence at breakfast","summary":"He asked for more apples in a full sentence and clapped proudly - an exciting little step in his language."}
+
+        Input transcript:
+        "She put on her shoes by herself for the first time and smiled."
+        Output:
+        {"title":"Put on shoes by herself","summary":"She managed her shoes on her own for the first time, and her proud smile made the whole moment feel big."}
+
+        Now produce the JSON for the provided transcript.
+        """;
+    private static final String JSON_RETRY_NOTE = "Return ONLY valid JSON with exactly the keys \"title\" and \"summary\".";
+    private static final String SPECIFIC_TITLE_RETRY_NOTE =
+        "Your title is too generic. Make it concrete and timeline-friendly. Avoid words like moment, memory, today, nice, sweet, or a day.";
+    private static final Set<String> TITLE_GENERIC_PATTERNS = Set.of(
+        "moment", "memory", "today", "a day", "nice", "sweet"
+    );
+    private static final Set<String> TITLE_FILLER_WORDS = Set.of(
+        "a", "an", "the", "my", "our", "little", "special", "beautiful", "nice", "sweet", "joyful",
+        "meaningful", "proud", "happy", "lovely", "wonderful", "moment", "memory", "today",
+        "ein", "eine", "der", "die", "das", "besonderer", "besondere", "schoener", "suesser"
+    );
+    private static final Map<String, String> CLINICAL_WORD_REPLACEMENTS = Map.of(
+        "independently", "on their own",
+        "facilitated", "helped",
+        "atmosphere", "mood",
+        "demonstrated", "showed"
+    );
 
     private static final Set<String> STOP_WORDS_EN = Set.of(
         "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "had", "has", "have",
@@ -77,53 +138,99 @@ public class MemoryInsightsService {
         RestClient client = RestClient.builder().baseUrl(baseUrl).build();
 
         try {
-            ChatCompletionsResponse response = client.post()
-                .uri("/v1/chat/completions")
-                .headers(headers -> headers.setBearerAuth(apiKey))
-                .body(new ChatCompletionsRequest(
-                    model,
-                    0.2,
-                    new ResponseFormat("json_object"),
-                    List.of(
-                        new ChatMessage("system", "You write parenting-memory metadata. Return strict JSON with keys title and summary. " +
-                            "Title: 3-8 words, specific, no trailing punctuation. " +
-                            "Summary: one concise sentence, max 28 words, paraphrase transcript and do not copy it verbatim. " +
-                            "Use same language as transcript."),
-                        new ChatMessage("user", transcript)
-                    )
-                ))
-                .retrieve()
-                .body(ChatCompletionsResponse.class);
+            // Rules live in code so we can enforce quality even when model output drifts.
+            String basePrompt = METADATA_USER_PROMPT_TEMPLATE.formatted(transcript);
+            ProcessedInsights processed = parseAndValidateModelOutput(
+                requestInsights(client, apiKey, model, basePrompt),
+                transcript,
+                transcriptLanguage
+            );
 
-            if (response == null || response.choices() == null || response.choices().isEmpty()) {
-                return null;
+            if (!processed.valid()) {
+                String retryPrompt = basePrompt + "\n\n" + JSON_RETRY_NOTE;
+                processed = parseAndValidateModelOutput(
+                    requestInsights(client, apiKey, model, retryPrompt),
+                    transcript,
+                    transcriptLanguage
+                );
             }
 
-            String content = response.choices().getFirst().message() != null
-                ? response.choices().getFirst().message().content()
-                : null;
-
-            if (content == null || content.isBlank()) {
-                return null;
+            if (processed.valid() && processed.genericTitle()) {
+                String retryPrompt = basePrompt + "\n\n" + SPECIFIC_TITLE_RETRY_NOTE;
+                ProcessedInsights specificRetry = parseAndValidateModelOutput(
+                    requestInsights(client, apiKey, model, retryPrompt),
+                    transcript,
+                    transcriptLanguage
+                );
+                if (specificRetry.valid()) {
+                    processed = specificRetry;
+                }
             }
 
-            String titleRaw = extractJsonValue(content, JSON_TITLE_PATTERN);
-            String summaryRaw = extractJsonValue(content, JSON_SUMMARY_PATTERN);
-
-            String title = sanitizeTitle(titleRaw, transcript);
-            String summary = sanitizeSummary(summaryRaw, transcript, title);
-
-            if (title.isBlank() || summary.isBlank()) {
-                return null;
+            if (processed.valid() && !processed.genericTitle()) {
+                return processed.insights();
             }
-            if (!matchesLanguage(title, transcriptLanguage) || !matchesLanguage(summary, transcriptLanguage)) {
-                return null;
-            }
-
-            return new MemoryInsights(title, summary);
+            return null;
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private String requestInsights(
+        RestClient client,
+        String apiKey,
+        String model,
+        String userPrompt
+    ) {
+        ChatCompletionsResponse response = client.post()
+            .uri("/v1/chat/completions")
+            .headers(headers -> headers.setBearerAuth(apiKey))
+            .body(new ChatCompletionsRequest(
+                model,
+                0.2,
+                new ResponseFormat("json_object"),
+                List.of(
+                    new ChatMessage("system", METADATA_SYSTEM_PROMPT),
+                    new ChatMessage("user", userPrompt)
+                )
+            ))
+            .retrieve()
+            .body(ChatCompletionsResponse.class);
+
+        if (response == null || response.choices() == null || response.choices().isEmpty()) {
+            return null;
+        }
+        return response.choices().getFirst().message() != null
+            ? response.choices().getFirst().message().content()
+            : null;
+    }
+
+    private ProcessedInsights parseAndValidateModelOutput(
+        String modelJson,
+        String transcript,
+        DetectedLanguage transcriptLanguage
+    ) {
+        if (modelJson == null || modelJson.isBlank()) {
+            return ProcessedInsights.invalid(false);
+        }
+
+        String titleRaw = extractJsonValue(modelJson, JSON_TITLE_PATTERN);
+        String summaryRaw = extractJsonValue(modelJson, JSON_SUMMARY_PATTERN);
+        if (titleRaw.isBlank() || summaryRaw.isBlank()) {
+            return ProcessedInsights.invalid(false);
+        }
+
+        String title = sanitizeTitle(titleRaw, transcript);
+        String summary = sanitizeSummary(summaryRaw, transcript, title);
+        if (title.isBlank() || summary.isBlank()) {
+            return ProcessedInsights.invalid(false);
+        }
+        if (!matchesLanguage(title, transcriptLanguage) || !matchesLanguage(summary, transcriptLanguage)) {
+            return ProcessedInsights.invalid(false);
+        }
+
+        boolean genericTitle = isGenericTitle(title);
+        return new ProcessedInsights(new MemoryInsights(title, summary), true, genericTitle);
     }
 
     private String extractJsonValue(String json, Pattern pattern) {
@@ -239,11 +346,14 @@ public class MemoryInsightsService {
     }
 
     private String sanitizeTitle(String value, String transcript) {
-        String title = normalize(value).replaceAll("^[\"'`]+|[\"'`.,!?]+$", "");
+        String title = normalize(value)
+            .replaceAll("[\\n\\r\\t]+", " ")
+            .replaceAll("^[\"'`]+|[\"'`.,!?;:]+$", "");
         if (title.isBlank()) {
             return "";
         }
 
+        title = enforceTitleWordLimit(title);
         if (title.length() > MAX_TITLE_LENGTH) {
             title = title.substring(0, MAX_TITLE_LENGTH - 3).trim() + "...";
         }
@@ -256,7 +366,13 @@ public class MemoryInsightsService {
     }
 
     private String sanitizeSummary(String value, String transcript, String title) {
-        String summary = normalize(value);
+        String summary = normalize(value)
+            .replace('\n', ' ')
+            .replace('\r', ' ');
+        summary = LEADING_LIST_PATTERN.matcher(summary).replaceFirst("");
+        summary = keepFirstSentence(summary);
+        summary = softenClinicalLanguage(summary);
+        summary = limitSummaryWordCount(summary, MAX_SUMMARY_WORDS);
         if (summary.isBlank()) {
             return "";
         }
@@ -268,8 +384,119 @@ public class MemoryInsightsService {
         if (equalsIgnoringPunctuation(summary, transcript) || equalsIgnoringPunctuation(summary, title)) {
             return "";
         }
+        if (summaryRepeatsTitle(summary, title)) {
+            return "";
+        }
 
         return summary;
+    }
+
+    private String enforceTitleWordLimit(String value) {
+        List<String> words = splitWords(value);
+        if (words.size() <= MAX_TITLE_WORDS) {
+            return String.join(" ", words);
+        }
+
+        List<String> withoutFillers = new ArrayList<>();
+        for (String word : words) {
+            String normalizedWord = word.toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]", "");
+            if (!TITLE_FILLER_WORDS.contains(normalizedWord)) {
+                withoutFillers.add(word);
+            }
+        }
+        if (withoutFillers.size() >= 3 && withoutFillers.size() < words.size()) {
+            words = withoutFillers;
+        }
+
+        if (words.size() > MAX_TITLE_WORDS) {
+            words = new ArrayList<>(words.subList(0, MAX_TITLE_WORDS));
+        }
+        return String.join(" ", words).trim();
+    }
+
+    private String keepFirstSentence(String value) {
+        String normalized = normalize(value);
+        if (normalized.isBlank()) {
+            return "";
+        }
+        Matcher matcher = FIRST_SENTENCE_PATTERN.matcher(normalized);
+        if (matcher.matches()) {
+            return normalize(matcher.group(1));
+        }
+        return normalized;
+    }
+
+    private String softenClinicalLanguage(String value) {
+        String softened = value;
+        for (Map.Entry<String, String> entry : CLINICAL_WORD_REPLACEMENTS.entrySet()) {
+            softened = softened.replaceAll(
+                "(?i)\\b" + Pattern.quote(entry.getKey()) + "\\b",
+                entry.getValue()
+            );
+        }
+        return normalize(softened);
+    }
+
+    private String limitSummaryWordCount(String summary, int maxWords) {
+        String current = normalize(summary);
+        if (splitWords(current).size() <= maxWords) {
+            return current;
+        }
+
+        while (splitWords(current).size() > maxWords) {
+            int clauseBreak = Math.max(
+                Math.max(current.lastIndexOf(","), current.lastIndexOf(";")),
+                Math.max(current.lastIndexOf(" - "), current.lastIndexOf(" -- "))
+            );
+            if (clauseBreak > 20) {
+                current = normalize(current.substring(0, clauseBreak));
+                continue;
+            }
+            List<String> words = splitWords(current);
+            if (words.isEmpty()) {
+                return "";
+            }
+            words.remove(words.size() - 1);
+            current = String.join(" ", words);
+        }
+        return current;
+    }
+
+    private boolean summaryRepeatsTitle(String summary, String title) {
+        String normalizedSummary = normalize(summary).toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N} ]", "");
+        String normalizedTitle = normalize(title).toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N} ]", "");
+        if (normalizedSummary.isBlank() || normalizedTitle.isBlank()) {
+            return false;
+        }
+        if (normalizedSummary.equals(normalizedTitle)) {
+            return true;
+        }
+        return normalizedSummary.startsWith(normalizedTitle + " ");
+    }
+
+    private boolean isGenericTitle(String title) {
+        String normalizedTitle = normalize(title).toLowerCase(Locale.ROOT);
+        for (String banned : TITLE_GENERIC_PATTERNS) {
+            if (normalizedTitle.contains(banned)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<String> splitWords(String text) {
+        String normalized = normalize(text);
+        if (normalized.isBlank()) {
+            return List.of();
+        }
+        String[] split = normalized.split("\\s+");
+        List<String> words = new ArrayList<>();
+        for (String word : split) {
+            if (!word.isBlank()) {
+                words.add(word);
+            }
+        }
+        return words;
     }
 
     private boolean equalsIgnoringPunctuation(String left, String right) {
@@ -366,7 +593,17 @@ public class MemoryInsightsService {
         return deScore > enScore ? DetectedLanguage.GERMAN : DetectedLanguage.ENGLISH;
     }
 
+    ProcessedInsights postProcessModelOutputForTest(String modelJson, String transcript) {
+        return parseAndValidateModelOutput(modelJson, normalize(transcript), detectLanguage(transcript));
+    }
+
     public record MemoryInsights(String title, String summary) {
+    }
+
+    record ProcessedInsights(MemoryInsights insights, boolean valid, boolean genericTitle) {
+        static ProcessedInsights invalid(boolean genericTitle) {
+            return new ProcessedInsights(null, false, genericTitle);
+        }
     }
 
     private enum DetectedLanguage {

@@ -115,11 +115,11 @@ export function SettingsPage({ navigate, onLogout }: SettingsPageProps) {
           <Chevron>›</Chevron>
         </Item>
 
-        <Item $interactive={false} type="button" aria-disabled>
-          <ItemIcon>▭</ItemIcon>
+        <Item type="button" $interactive onClick={() => navigate('/settings/family')}>
+          <ItemIcon>◒</ItemIcon>
           <ItemText>
-            <ItemTitle>Subscription</ItemTitle>
-            <ItemSubtitle>Premium summaries</ItemSubtitle>
+            <ItemTitle>Family</ItemTitle>
+            <ItemSubtitle>Members & invite links</ItemSubtitle>
           </ItemText>
           <Chevron>›</Chevron>
         </Item>
@@ -129,15 +129,6 @@ export function SettingsPage({ navigate, onLogout }: SettingsPageProps) {
           <ItemText>
             <ItemTitle>Privacy</ItemTitle>
             <ItemSubtitle>Privacy & data protection</ItemSubtitle>
-          </ItemText>
-          <Chevron>›</Chevron>
-        </Item>
-
-        <Item type="button" $interactive onClick={() => navigate('/settings/family')}>
-          <ItemIcon>◒</ItemIcon>
-          <ItemText>
-            <ItemTitle>Family</ItemTitle>
-            <ItemSubtitle>Members & invite links</ItemSubtitle>
           </ItemText>
           <Chevron>›</Chevron>
         </Item>

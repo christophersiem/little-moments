@@ -1,14 +1,16 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
 import { PageContainer } from '../components/PageContainer'
 import { acceptInvitation } from '../features/families/api'
+import { clearPendingInviteToken, getPendingInviteToken, setPendingInviteToken } from '../features/families/localState'
 import { supabase } from '../lib/supabase'
 import { isForbiddenError, isUnauthorizedError } from '../lib/supabaseErrors'
 
 interface AcceptInvitePageProps {
   navigate: (nextPath: string) => void
+  onAccepted?: (familyId: string) => void
 }
 
 const Section = styled.section`
@@ -48,11 +50,18 @@ function getTokenFromSearch(): string {
   return params.get('token')?.trim() ?? ''
 }
 
-export function AcceptInvitePage({ navigate }: AcceptInvitePageProps) {
-  const token = useMemo(() => getTokenFromSearch(), [])
+export function AcceptInvitePage({ navigate, onAccepted }: AcceptInvitePageProps) {
+  const tokenFromUrl = useMemo(() => getTokenFromSearch(), [])
+  const token = tokenFromUrl || getPendingInviteToken() || ''
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+
+  useEffect(() => {
+    if (tokenFromUrl) {
+      setPendingInviteToken(tokenFromUrl)
+    }
+  }, [tokenFromUrl])
 
   const onAccept = async () => {
     if (!token) {
@@ -63,10 +72,14 @@ export function AcceptInvitePage({ navigate }: AcceptInvitePageProps) {
     setError('')
     setSuccess('')
     try {
-      await acceptInvitation(token)
+      const acceptedFamilyId = await acceptInvitation(token)
+      clearPendingInviteToken()
       setSuccess('Invitation accepted. You are now a member of this family.')
+      onAccepted?.(acceptedFamilyId)
+      navigate('/memories')
     } catch (acceptError) {
       if (isUnauthorizedError(acceptError)) {
+        setPendingInviteToken(token)
         setError('Your session expired. Please sign in again.')
         void supabase?.auth.signOut()
         navigate('/record')
@@ -79,6 +92,14 @@ export function AcceptInvitePage({ navigate }: AcceptInvitePageProps) {
       setIsSubmitting(false)
     }
   }
+
+  useEffect(() => {
+    if (!token) {
+      return
+    }
+    void onAccept()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token])
 
   return (
     <Section>
