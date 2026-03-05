@@ -1,6 +1,6 @@
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
-import { toSupabaseRequestError } from '../../lib/supabaseErrors'
+import { backendRequestJson, backendRequestVoid } from '../../lib/backendApi'
 
 const PENDING_DISPLAY_NAME_PREFIX = 'lm_pending_display_name_'
 
@@ -61,27 +61,19 @@ export async function ensureOwnProfileForSession(
   user: User,
   preferredDisplayName?: string,
 ): Promise<void> {
-  const client = requireSupabase()
+  requireSupabase()
   const fallbackDisplayName =
     normalizeDisplayName(preferredDisplayName) ??
     readPendingDisplayName(user.id) ??
     displayNameFromMetadata(user) ??
     'Member'
 
-  const { error } = await client.from('profiles').upsert(
-    {
-      user_id: user.id,
-      display_name: fallbackDisplayName,
-    },
-    {
-      onConflict: 'user_id',
-      ignoreDuplicates: true,
-    },
-  )
-
-  if (error) {
-    throw toSupabaseRequestError(error, 'Could not ensure profile.')
-  }
+  await backendRequestVoid('/profiles/ensure', {
+    method: 'POST',
+    body: JSON.stringify({
+      displayName: fallbackDisplayName,
+    }),
+  })
 
   clearPendingDisplayName(user.id)
 }
@@ -90,89 +82,36 @@ export async function getOwnProfile(): Promise<Profile | null> {
   const client = requireSupabase()
   const {
     data: { user },
-    error: authError,
+    error,
   } = await client.auth.getUser()
 
-  if (authError) {
-    throw toSupabaseRequestError(authError, 'Could not load account.')
+  if (error) {
+    throw error
   }
   if (!user) {
     return null
   }
 
-  const { data, error } = await client
-    .from('profiles')
-    .select('user_id,display_name')
-    .eq('user_id', user.id)
-    .maybeSingle()
-
-  if (error) {
-    throw toSupabaseRequestError(error, 'Could not load profile.')
-  }
-  if (!data) {
-    return null
-  }
+  const data = await backendRequestJson<{ userId: string; displayName: string }>('/profiles/me')
 
   return {
-    userId: String(data.user_id),
-    displayName: String(data.display_name),
+    userId: String(data.userId),
+    displayName: String(data.displayName),
   }
 }
 
 export async function updateOwnDisplayName(displayName: string): Promise<void> {
-  const client = requireSupabase()
-  const {
-    data: { user },
-    error: authError,
-  } = await client.auth.getUser()
-
-  if (authError) {
-    throw toSupabaseRequestError(authError, 'Could not update profile.')
-  }
-  if (!user) {
-    throw new Error('Not authenticated.')
-  }
+  requireSupabase()
 
   const normalizedDisplayName = normalizeDisplayName(displayName)
   if (!normalizedDisplayName) {
     throw new Error('Display name is required.')
   }
 
-  const { error } = await client
-    .from('profiles')
-    .update({
-      display_name: normalizedDisplayName,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('user_id', user.id)
-
-  if (error) {
-    throw toSupabaseRequestError(error, 'Could not update display name.')
-  }
-}
-
-export async function getDisplayNamesByUserIds(userIds: string[]): Promise<Record<string, string>> {
-  const client = requireSupabase()
-  if (userIds.length === 0) {
-    return {}
-  }
-
-  const { data, error } = await client
-    .from('profiles')
-    .select('user_id,display_name')
-    .in('user_id', userIds)
-
-  if (error) {
-    throw toSupabaseRequestError(error, 'Could not load member profiles.')
-  }
-
-  const displayNames: Record<string, string> = {}
-  for (const row of data ?? []) {
-    const userId = String(row.user_id)
-    const displayName = normalizeDisplayName(String(row.display_name))
-    if (displayName) {
-      displayNames[userId] = displayName
-    }
-  }
-  return displayNames
+  await backendRequestVoid('/profiles/me', {
+    method: 'PATCH',
+    body: JSON.stringify({
+      displayName: normalizedDisplayName,
+    }),
+  })
 }

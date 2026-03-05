@@ -14,6 +14,7 @@ public class AppProperties {
     private final Transcription transcription = new Transcription();
     private final Insights insights = new Insights();
     private final Splitter splitter = new Splitter();
+    private final Supabase supabase = new Supabase();
 
     public UUID getDefaultUserId() {
         return defaultUserId;
@@ -41,6 +42,10 @@ public class AppProperties {
 
     public Splitter getSplitter() {
         return splitter;
+    }
+
+    public Supabase getSupabase() {
+        return supabase;
     }
 
     public List<String> getCorsOriginsAsList() {
@@ -173,6 +178,27 @@ public class AppProperties {
 
         public void setMinExcerptChars(int minExcerptChars) {
             this.minExcerptChars = minExcerptChars;
+        }
+    }
+
+    public static class Supabase {
+        private String url;
+        private String anonKey;
+
+        public String getUrl() {
+            return url;
+        }
+
+        public void setUrl(String url) {
+            this.url = url;
+        }
+
+        public String getAnonKey() {
+            return anonKey;
+        }
+
+        public void setAnonKey(String anonKey) {
+            this.anonKey = anonKey;
         }
     }
 }
