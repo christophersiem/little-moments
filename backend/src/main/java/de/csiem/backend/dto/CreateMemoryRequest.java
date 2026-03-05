@@ -8,6 +8,8 @@ import java.time.Instant;
 public record CreateMemoryRequest(
     MultipartFile audio,
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant recordedAt,
-    String childId
+    String childId,
+    Boolean keepAudio,
+    Integer durationSeconds
 ) {
 }

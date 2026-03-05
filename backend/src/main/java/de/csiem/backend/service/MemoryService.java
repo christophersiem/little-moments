@@ -79,6 +79,17 @@ public class MemoryService {
         if (audio == null || audio.isEmpty()) {
             throw new ResponseStatusException(BAD_REQUEST, "Audio file is required");
         }
+        int maxRecordingSeconds = Math.max(appProperties.getRecording().getMaxSeconds(), 1);
+        int durationSeconds = request.durationSeconds() != null ? request.durationSeconds() : -1;
+        if (durationSeconds < 1) {
+            throw new ResponseStatusException(BAD_REQUEST, "durationSeconds is required");
+        }
+        if (durationSeconds > maxRecordingSeconds) {
+            throw new ResponseStatusException(
+                BAD_REQUEST,
+                "Recording exceeds max duration of %d seconds".formatted(maxRecordingSeconds)
+            );
+        }
 
         UserEntity user = getOrCreateDefaultUser();
         MemoryEntity memory = new MemoryEntity(
@@ -205,6 +216,11 @@ public class MemoryService {
         MemoryEntity memory = memoryRepository.findByIdAndUser_IdAndIsParentFalse(id, appProperties.getDefaultUserId())
             .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Memory not found"));
         return MemoryMapper.toMemoryResponse(memory);
+    }
+
+    @Transactional(readOnly = true)
+    public String getMemoryAudioUrl(UUID id) {
+        throw new ResponseStatusException(NOT_FOUND, "Audio is not available for this memory.");
     }
 
     @Transactional

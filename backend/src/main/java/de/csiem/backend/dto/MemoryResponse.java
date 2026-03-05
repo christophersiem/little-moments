@@ -15,6 +15,7 @@ public record MemoryResponse(
     String summary,
     String transcript,
     String errorMessage,
-    List<String> tags
+    List<String> tags,
+    boolean audioAvailable
 ) {
 }

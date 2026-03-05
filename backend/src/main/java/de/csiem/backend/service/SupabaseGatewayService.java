@@ -7,6 +7,7 @@ import de.csiem.backend.dto.FamilyMemberResponse;
 import de.csiem.backend.dto.FamilySummaryResponse;
 import de.csiem.backend.dto.ProfileResponse;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -266,6 +267,84 @@ public class SupabaseGatewayService {
         assertOwnerForChild(authorizationHeader, user.id(), childId, "Only owners can record memories.");
     }
 
+    public String resolveFamilyIdForChild(String authorizationHeader, String childId) {
+        String childUri = UriComponentsBuilder
+            .fromPath("/rest/v1/children")
+            .queryParam("select", "family_id")
+            .queryParam("id", "eq." + childId)
+            .queryParam("limit", 1)
+            .build(true)
+            .toUriString();
+
+        JsonNode childRows = callGet(childUri, authorizationHeader);
+        if (!childRows.isArray() || childRows.isEmpty()) {
+            throw new ResponseStatusException(NOT_FOUND, "Child not found");
+        }
+
+        String familyId = asText(childRows.get(0).get("family_id"));
+        if (!StringUtils.hasText(familyId)) {
+            throw new ResponseStatusException(FORBIDDEN, "Family not found for child");
+        }
+
+        return familyId;
+    }
+
+    public void uploadMemoryAudio(String objectPath, byte[] audioBytes, String contentType) {
+        String bucket = appProperties.getSupabase().getAudioBucket();
+        if (!StringUtils.hasText(bucket)) {
+            throw new ResponseStatusException(BAD_REQUEST, "SUPABASE_AUDIO_BUCKET is not configured");
+        }
+
+        String uri = "/storage/v1/object/" + bucket + "/" + objectPath;
+
+        try {
+            restClient().post()
+                .uri(uri)
+                .headers(headers -> {
+                    applyServiceRoleHeaders(headers, null);
+                    headers.set("x-upsert", "true");
+                })
+                .contentType(safeMediaType(contentType))
+                .body(audioBytes)
+                .retrieve()
+                .toBodilessEntity();
+        } catch (RestClientResponseException ex) {
+            throw mapException(ex, "Could not upload audio to storage");
+        } catch (Exception ex) {
+            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Could not upload audio to storage");
+        }
+    }
+
+    public String createSignedAudioUrl(String objectPath, int expiresInSeconds) {
+        String bucket = appProperties.getSupabase().getAudioBucket();
+        if (!StringUtils.hasText(bucket)) {
+            throw new ResponseStatusException(BAD_REQUEST, "SUPABASE_AUDIO_BUCKET is not configured");
+        }
+
+        JsonNode response = callPostWithServiceRole(
+            "/storage/v1/object/sign/" + bucket + "/" + objectPath,
+            Map.of("expiresIn", Math.max(expiresInSeconds, 1)),
+            null
+        );
+
+        String signedPath = firstNonBlank(asText(response.get("signedURL")), asText(response.get("signedUrl")));
+        if (!StringUtils.hasText(signedPath)) {
+            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Could not sign audio URL");
+        }
+
+        if (signedPath.startsWith("http://") || signedPath.startsWith("https://")) {
+            return signedPath;
+        }
+        String baseUrl = appProperties.getSupabase().getUrl();
+        if (!StringUtils.hasText(baseUrl)) {
+            throw new ResponseStatusException(BAD_REQUEST, "SUPABASE_URL is not configured");
+        }
+        if (signedPath.startsWith("/")) {
+            return baseUrl + signedPath;
+        }
+        return baseUrl + "/" + signedPath;
+    }
+
     public void assertOwnerCanManageMemory(String authorizationHeader, String memoryId) {
         SupabaseUser user = getCurrentUser(authorizationHeader);
         String memoryUri = UriComponentsBuilder
@@ -376,7 +455,11 @@ public class SupabaseGatewayService {
         String transcript,
         String title,
         String summary,
-        List<String> tags
+        List<String> tags,
+        String audioPath,
+        String audioMimeType,
+        Long audioSizeBytes,
+        Integer audioDurationSeconds
     ) {
         SupabaseUser user = getCurrentUser(authorizationHeader);
         String uri = UriComponentsBuilder
@@ -385,19 +468,26 @@ public class SupabaseGatewayService {
             .build(true)
             .toUriString();
 
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("child_id", childId);
+        payload.put("created_by", user.id());
+        payload.put("recorded_at", recordedAt.toString());
+        payload.put("status", "READY");
+        payload.put("transcript", transcript);
+        payload.put("title", title);
+        payload.put("summary", summary);
+        payload.put("tags", tags);
+        if (StringUtils.hasText(audioPath)) {
+            payload.put("audio_path", audioPath);
+            payload.put("audio_mime_type", audioMimeType);
+            payload.put("audio_size_bytes", audioSizeBytes);
+            payload.put("audio_duration_seconds", audioDurationSeconds);
+        }
+
         return firstRow(
             callPost(
                 uri,
-                Map.of(
-                    "child_id", childId,
-                    "created_by", user.id(),
-                    "recorded_at", recordedAt.toString(),
-                    "status", "READY",
-                    "transcript", transcript,
-                    "title", title,
-                    "summary", summary,
-                    "tags", tags
-                ),
+                payload,
                 authorizationHeader,
                 "return=representation"
             ),
@@ -583,6 +673,27 @@ public class SupabaseGatewayService {
         }
     }
 
+    private JsonNode callPostWithServiceRole(String uri, Object payload, String preferHeader) {
+        try {
+            String body = restClient().post()
+                .uri(uri)
+                .headers(headers -> applyServiceRoleHeaders(headers, preferHeader))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(payload)
+                .retrieve()
+                .body(String.class);
+
+            if (!StringUtils.hasText(body)) {
+                return objectMapper.nullNode();
+            }
+            return objectMapper.readTree(body);
+        } catch (RestClientResponseException ex) {
+            throw mapException(ex, "Supabase request failed");
+        } catch (Exception ex) {
+            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Supabase request failed");
+        }
+    }
+
     private JsonNode callPatchForJson(String uri, Object payload, String authorizationHeader, String preferHeader) {
         try {
             String body = restClient().patch()
@@ -650,6 +761,19 @@ public class SupabaseGatewayService {
 
         headers.set("apikey", supabase.getAnonKey());
         headers.set(HttpHeaders.AUTHORIZATION, authorizationHeader);
+        if (StringUtils.hasText(preferHeader)) {
+            headers.set("Prefer", preferHeader);
+        }
+    }
+
+    private void applyServiceRoleHeaders(HttpHeaders headers, String preferHeader) {
+        AppProperties.Supabase supabase = appProperties.getSupabase();
+        if (!StringUtils.hasText(supabase.getServiceRoleKey())) {
+            throw new ResponseStatusException(BAD_REQUEST, "SUPABASE_SERVICE_ROLE_KEY is not configured");
+        }
+
+        headers.set("apikey", supabase.getServiceRoleKey());
+        headers.setBearerAuth(supabase.getServiceRoleKey());
         if (StringUtils.hasText(preferHeader)) {
             headers.set("Prefer", preferHeader);
         }
@@ -802,8 +926,19 @@ public class SupabaseGatewayService {
         return rows.get(0);
     }
 
+    private MediaType safeMediaType(String value) {
+        if (!StringUtils.hasText(value)) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
+        try {
+            return MediaType.parseMediaType(value);
+        } catch (InvalidMediaTypeException ignored) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
+    }
+
     private String memorySelect() {
-        return "id,created_at,recorded_at,status,title,summary,transcript,error_message,tags";
+        return "id,created_at,recorded_at,status,title,summary,transcript,error_message,tags,audio_path,audio_mime_type,audio_size_bytes,audio_duration_seconds";
     }
 
     private record SupabaseUser(String id, String email) {
