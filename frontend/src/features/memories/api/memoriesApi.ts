@@ -58,6 +58,7 @@ interface MemoryApiResponse {
   transcript: string | null
   errorMessage: string | null
   tags: string[] | null
+  audioAvailable: boolean
 }
 
 const VALID_TAGS = new Set<string>(MEMORY_TAG_OPTIONS)
@@ -113,6 +114,7 @@ function mapMemory(payload: MemoryApiResponse): Memory {
     transcript: payload.transcript ?? null,
     errorMessage: payload.errorMessage ?? null,
     tags: normalizeTags(payload.tags),
+    audioAvailable: payload.audioAvailable === true,
   }
 }
 
@@ -120,11 +122,15 @@ export async function createMemory(
   audioBlob: Blob,
   recordedAtIso: string,
   childId: string,
+  keepAudio: boolean,
+  durationSeconds: number,
 ): Promise<CreateMemoryResponse> {
   const formData = new FormData()
   formData.append('audio', audioBlob, 'recording.webm')
   formData.append('recordedAt', recordedAtIso)
   formData.append('childId', childId)
+  formData.append('keepAudio', keepAudio ? 'true' : 'false')
+  formData.append('durationSeconds', String(Math.max(1, Math.round(durationSeconds))))
 
   const payload = await backendRequestJson<CreateMemoryApiResponse>('/memories', {
     method: 'POST',
@@ -199,4 +205,15 @@ export async function deleteMemory(memoryId: string): Promise<void> {
   await backendRequestVoid(`/memories/${encodeURIComponent(memoryId)}`, {
     method: 'DELETE',
   })
+}
+
+export async function getMemoryAudioUrl(memoryId: string): Promise<string> {
+  const payload = await backendRequestJson<{ audioSignedUrl?: string | null }>(
+    `/memories/${encodeURIComponent(memoryId)}/audio-url`,
+  )
+  const value = typeof payload.audioSignedUrl === 'string' ? payload.audioSignedUrl.trim() : ''
+  if (!value) {
+    throw new Error('Audio URL is not available.')
+  }
+  return value
 }

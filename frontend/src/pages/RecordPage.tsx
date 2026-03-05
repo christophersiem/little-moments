@@ -3,6 +3,7 @@ import styled from 'styled-components'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
 import { RecordButton } from '../components/RecordButton'
+import { MAX_RECORDING_SECONDS } from '../features/memories/constants'
 import { startMemoryUpload } from '../features/memories/hooks/uploadSessionStore'
 import {
   transitionStopDecision,
@@ -22,6 +23,7 @@ type RecordPhase = 'idle' | 'recording' | 'stopped' | 'error'
 interface RecordingPayload {
   blob: Blob
   recordedAt: string
+  durationSeconds: number
 }
 
 const NOOP = () => undefined
@@ -29,6 +31,7 @@ const MIN_RECORDING_SECONDS = 2
 const MIN_RECORDING_BYTES = 10000
 const SHORT_RECORDING_HINT = 'Recording too short. Please speak at least 5 words.'
 const SHORT_HINT_DISPLAY_MS = 5200
+const MAX_DURATION_HINT = `Max ${MAX_RECORDING_SECONDS}s`
 
 function isLikelyTooShort(blob: Blob, elapsedSeconds: number): boolean {
   return elapsedSeconds < MIN_RECORDING_SECONDS || blob.size < MIN_RECORDING_BYTES
@@ -91,6 +94,24 @@ const BodyText = styled.p`
   max-width: 280px;
   color: ${({ theme }) => theme.colors.textMuted};
   font-size: ${({ theme }) => theme.typography.bodySize};
+`
+
+const HelperText = styled.p`
+  max-width: 280px;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+`
+
+const InlineNotice = styled.p`
+  width: min(360px, calc(100vw - 48px));
+  margin: ${({ theme }) => `${theme.space.x2} 0 0`};
+  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3}`};
+  border: 1px solid ${({ theme }) => theme.colors.accentStrong};
+  border-radius: ${({ theme }) => theme.radii.md};
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  color: ${({ theme }) => theme.colors.text};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+  text-align: center;
 `
 
 const HintBanner = styled.p`
@@ -162,17 +183,34 @@ const SheetActions = styled.div`
   gap: ${({ theme }) => theme.space.x2};
 `
 
+const KeepAudioControl = styled.label`
+  display: inline-flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.x2};
+  margin-top: ${({ theme }) => theme.space.x3};
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.bodySize};
+`
+
+const KeepAudioCheckbox = styled.input`
+  width: 18px;
+  height: 18px;
+`
+
 export function RecordPage({ navigate, childId, onNavigationLockChange }: RecordPageProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const latestRecordingRef = useRef<RecordingPayload | null>(null)
   const intervalRef = useRef<number | null>(null)
+  const elapsedRef = useRef(0)
 
   const [phase, setPhase] = useState<RecordPhase>('idle')
   const [stopDecisionState, setStopDecisionState] = useState<StopDecisionState>('hidden')
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [errorMessage, setErrorMessage] = useState('')
+  const [recordingNotice, setRecordingNotice] = useState('')
+  const [keepAudio, setKeepAudio] = useState(false)
 
   const cleanupStream = () => {
     if (streamRef.current) {
@@ -204,8 +242,20 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
   }, [errorMessage, phase])
 
   useEffect(() => {
+    if (!recordingNotice) {
+      return
+    }
+    const timer = window.setTimeout(() => setRecordingNotice(''), 2800)
+    return () => window.clearTimeout(timer)
+  }, [recordingNotice])
+
+  useEffect(() => {
     onNavigationLockChange?.(phase === 'recording')
   }, [onNavigationLockChange, phase])
+
+  useEffect(() => {
+    elapsedRef.current = elapsedSeconds
+  }, [elapsedSeconds])
 
   useEffect(() => {
     if (phase !== 'stopped' || stopDecisionState === 'hidden') {
@@ -239,7 +289,9 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
     }
 
     setErrorMessage('')
+    setRecordingNotice('')
     setElapsedSeconds(0)
+    elapsedRef.current = 0
     setStopDecisionState('hidden')
 
     try {
@@ -260,7 +312,11 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
         cleanupStream()
         const recordingEndedAt = new Date().toISOString()
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' })
-        latestRecordingRef.current = { blob, recordedAt: recordingEndedAt }
+        latestRecordingRef.current = {
+          blob,
+          recordedAt: recordingEndedAt,
+          durationSeconds: Math.max(elapsedRef.current, 1),
+        }
         setPhase('stopped')
         setStopDecisionState(transitionStopDecision('hidden', 'recording-stopped').state)
       }
@@ -268,7 +324,16 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
       recorder.start(300)
       setPhase('recording')
       intervalRef.current = window.setInterval(() => {
-        setElapsedSeconds((current) => current + 1)
+        setElapsedSeconds((current) => {
+          const next = current + 1
+          if (next >= MAX_RECORDING_SECONDS) {
+            window.setTimeout(() => {
+              stopRecording()
+              setRecordingNotice(`Stopped at ${MAX_RECORDING_SECONDS} seconds (max).`)
+            }, 0)
+          }
+          return Math.min(next, MAX_RECORDING_SECONDS)
+        })
       }, 1000)
     } catch {
       cleanupStream()
@@ -312,7 +377,13 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
         return
       }
 
-      const session = startMemoryUpload(latestRecordingRef.current.blob, latestRecordingRef.current.recordedAt, childId)
+      const session = startMemoryUpload(
+        latestRecordingRef.current.blob,
+        latestRecordingRef.current.recordedAt,
+        childId,
+        keepAudio,
+        latestRecordingRef.current.durationSeconds,
+      )
       latestRecordingRef.current = null
       chunksRef.current = []
       setStopDecisionState('hidden')
@@ -345,7 +416,7 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
             <RecordButton
               status="recording"
               elapsedSec={elapsedSeconds}
-              maxDurationSec={60}
+              maxDurationSec={MAX_RECORDING_SECONDS}
               onStart={NOOP}
               onStop={stopRecording}
               diameter={188}
@@ -353,6 +424,7 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
             <RecordingMeta>
               <Timer>{formatDuration(elapsedSeconds)}</Timer>
               <BodyText>Speak naturally. We will structure this moment for you.</BodyText>
+              <HelperText>{MAX_DURATION_HINT}</HelperText>
             </RecordingMeta>
           </RecordAnchor>
         </CenterHero>
@@ -368,12 +440,13 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
             <RecordButton
               status="stopped"
               elapsedSec={elapsedSeconds}
-              maxDurationSec={60}
+              maxDurationSec={MAX_RECORDING_SECONDS}
               onStart={NOOP}
               onStop={NOOP}
               diameter={96}
             />
             <BodyText>Your recording is ready to save.</BodyText>
+            {recordingNotice && <InlineNotice role="status">{recordingNotice}</InlineNotice>}
           </Hero>
         </Stage>
 
@@ -385,7 +458,11 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
                 <>
                   <h2>Save this recording?</h2>
                   <BodyText>Save now, or discard this moment.</BodyText>
-                  <PrivacyText>Audio is transcribed to text and not stored as audio.</PrivacyText>
+                  <PrivacyText>
+                    {keepAudio
+                      ? 'Audio will be kept so you can replay the original recording.'
+                      : 'Audio is transcribed to text and not stored as audio.'}
+                  </PrivacyText>
                   <SheetActions>
                     <Button variant="primary" fullWidth autoFocus onClick={() => onStopDecision('save-selected')}>
                       Save recording
@@ -422,11 +499,21 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
         <RecordButton
           status="idle"
           elapsedSec={0}
-          maxDurationSec={60}
+          maxDurationSec={MAX_RECORDING_SECONDS}
           onStart={() => void startRecording()}
           onStop={NOOP}
           diameter={188}
         />
+        <KeepAudioControl>
+          <KeepAudioCheckbox
+            type="checkbox"
+            checked={keepAudio}
+            onChange={(event) => setKeepAudio(event.target.checked)}
+          />
+          Keep audio
+        </KeepAudioControl>
+        <HelperText>Max 60s. Lets you replay the original voice.</HelperText>
+        {recordingNotice && <InlineNotice role="status">{recordingNotice}</InlineNotice>}
         {errorMessage && <HintBanner role="status">{errorMessage}</HintBanner>}
       </CenterHero>
     </CenterStage>

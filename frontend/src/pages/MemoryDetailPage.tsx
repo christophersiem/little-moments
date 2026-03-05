@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { Button } from '../components/Button'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { OverflowMenu, type OverflowMenuAction } from '../components/OverflowMenu'
-import { deleteMemory, updateMemory } from '../features/memories/api'
+import { deleteMemory, getMemoryAudioUrl, updateMemory } from '../features/memories/api'
 import { MEMORY_TAG_OPTIONS, type Memory, type MemoryTag } from '../features/memories/types'
 import { useMemoryDetail } from '../features/memories/hooks'
 import { supabase } from '../lib/supabase'
@@ -37,6 +37,12 @@ const TopBar = styled.div`
   gap: ${({ theme }) => theme.space.x2};
 `
 
+const TopBarActions = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.x2};
+`
+
 const BackButton = styled.button`
   min-height: ${({ theme }) => theme.layout.minTouchTarget};
   border: 1px solid ${({ theme }) => theme.colors.border};
@@ -50,6 +56,27 @@ const BackButton = styled.button`
   &:focus-visible {
     outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
     outline-offset: 2px;
+  }
+`
+
+const AudioButton = styled.button`
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.pill};
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  color: ${({ theme }) => theme.colors.text};
+  padding: 0 ${({ theme }) => theme.space.x3};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
   }
 `
 
@@ -219,6 +246,10 @@ const SuccessText = styled.p`
   color: ${({ theme }) => theme.colors.accentStrong};
 `
 
+const HiddenAudio = styled.audio`
+  display: none;
+`
+
 function SaveIcon() {
   return (
     <EditIcon viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -274,6 +305,7 @@ function toIsoFromLocalDateTime(value: string): string | null {
 
 export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }: MemoryDetailPageProps) {
   const { loading, error, memory, reload } = useMemoryDetail(memoryId)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const [currentMemory, setCurrentMemory] = useState<Memory | null>(null)
   const [saveError, setSaveError] = useState('')
@@ -294,6 +326,10 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
 
   const [editingTags, setEditingTags] = useState(false)
   const [tagsDraft, setTagsDraft] = useState<MemoryTag[]>([])
+  const [audioUrl, setAudioUrl] = useState('')
+  const [audioLoading, setAudioLoading] = useState(false)
+  const [audioPlaying, setAudioPlaying] = useState(false)
+  const [audioError, setAudioError] = useState('')
 
   useEffect(() => {
     if (!memory) {
@@ -305,7 +341,23 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
     setTranscriptDraft(memory.transcript || '')
     setTagsDraft(memory.tags)
     setSaveError('')
+    setAudioUrl('')
+    setAudioError('')
+    setAudioPlaying(false)
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.src = ''
+    }
   }, [memory])
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current.src = ''
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!saveNotice) {
@@ -411,6 +463,57 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
     }
   }
 
+  const fetchAudioUrl = async (): Promise<string> => {
+    if (!currentMemory) {
+      throw new Error('Memory is not available.')
+    }
+    const url = await getMemoryAudioUrl(currentMemory.id)
+    setAudioUrl(url)
+    return url
+  }
+
+  const playAudioWithRetry = async (url: string): Promise<void> => {
+    const element = audioRef.current
+    if (!element) {
+      throw new Error('Audio player is not available.')
+    }
+    element.src = url
+    try {
+      await element.play()
+      setAudioPlaying(true)
+    } catch {
+      const refreshedUrl = await fetchAudioUrl()
+      element.src = refreshedUrl
+      await element.play()
+      setAudioPlaying(true)
+    }
+  }
+
+  const onToggleAudio = async () => {
+    if (!currentMemory?.audioAvailable) {
+      return
+    }
+
+    if (audioPlaying && audioRef.current) {
+      audioRef.current.pause()
+      setAudioPlaying(false)
+      return
+    }
+
+    setAudioLoading(true)
+    setAudioError('')
+    try {
+      const urlToPlay = audioUrl || (await fetchAudioUrl())
+      await playAudioWithRetry(urlToPlay)
+    } catch (playbackError) {
+      const message = playbackError instanceof Error ? playbackError.message : 'Could not play audio.'
+      setAudioError(message)
+      setAudioPlaying(false)
+    } finally {
+      setAudioLoading(false)
+    }
+  }
+
   const menuActions: OverflowMenuAction[] = canManageMemory
     ? [
         {
@@ -497,9 +600,21 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
           <BackButton type="button" onClick={() => navigate('/memories')} aria-label="Back to memories">
             ← Back
           </BackButton>
-          {canManageMemory && (
-            <OverflowMenu actions={menuActions} ariaLabel="More actions" disabled={saving || deleting} />
-          )}
+          <TopBarActions>
+            {currentMemory.audioAvailable && (
+              <AudioButton
+                type="button"
+                onClick={() => void onToggleAudio()}
+                disabled={audioLoading}
+                aria-label={audioPlaying ? 'Pause audio' : 'Play audio'}
+              >
+                {audioLoading ? 'Loading...' : audioPlaying ? 'Pause' : 'Play'}
+              </AudioButton>
+            )}
+            {canManageMemory && (
+              <OverflowMenu actions={menuActions} ariaLabel="More actions" disabled={saving || deleting || audioLoading} />
+            )}
+          </TopBarActions>
         </TopBar>
 
         <TitleRow>
@@ -652,6 +767,8 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
       {!canManageMemory && <MetaText>Only owners can edit or delete memories.</MetaText>}
       {saveError && <ErrorText>{saveError}</ErrorText>}
       {saveNotice && <SuccessText>{saveNotice}</SuccessText>}
+      {audioError && <ErrorText>{audioError}</ErrorText>}
+      <HiddenAudio ref={audioRef} preload="none" onPause={() => setAudioPlaying(false)} onEnded={() => setAudioPlaying(false)} />
 
       {deleteError && <ErrorText>{deleteError}</ErrorText>}
       <ConfirmDialog

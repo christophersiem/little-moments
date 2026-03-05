@@ -9,6 +9,8 @@ export interface ActiveUploadSession {
   startedAt: string
   recordedAt: string
   childId: string
+  keepAudio: boolean
+  durationSeconds: number
   status: ActiveUploadStatus
   memoryId?: string
   ids: string[]
@@ -20,6 +22,8 @@ let activeSession: ActiveUploadSession | null = null
 let activeBlob: Blob | null = null
 let activeRecordedAt = ''
 let activeChildId = ''
+let activeKeepAudio = false
+let activeDurationSeconds = 0
 let requestVersion = 0
 
 const listeners = new Set<() => void>()
@@ -76,8 +80,15 @@ function applyResponseToSession(
   }
 }
 
-function runUpload(version: number, audioBlob: Blob, recordedAtIso: string, childId: string): void {
-  void createMemory(audioBlob, recordedAtIso, childId)
+function runUpload(
+  version: number,
+  audioBlob: Blob,
+  recordedAtIso: string,
+  childId: string,
+  keepAudio: boolean,
+  durationSeconds: number,
+): void {
+  void createMemory(audioBlob, recordedAtIso, childId, keepAudio, durationSeconds)
     .then((response) => {
       if (version !== requestVersion || !activeSession) {
         return
@@ -101,13 +112,21 @@ function runUpload(version: number, audioBlob: Blob, recordedAtIso: string, chil
     })
 }
 
-export function startMemoryUpload(audioBlob: Blob, recordedAtIso: string, childId: string): ActiveUploadSession {
+export function startMemoryUpload(
+  audioBlob: Blob,
+  recordedAtIso: string,
+  childId: string,
+  keepAudio: boolean,
+  durationSeconds: number,
+): ActiveUploadSession {
   requestVersion += 1
   const nextSession: ActiveUploadSession = {
     clientId: makeClientId(),
     startedAt: new Date().toISOString(),
     recordedAt: recordedAtIso,
     childId,
+    keepAudio,
+    durationSeconds,
     status: 'uploading',
     ids: [],
     count: 0,
@@ -117,8 +136,10 @@ export function startMemoryUpload(audioBlob: Blob, recordedAtIso: string, childI
   activeBlob = audioBlob
   activeRecordedAt = recordedAtIso
   activeChildId = childId
+  activeKeepAudio = keepAudio
+  activeDurationSeconds = durationSeconds
   emit()
-  runUpload(requestVersion, audioBlob, recordedAtIso, childId)
+  runUpload(requestVersion, audioBlob, recordedAtIso, childId, keepAudio, durationSeconds)
 
   return nextSession
 }
@@ -142,7 +163,7 @@ export function retryActiveMemoryUpload(): boolean {
     count: 0,
   }
   emit()
-  runUpload(requestVersion, activeBlob, activeRecordedAt, activeChildId)
+  runUpload(requestVersion, activeBlob, activeRecordedAt, activeChildId, activeKeepAudio, activeDurationSeconds)
   return true
 }
 
@@ -177,6 +198,8 @@ export function clearActiveUploadSession(): void {
   activeBlob = null
   activeRecordedAt = ''
   activeChildId = ''
+  activeKeepAudio = false
+  activeDurationSeconds = 0
   emit()
 }
 
