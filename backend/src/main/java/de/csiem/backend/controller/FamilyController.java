@@ -6,6 +6,7 @@ import de.csiem.backend.dto.CreateInvitationRequest;
 import de.csiem.backend.dto.FamilyIdResponse;
 import de.csiem.backend.dto.FamilyMemberResponse;
 import de.csiem.backend.dto.FamilyNameRequest;
+import de.csiem.backend.dto.FamilySummaryResponse;
 import de.csiem.backend.dto.SetMemberRoleRequest;
 import de.csiem.backend.dto.TokenResponse;
 import de.csiem.backend.service.SupabaseGatewayService;
@@ -61,6 +62,13 @@ public class FamilyController {
         @PathVariable("familyId") String familyId
     ) {
         return new ChildIdResponse(supabaseGatewayService.ensureDefaultChildForFamily(authorizationHeader, familyId));
+    }
+
+    @GetMapping("/families")
+    public List<FamilySummaryResponse> listMyFamilies(
+        @RequestHeader("Authorization") String authorizationHeader
+    ) {
+        return supabaseGatewayService.listMyFamilies(authorizationHeader);
     }
 
     @GetMapping("/families/{familyId}/members")

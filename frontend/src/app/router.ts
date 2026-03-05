@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 export type AppRoute =
+  | { kind: 'onboarding' }
   | { kind: 'record' }
   | { kind: 'memories' }
   | { kind: 'memory-detail'; memoryId: string }
@@ -28,6 +29,9 @@ function normalizePath(pathname: string): string {
 }
 
 function resolveRoute(pathname: string): AppRoute {
+  if (pathname === '/onboarding') {
+    return { kind: 'onboarding' }
+  }
   if (pathname === '/record') {
     return { kind: 'record' }
   }

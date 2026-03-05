@@ -10,16 +10,19 @@ import {
   removeMember,
   setMemberRole,
   type FamilyMember,
+  type FamilySummary,
 } from '../features/families/api'
 import { supabase } from '../lib/supabase'
 import { isForbiddenError, isUnauthorizedError } from '../lib/supabaseErrors'
 
 interface FamilyPageProps {
   familyId: string | null
+  families: FamilySummary[]
   navigate: (nextPath: string) => void
+  onActiveFamilyChange?: (nextFamilyId: string) => void
 }
 
-type ConfirmActionType = 'make-owner' | 'remove'
+type ConfirmActionType = 'make-owner' | 'demote-owner' | 'remove'
 
 interface ConfirmAction {
   type: ConfirmActionType
@@ -44,6 +47,17 @@ const Block = styled.section`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.space.x3};
+`
+
+const FamilySelector = styled.select`
+  width: 100%;
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  border-radius: ${({ theme }) => theme.radii.md};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  color: ${({ theme }) => theme.colors.text};
+  padding: ${({ theme }) => `0 ${theme.space.x3}`};
+  font-size: ${({ theme }) => theme.typography.bodySize};
 `
 
 const Subheading = styled.h3`
@@ -135,7 +149,7 @@ function displayName(member: FamilyMember): string {
   return member.displayName?.trim() || 'Member'
 }
 
-export function FamilyPage({ familyId, navigate }: FamilyPageProps) {
+export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange }: FamilyPageProps) {
   const [members, setMembers] = useState<FamilyMember[]>([])
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [membersError, setMembersError] = useState('')
@@ -292,6 +306,17 @@ export function FamilyPage({ familyId, navigate }: FamilyPageProps) {
       return
     }
 
+    if (type === 'demote-owner') {
+      await runMemberAction(
+        `demote-owner:${member.userId}`,
+        () => setMemberRole(familyId, member.userId, 'MEMBER'),
+        'Owner access removed.',
+        'Could not update role.',
+      )
+      setConfirmAction(null)
+      return
+    }
+
     await runMemberAction(
       `remove:${member.userId}`,
       () => removeMember(familyId, member.userId),
@@ -349,20 +374,38 @@ export function FamilyPage({ familyId, navigate }: FamilyPageProps) {
   const confirmDialogTitle = confirmAction
     ? confirmAction.type === 'make-owner'
       ? `Make ${displayName(confirmAction.member)} the owner?`
+      : confirmAction.type === 'demote-owner'
+        ? `Remove owner access for ${displayName(confirmAction.member)}?`
       : `Remove ${displayName(confirmAction.member)}?`
     : ''
 
   const confirmDialogBody = confirmAction
     ? confirmAction.type === 'make-owner'
-      ? 'They will be able to manage members and invites.'
+      ? 'They will be able to manage members and invites, and record moments.'
+      : confirmAction.type === 'demote-owner'
+        ? 'They will remain in the family as a member.'
       : 'They will lose access to memories in this family.'
     : ''
 
   const memberRows = members.map((member, index) => {
     const isCurrentUser = member.userId === currentUserId
     const menuActions: OverflowMenuAction[] =
-      isCurrentUserOwner && !isCurrentUser && member.role !== 'OWNER'
-        ? [
+      isCurrentUserOwner && !isCurrentUser
+        ? member.role === 'OWNER'
+          ? [
+              {
+                id: `demote-owner:${member.userId}`,
+                label: 'Remove owner access',
+                onSelect: () => setConfirmAction({ type: 'demote-owner', member }),
+              },
+              {
+                id: `remove:${member.userId}`,
+                label: 'Remove from family',
+                tone: 'destructive',
+                onSelect: () => setConfirmAction({ type: 'remove', member }),
+              },
+            ]
+          : [
             {
               id: `make-owner:${member.userId}`,
               label: 'Make owner',
@@ -395,6 +438,23 @@ export function FamilyPage({ familyId, navigate }: FamilyPageProps) {
       <Section>
         <Heading>Family</Heading>
 
+        {families.length > 1 && (
+          <Block>
+            <Subheading>Active family</Subheading>
+            <FamilySelector
+              value={familyId ?? ''}
+              onChange={(event) => onActiveFamilyChange?.(event.target.value)}
+              aria-label="Active family"
+            >
+              {families.map((family) => (
+                <option key={family.familyId} value={family.familyId}>
+                  {family.familyName}
+                </option>
+              ))}
+            </FamilySelector>
+          </Block>
+        )}
+
         <Block>
           <Subheading>Members</Subheading>
           <Card>
@@ -407,39 +467,48 @@ export function FamilyPage({ familyId, navigate }: FamilyPageProps) {
           </Card>
         </Block>
 
-        <Block>
-          <Subheading>Invite another parent</Subheading>
-          <Card>
-            <SmallText>Share access so you can both capture memories.</SmallText>
-            <InviteForm onSubmit={onCreateInvite}>
-              <InviteInput
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="Email address"
-                autoComplete="email"
-                required
-              />
-              <Button type="submit" variant="primary" disabled={creatingInvite || !familyId} fullWidth>
-                {creatingInvite ? 'Creating invite link...' : 'Create invite link'}
-              </Button>
-            </InviteForm>
-
-            {inviteError && <ErrorText>{inviteError}</ErrorText>}
-            {inviteMessage && <SuccessText>{inviteMessage}</SuccessText>}
-
-            {inviteLink && (
-              <LinkWrap>
-                <InviteLinkField readOnly value={inviteLink} aria-label="Invite link" />
-                <Button type="button" onClick={() => void onCopyInvite()} fullWidth>
-                  Copy link
+        {isCurrentUserOwner ? (
+          <Block>
+            <Subheading>Invite another parent</Subheading>
+            <Card>
+              <SmallText>Share access so you can both capture memories.</SmallText>
+              <InviteForm onSubmit={onCreateInvite}>
+                <InviteInput
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="Email address"
+                  autoComplete="email"
+                  required
+                />
+                <Button type="submit" variant="primary" disabled={creatingInvite || !familyId} fullWidth>
+                  {creatingInvite ? 'Creating invite link...' : 'Create invite link'}
                 </Button>
-              </LinkWrap>
-            )}
+              </InviteForm>
 
-            <SmallText>No email is sent automatically. Share this link manually.</SmallText>
-          </Card>
-        </Block>
+              {inviteError && <ErrorText>{inviteError}</ErrorText>}
+              {inviteMessage && <SuccessText>{inviteMessage}</SuccessText>}
+
+              {inviteLink && (
+                <LinkWrap>
+                  <InviteLinkField readOnly value={inviteLink} aria-label="Invite link" />
+                  <Button type="button" onClick={() => void onCopyInvite()} fullWidth>
+                    Copy link
+                  </Button>
+                </LinkWrap>
+              )}
+
+              <SmallText>No email is sent automatically. Share this link manually.</SmallText>
+            </Card>
+          </Block>
+        ) : (
+          <Block>
+            <Subheading>Invite another parent</Subheading>
+            <Card>
+              <SmallText>Only owners can invite new members.</SmallText>
+            </Card>
+          </Block>
+        )}
       </Section>
 
       <ConfirmDialog
@@ -447,7 +516,13 @@ export function FamilyPage({ familyId, navigate }: FamilyPageProps) {
         title={confirmDialogTitle}
         body={confirmDialogBody}
         cancelLabel="Cancel"
-        confirmLabel={confirmAction?.type === 'make-owner' ? 'Make owner' : 'Remove'}
+        confirmLabel={
+          confirmAction?.type === 'make-owner'
+            ? 'Make owner'
+            : confirmAction?.type === 'demote-owner'
+              ? 'Remove owner access'
+              : 'Remove'
+        }
         confirmVariant={confirmAction?.type === 'remove' ? 'danger' : 'primary'}
         busy={memberActionBusyKey !== null}
         onCancel={() => setConfirmAction(null)}
@@ -456,4 +531,3 @@ export function FamilyPage({ familyId, navigate }: FamilyPageProps) {
     </>
   )
 }
-

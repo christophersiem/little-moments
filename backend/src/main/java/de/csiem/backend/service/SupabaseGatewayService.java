@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.csiem.backend.config.AppProperties;
 import de.csiem.backend.dto.FamilyMemberResponse;
+import de.csiem.backend.dto.FamilySummaryResponse;
 import de.csiem.backend.dto.ProfileResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -16,12 +17,14 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.ArrayList;
 import java.time.Instant;
+import java.net.URI;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
@@ -113,6 +116,69 @@ public class SupabaseGatewayService {
         return response;
     }
 
+    public List<FamilySummaryResponse> listMyFamilies(String authorizationHeader) {
+        SupabaseUser user = getCurrentUser(authorizationHeader);
+
+        String membershipUri = UriComponentsBuilder
+            .fromPath("/rest/v1/family_members")
+            .queryParam("select", "family_id,role,joined_at")
+            .queryParam("user_id", "eq." + user.id())
+            .queryParam("order", "joined_at.asc")
+            .build(true)
+            .toUriString();
+
+        JsonNode membershipRows = callGet(membershipUri, authorizationHeader);
+        if (!membershipRows.isArray() || membershipRows.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> familyIds = new ArrayList<>();
+        for (JsonNode row : membershipRows) {
+            String familyId = asText(row.get("family_id"));
+            if (!familyId.isBlank()) {
+                familyIds.add(familyId);
+            }
+        }
+        if (familyIds.isEmpty()) {
+            return List.of();
+        }
+
+        String familiesUri = UriComponentsBuilder
+            .fromPath("/rest/v1/families")
+            .queryParam("select", "id,name")
+            .queryParam("id", "in.(" + String.join(",", familyIds) + ")")
+            .build(true)
+            .toUriString();
+
+        JsonNode familyRows = callGet(familiesUri, authorizationHeader);
+        Map<String, String> familyNamesById = new HashMap<>();
+        if (familyRows.isArray()) {
+            for (JsonNode row : familyRows) {
+                String familyId = asText(row.get("id"));
+                if (!familyId.isBlank()) {
+                    familyNamesById.put(familyId, firstNonBlank(asText(row.get("name")), "Family"));
+                }
+            }
+        }
+
+        List<FamilySummaryResponse> result = new ArrayList<>();
+        for (JsonNode row : membershipRows) {
+            String familyId = asText(row.get("family_id"));
+            if (familyId.isBlank()) {
+                continue;
+            }
+            result.add(
+                new FamilySummaryResponse(
+                    familyId,
+                    familyNamesById.getOrDefault(familyId, "Family"),
+                    asText(row.get("role")),
+                    asText(row.get("joined_at"))
+                )
+            );
+        }
+        return result;
+    }
+
     public String createInvitation(String authorizationHeader, String familyId, String email, String role) {
         JsonNode result = callRpc(
             "rpc_create_invitation",
@@ -193,6 +259,73 @@ public class SupabaseGatewayService {
             asText(row.get("user_id")),
             firstNonBlank(asText(row.get("display_name")), "Member")
         );
+    }
+
+    public void assertOwnerCanCreateMemory(String authorizationHeader, String childId) {
+        SupabaseUser user = getCurrentUser(authorizationHeader);
+        assertOwnerForChild(authorizationHeader, user.id(), childId, "Only owners can record memories.");
+    }
+
+    public void assertOwnerCanManageMemory(String authorizationHeader, String memoryId) {
+        SupabaseUser user = getCurrentUser(authorizationHeader);
+        String memoryUri = UriComponentsBuilder
+            .fromPath("/rest/v1/memories")
+            .queryParam("select", "child_id")
+            .queryParam("id", "eq." + memoryId)
+            .queryParam("limit", 1)
+            .build(true)
+            .toUriString();
+
+        JsonNode memoryRows = callGet(memoryUri, authorizationHeader);
+        if (!memoryRows.isArray() || memoryRows.isEmpty()) {
+            throw new ResponseStatusException(NOT_FOUND, "Memory not found");
+        }
+
+        String childId = asText(memoryRows.get(0).get("child_id"));
+        if (!StringUtils.hasText(childId)) {
+            throw new ResponseStatusException(FORBIDDEN, "Only owners can edit or delete memories.");
+        }
+
+        assertOwnerForChild(authorizationHeader, user.id(), childId, "Only owners can edit or delete memories.");
+    }
+
+    private void assertOwnerForChild(String authorizationHeader, String userId, String childId, String errorMessage) {
+        String childUri = UriComponentsBuilder
+            .fromPath("/rest/v1/children")
+            .queryParam("select", "family_id")
+            .queryParam("id", "eq." + childId)
+            .queryParam("limit", 1)
+            .build(true)
+            .toUriString();
+
+        JsonNode childRows = callGet(childUri, authorizationHeader);
+        if (!childRows.isArray() || childRows.isEmpty()) {
+            throw new ResponseStatusException(NOT_FOUND, "Child not found");
+        }
+
+        String familyId = asText(childRows.get(0).get("family_id"));
+        if (!StringUtils.hasText(familyId)) {
+            throw new ResponseStatusException(FORBIDDEN, errorMessage);
+        }
+
+        String membershipUri = UriComponentsBuilder
+            .fromPath("/rest/v1/family_members")
+            .queryParam("select", "role")
+            .queryParam("family_id", "eq." + familyId)
+            .queryParam("user_id", "eq." + userId)
+            .queryParam("limit", 1)
+            .build(true)
+            .toUriString();
+
+        JsonNode membershipRows = callGet(membershipUri, authorizationHeader);
+        if (!membershipRows.isArray() || membershipRows.isEmpty()) {
+            throw new ResponseStatusException(FORBIDDEN, errorMessage);
+        }
+
+        String role = asText(membershipRows.get(0).get("role"));
+        if (!"OWNER".equalsIgnoreCase(role)) {
+            throw new ResponseStatusException(FORBIDDEN, errorMessage);
+        }
     }
 
     public void updateOwnProfile(String authorizationHeader, String displayName) {
@@ -308,6 +441,7 @@ public class SupabaseGatewayService {
         String authorizationHeader,
         int offset,
         int limit,
+        String familyId,
         String fromRecordedAtIso,
         String toRecordedAtIso,
         List<String> tags
@@ -319,12 +453,13 @@ public class SupabaseGatewayService {
             .queryParam("offset", offset)
             .queryParam("limit", limit);
 
-        applyMemoryFilters(builder, fromRecordedAtIso, toRecordedAtIso, tags);
-        return callGet(builder.build(true).toUriString(), authorizationHeader);
+        applyMemoryFilters(builder, authorizationHeader, familyId, fromRecordedAtIso, toRecordedAtIso, tags);
+        return callGet(builder.build().encode().toUri(), authorizationHeader);
     }
 
     public long countMemories(
         String authorizationHeader,
+        String familyId,
         String fromRecordedAtIso,
         String toRecordedAtIso,
         List<String> tags
@@ -333,8 +468,8 @@ public class SupabaseGatewayService {
             .fromPath("/rest/v1/memories")
             .queryParam("select", "id");
 
-        applyMemoryFilters(builder, fromRecordedAtIso, toRecordedAtIso, tags);
-        JsonNode rows = callGet(builder.build(true).toUriString(), authorizationHeader);
+        applyMemoryFilters(builder, authorizationHeader, familyId, fromRecordedAtIso, toRecordedAtIso, tags);
+        JsonNode rows = callGet(builder.build().encode().toUri(), authorizationHeader);
         if (!rows.isArray()) {
             return 0L;
         }
@@ -390,6 +525,25 @@ public class SupabaseGatewayService {
     }
 
     private JsonNode callGet(String uri, String authorizationHeader) {
+        try {
+            String body = restClient().get()
+                .uri(uri)
+                .headers(headers -> applySupabaseHeaders(headers, authorizationHeader, null))
+                .retrieve()
+                .body(String.class);
+
+            if (!StringUtils.hasText(body)) {
+                return objectMapper.nullNode();
+            }
+            return objectMapper.readTree(body);
+        } catch (RestClientResponseException ex) {
+            throw mapException(ex, "Supabase request failed");
+        } catch (Exception ex) {
+            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Supabase request failed");
+        }
+    }
+
+    private JsonNode callGet(URI uri, String authorizationHeader) {
         try {
             String body = restClient().get()
                 .uri(uri)
@@ -565,10 +719,20 @@ public class SupabaseGatewayService {
 
     private void applyMemoryFilters(
         UriComponentsBuilder builder,
+        String authorizationHeader,
+        String familyId,
         String fromRecordedAtIso,
         String toRecordedAtIso,
         List<String> tags
     ) {
+        if (StringUtils.hasText(familyId)) {
+            List<String> childIds = listChildIdsForFamily(authorizationHeader, familyId);
+            if (childIds.isEmpty()) {
+                builder.queryParam("id", "eq.00000000-0000-0000-0000-000000000000");
+                return;
+            }
+            builder.queryParam("child_id", "in.(" + String.join(",", childIds) + ")");
+        }
         if (StringUtils.hasText(fromRecordedAtIso)) {
             builder.queryParam("recorded_at", "gte." + fromRecordedAtIso);
         }
@@ -576,8 +740,59 @@ public class SupabaseGatewayService {
             builder.queryParam("recorded_at", "lt." + toRecordedAtIso);
         }
         if (tags != null && !tags.isEmpty()) {
-            builder.queryParam("tags", "ov.{" + String.join(",", tags) + "}");
+            String tagFilter = buildTagOverlapFilter(tags);
+            if (StringUtils.hasText(tagFilter)) {
+                builder.queryParam("tags", tagFilter);
+            }
         }
+    }
+
+    private List<String> listChildIdsForFamily(String authorizationHeader, String familyId) {
+        String uri = UriComponentsBuilder
+            .fromPath("/rest/v1/children")
+            .queryParam("select", "id")
+            .queryParam("family_id", "eq." + familyId)
+            .build(true)
+            .toUriString();
+
+        JsonNode rows = callGet(uri, authorizationHeader);
+        if (!rows.isArray()) {
+            return List.of();
+        }
+
+        List<String> childIds = new ArrayList<>();
+        for (JsonNode row : rows) {
+            String childId = asText(row.get("id"));
+            if (!childId.isBlank()) {
+                childIds.add(childId);
+            }
+        }
+        return childIds;
+    }
+
+    String buildTagOverlapFilter(List<String> values) {
+        String tagArrayLiteral = toPostgresTextArrayLiteral(values);
+        if (!StringUtils.hasText(tagArrayLiteral)) {
+            return null;
+        }
+        return "ov." + tagArrayLiteral;
+    }
+
+    String toPostgresTextArrayLiteral(List<String> values) {
+        List<String> quotedValues = new ArrayList<>();
+        for (String value : values) {
+            if (!StringUtils.hasText(value)) {
+                continue;
+            }
+            String escaped = value.trim()
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"");
+            quotedValues.add("\"" + escaped + "\"");
+        }
+        if (quotedValues.isEmpty()) {
+            return null;
+        }
+        return "{" + String.join(",", quotedValues) + "}";
     }
 
     private JsonNode firstRow(JsonNode rows, org.springframework.http.HttpStatus status, String message) {

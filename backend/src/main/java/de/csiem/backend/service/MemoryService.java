@@ -220,6 +220,10 @@ public class MemoryService {
             memory.replaceTags(resolveTags(request.tags()));
         }
 
+        if (request.recordedAt() != null) {
+            memory.setRecordedAt(request.recordedAt());
+        }
+
         if (request.transcript() != null) {
             String nextTranscript = normalizeTranscript(request.transcript());
             MemoryInsightsService.MemoryInsights insights = memoryInsightsService.generate(nextTranscript);

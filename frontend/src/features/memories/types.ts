@@ -70,4 +70,5 @@ export interface UpdateMemoryRequest {
   title?: string
   transcript?: string
   tags?: MemoryTag[]
+  recordedAt?: string
 }

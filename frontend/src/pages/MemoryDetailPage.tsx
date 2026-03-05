@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { Button } from '../components/Button'
+import { ConfirmDialog } from '../components/ConfirmDialog'
+import { OverflowMenu, type OverflowMenuAction } from '../components/OverflowMenu'
 import { deleteMemory, updateMemory } from '../features/memories/api'
 import { MEMORY_TAG_OPTIONS, type Memory, type MemoryTag } from '../features/memories/types'
 import { useMemoryDetail } from '../features/memories/hooks'
@@ -11,6 +13,7 @@ import { formatDateTime } from '../lib/utils'
 interface MemoryDetailPageProps {
   memoryId: string
   navigate: (nextPath: string) => void
+  canManageMemory?: boolean
 }
 
 const Section = styled.section`
@@ -25,6 +28,29 @@ const Header = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.space.x2};
+`
+
+const TopBar = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.space.x2};
+`
+
+const BackButton = styled.button`
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.pill};
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  color: ${({ theme }) => theme.colors.text};
+  padding: 0 ${({ theme }) => theme.space.x3};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
+    outline-offset: 2px;
+  }
 `
 
 const TitleRow = styled.div`
@@ -56,23 +82,21 @@ const MetaText = styled.p`
   font-size: ${({ theme }) => theme.typography.secondarySize};
 `
 
-const EditIconButton = styled.button`
-  width: ${({ theme }) => theme.layout.minTouchTarget};
-  height: ${({ theme }) => theme.layout.minTouchTarget};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  background: ${({ theme }) => theme.colors.surfaceStrong};
-  color: ${({ theme }) => theme.colors.textMuted};
-  border-radius: 50%;
-  display: inline-flex;
+const DateEditRow = styled.div`
+  display: flex;
   align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 0;
+  gap: ${({ theme }) => theme.space.x2};
+  flex-wrap: wrap;
+`
 
-  &:focus-visible {
-    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
-    outline-offset: 2px;
-  }
+const DateInput = styled.input`
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.md};
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  color: ${({ theme }) => theme.colors.text};
+  padding: 0 ${({ theme }) => theme.space.x3};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
 `
 
 const EditIcon = styled.svg`
@@ -195,79 +219,6 @@ const SuccessText = styled.p`
   color: ${({ theme }) => theme.colors.accentStrong};
 `
 
-const DangerRow = styled.div`
-  margin-top: ${({ theme }) => theme.space.x2};
-`
-
-const DeleteButton = styled.button`
-  border: 1px solid ${({ theme }) => theme.colors.danger};
-  background: ${({ theme }) => theme.colors.surfaceStrong};
-  color: ${({ theme }) => theme.colors.danger};
-  border-radius: ${({ theme }) => theme.radii.pill};
-  min-height: ${({ theme }) => theme.layout.minTouchTarget};
-  padding: 0 ${({ theme }) => theme.space.x3};
-  font-size: ${({ theme }) => theme.typography.secondarySize};
-  cursor: pointer;
-
-  &:focus-visible {
-    outline: 2px solid ${({ theme }) => theme.colors.danger};
-    outline-offset: 2px;
-  }
-`
-
-const ModalOverlay = styled.div`
-  position: fixed;
-  inset: 0;
-  background: ${({ theme }) => theme.colors.overlay};
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding: ${({ theme }) =>
-    `${theme.space.x3} ${theme.space.x3} calc(${theme.layout.bottomNavHeight} + ${theme.space.x3} + env(safe-area-inset-bottom, 0px))`};
-  z-index: 20;
-`
-
-const ModalSheet = styled.section`
-  width: min(${({ theme }) => theme.layout.maxWidth}, 100%);
-  background: ${({ theme }) => theme.colors.surfaceStrong};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: ${({ theme }) => `${theme.radii.xl} ${theme.radii.xl} ${theme.radii.md} ${theme.radii.md}`};
-  padding: ${({ theme }) => theme.space.x4};
-  display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.space.x3};
-  box-shadow: ${({ theme }) => theme.shadows.sheet};
-  animation: rise-in 220ms ease-out;
-`
-
-const SheetHandle = styled.div`
-  align-self: center;
-  width: 40px;
-  height: 4px;
-  border-radius: ${({ theme }) => theme.radii.pill};
-  background: ${({ theme }) => theme.colors.border};
-`
-
-const SheetActions = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.space.x2};
-`
-
-function PencilIcon() {
-  return (
-    <EditIcon viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M15.2 4.8L19.2 8.8M6 18L4.8 19.2L6 18ZM6 18L7.1 14.3C7.2 13.95 7.39 13.63 7.65 13.36L15.2 5.8C15.97 5.02 17.23 5.02 18 5.8L18.2 6C18.98 6.77 18.98 8.03 18.2 8.8L10.65 16.36C10.38 16.63 10.06 16.82 9.71 16.93L6 18Z"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </EditIcon>
-  )
-}
-
 function SaveIcon() {
   return (
     <EditIcon viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -296,7 +247,32 @@ function CancelIcon() {
   )
 }
 
-export function MemoryDetailPage({ memoryId, navigate }: MemoryDetailPageProps) {
+function toDateTimeLocalValue(isoValue: string): string {
+  const date = new Date(isoValue)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hour = String(date.getHours()).padStart(2, '0')
+  const minute = String(date.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hour}:${minute}`
+}
+
+function toIsoFromLocalDateTime(value: string): string | null {
+  const normalized = value.trim()
+  if (!normalized) {
+    return null
+  }
+  const parsed = new Date(normalized)
+  if (Number.isNaN(parsed.getTime())) {
+    return null
+  }
+  return parsed.toISOString()
+}
+
+export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }: MemoryDetailPageProps) {
   const { loading, error, memory, reload } = useMemoryDetail(memoryId)
 
   const [currentMemory, setCurrentMemory] = useState<Memory | null>(null)
@@ -310,6 +286,8 @@ export function MemoryDetailPage({ memoryId, navigate }: MemoryDetailPageProps) 
 
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
+  const [editingDate, setEditingDate] = useState(false)
+  const [dateDraft, setDateDraft] = useState('')
 
   const [editingTranscript, setEditingTranscript] = useState(false)
   const [transcriptDraft, setTranscriptDraft] = useState('')
@@ -323,6 +301,7 @@ export function MemoryDetailPage({ memoryId, navigate }: MemoryDetailPageProps) 
     }
     setCurrentMemory(memory)
     setTitleDraft(memory.title || '')
+    setDateDraft(toDateTimeLocalValue(memory.recordedAt || memory.createdAt))
     setTranscriptDraft(memory.transcript || '')
     setTagsDraft(memory.tags)
     setSaveError('')
@@ -336,23 +315,7 @@ export function MemoryDetailPage({ memoryId, navigate }: MemoryDetailPageProps) 
     return () => window.clearTimeout(timer)
   }, [saveNotice])
 
-  useEffect(() => {
-    if (!deleteDialogOpen || deleting) {
-      return
-    }
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setDeleteError('')
-        setDeleteDialogOpen(false)
-      }
-    }
-
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [deleteDialogOpen, deleting])
-
-  const persist = async (changes: { title?: string; transcript?: string; tags?: MemoryTag[] }) => {
+  const persist = async (changes: { title?: string; transcript?: string; tags?: MemoryTag[]; recordedAt?: string }) => {
     if (!currentMemory) {
       return false
     }
@@ -388,6 +351,18 @@ export function MemoryDetailPage({ memoryId, navigate }: MemoryDetailPageProps) 
     const successful = await persist({ title: titleDraft })
     if (successful) {
       setEditingTitle(false)
+    }
+  }
+
+  const onSaveDate = async () => {
+    const isoValue = toIsoFromLocalDateTime(dateDraft)
+    if (!isoValue) {
+      setSaveError('Please select a valid date and time.')
+      return
+    }
+    const successful = await persist({ recordedAt: isoValue })
+    if (successful) {
+      setEditingDate(false)
     }
   }
 
@@ -436,6 +411,61 @@ export function MemoryDetailPage({ memoryId, navigate }: MemoryDetailPageProps) 
     }
   }
 
+  const menuActions: OverflowMenuAction[] = canManageMemory
+    ? [
+        {
+          id: 'edit-title',
+          label: 'Edit title',
+          onSelect: () => {
+            setEditingDate(false)
+            setEditingTranscript(false)
+            setEditingTags(false)
+            setEditingTitle(true)
+          },
+        },
+        {
+          id: 'edit-date',
+          label: 'Edit date',
+          onSelect: () => {
+            setEditingTitle(false)
+            setEditingTranscript(false)
+            setEditingTags(false)
+            setDateDraft(currentMemory ? toDateTimeLocalValue(currentMemory.recordedAt || currentMemory.createdAt) : '')
+            setEditingDate(true)
+          },
+        },
+        {
+          id: 'edit-transcript',
+          label: 'Edit transcript',
+          onSelect: () => {
+            setEditingTitle(false)
+            setEditingDate(false)
+            setEditingTags(false)
+            setEditingTranscript(true)
+          },
+        },
+        {
+          id: 'edit-tags',
+          label: 'Edit tags',
+          onSelect: () => {
+            setEditingTitle(false)
+            setEditingDate(false)
+            setEditingTranscript(false)
+            setEditingTags(true)
+          },
+        },
+        {
+          id: 'delete-memory',
+          label: 'Delete memory',
+          tone: 'destructive',
+          onSelect: () => {
+            setDeleteError('')
+            setDeleteDialogOpen(true)
+          },
+        },
+      ]
+    : []
+
   if (loading) {
     return (
       <Section>
@@ -463,6 +493,15 @@ export function MemoryDetailPage({ memoryId, navigate }: MemoryDetailPageProps) 
   return (
     <Section>
       <Header>
+        <TopBar>
+          <BackButton type="button" onClick={() => navigate('/memories')} aria-label="Back to memories">
+            ← Back
+          </BackButton>
+          {canManageMemory && (
+            <OverflowMenu actions={menuActions} ariaLabel="More actions" disabled={saving || deleting} />
+          )}
+        </TopBar>
+
         <TitleRow>
           {editingTitle ? (
             <TitleInput value={titleDraft} onChange={(event) => setTitleDraft(event.target.value)} />
@@ -470,7 +509,7 @@ export function MemoryDetailPage({ memoryId, navigate }: MemoryDetailPageProps) 
             <Title>{currentMemory.title || 'Untitled Memory'}</Title>
           )}
 
-          {editingTitle ? (
+          {canManageMemory && editingTitle && (
             <EditStateActions>
               <EditStateIconButton $kind="save" type="button" aria-label="Save title" disabled={saving} onClick={() => void onSaveTitle()}>
                 <SaveIcon />
@@ -488,28 +527,47 @@ export function MemoryDetailPage({ memoryId, navigate }: MemoryDetailPageProps) 
                 <CancelIcon />
               </EditStateIconButton>
             </EditStateActions>
-          ) : (
-            <EditIconButton type="button" aria-label="Edit title" onClick={() => setEditingTitle(true)}>
-              <PencilIcon />
-            </EditIconButton>
           )}
         </TitleRow>
 
-        <MetaText>{formatDateTime(currentMemory.recordedAt || currentMemory.createdAt)}</MetaText>
+        {editingDate ? (
+          <DateEditRow>
+            <DateInput
+              type="datetime-local"
+              value={dateDraft}
+              onChange={(event) => setDateDraft(event.target.value)}
+              aria-label="Edit memory date"
+            />
+            <EditStateActions>
+              <EditStateIconButton $kind="save" type="button" aria-label="Save date" disabled={saving} onClick={() => void onSaveDate()}>
+                <SaveIcon />
+              </EditStateIconButton>
+              <EditStateIconButton
+                $kind="cancel"
+                type="button"
+                aria-label="Cancel date editing"
+                disabled={saving}
+                onClick={() => {
+                  setDateDraft(toDateTimeLocalValue(currentMemory.recordedAt || currentMemory.createdAt))
+                  setEditingDate(false)
+                }}
+              >
+                <CancelIcon />
+              </EditStateIconButton>
+            </EditStateActions>
+          </DateEditRow>
+        ) : (
+          <MetaText>{formatDateTime(currentMemory.recordedAt || currentMemory.createdAt)}</MetaText>
+        )}
         {lastSavedAt && <MetaText>Last saved {formatDateTime(lastSavedAt)}</MetaText>}
 
         <TagRow>
           {(editingTags ? tagsDraft : currentMemory.tags).map((tag) => (
             <TagChip key={tag}>{tag}</TagChip>
           ))}
-          {!editingTags && (
-            <EditIconButton type="button" aria-label="Edit tags" onClick={() => setEditingTags(true)}>
-              <PencilIcon />
-            </EditIconButton>
-          )}
         </TagRow>
 
-        {editingTags && (
+        {canManageMemory && editingTags && (
           <EditStateActions>
             <EditStateIconButton $kind="save" type="button" aria-label="Save tags" disabled={saving} onClick={() => void onSaveTags()}>
               <SaveIcon />
@@ -529,7 +587,7 @@ export function MemoryDetailPage({ memoryId, navigate }: MemoryDetailPageProps) 
           </EditStateActions>
         )}
 
-        {editingTags && (
+        {canManageMemory && editingTags && (
           <TagRow>
             {MEMORY_TAG_OPTIONS.map((tag) => (
               <TagChip
@@ -557,7 +615,7 @@ export function MemoryDetailPage({ memoryId, navigate }: MemoryDetailPageProps) 
       <Card>
         <CardHeader>
           <CardLabel>Transcript</CardLabel>
-          {editingTranscript ? (
+          {canManageMemory && editingTranscript && (
             <EditStateActions>
               <EditStateIconButton
                 $kind="save"
@@ -581,63 +639,37 @@ export function MemoryDetailPage({ memoryId, navigate }: MemoryDetailPageProps) 
                 <CancelIcon />
               </EditStateIconButton>
             </EditStateActions>
-          ) : (
-            <EditIconButton type="button" aria-label="Edit transcript" onClick={() => setEditingTranscript(true)}>
-              <PencilIcon />
-            </EditIconButton>
           )}
         </CardHeader>
 
-        {editingTranscript ? (
+        {canManageMemory && editingTranscript ? (
           <TranscriptArea value={transcriptDraft} onChange={(event) => setTranscriptDraft(event.target.value)} />
         ) : (
           <TranscriptText>{currentMemory.transcript || 'Transcription still processing.'}</TranscriptText>
         )}
       </Card>
 
+      {!canManageMemory && <MetaText>Only owners can edit or delete memories.</MetaText>}
       {saveError && <ErrorText>{saveError}</ErrorText>}
       {saveNotice && <SuccessText>{saveNotice}</SuccessText>}
-      <DangerRow>
-        <DeleteButton
-          type="button"
-          onClick={() => {
+
+      {deleteError && <ErrorText>{deleteError}</ErrorText>}
+      <ConfirmDialog
+        open={canManageMemory && deleteDialogOpen}
+        title="Delete memory?"
+        body="This can’t be undone."
+        cancelLabel="Cancel"
+        confirmLabel={deleting ? 'Deleting...' : 'Delete'}
+        confirmVariant="danger"
+        busy={deleting}
+        onCancel={() => {
+          if (!deleting) {
             setDeleteError('')
-            setDeleteDialogOpen(true)
-          }}
-        >
-          Delete memory
-        </DeleteButton>
-      </DangerRow>
-
-      <Button variant="primary" fullWidth onClick={() => navigate('/record')}>
-        Record another moment
-      </Button>
-
-      {deleteDialogOpen && (
-        <ModalOverlay role="presentation">
-          <ModalSheet role="dialog" aria-modal="true" aria-label="Delete memory">
-            <SheetHandle aria-hidden />
-            <h2>Delete this memory?</h2>
-            <CardHint>This will permanently remove the title, transcript, summary, and tags.</CardHint>
-            {deleteError && <ErrorText>{deleteError}</ErrorText>}
-            <SheetActions>
-              <Button variant="danger" fullWidth autoFocus disabled={deleting} onClick={() => void onConfirmDelete()}>
-                {deleting ? 'Deleting...' : 'Yes, delete memory'}
-              </Button>
-              <Button
-                fullWidth
-                disabled={deleting}
-                onClick={() => {
-                  setDeleteError('')
-                  setDeleteDialogOpen(false)
-                }}
-              >
-                Cancel
-              </Button>
-            </SheetActions>
-          </ModalSheet>
-        </ModalOverlay>
-      )}
+            setDeleteDialogOpen(false)
+          }
+        }}
+        onConfirm={() => void onConfirmDelete()}
+      />
     </Section>
   )
 }

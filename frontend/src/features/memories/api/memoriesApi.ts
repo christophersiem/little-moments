@@ -13,6 +13,7 @@ import { backendRequestJson, backendRequestVoid } from '../../../lib/backendApi'
 interface ListMemoriesParams {
   page?: number
   size?: number
+  familyId?: string
   month?: string
   tags?: MemoryTag[]
 }
@@ -136,12 +137,16 @@ export async function createMemory(
 export async function listMemories({
   page = 0,
   size = 5,
+  familyId,
   month,
   tags = [],
 }: ListMemoriesParams = {}): Promise<MemoriesListResponse> {
   const query = new URLSearchParams()
   query.set('page', String(Math.max(page, 0)))
   query.set('size', String(Math.max(size, 1)))
+  if (familyId && familyId.trim().length > 0) {
+    query.set('familyId', familyId.trim())
+  }
   if (month && month !== 'all') {
     query.set('month', month)
   }
@@ -174,6 +179,9 @@ export async function updateMemory(memoryId: string, request: UpdateMemoryReques
   }
   if (Array.isArray(request.tags)) {
     patch.tags = request.tags
+  }
+  if (typeof request.recordedAt === 'string' && request.recordedAt.trim().length > 0) {
+    patch.recordedAt = request.recordedAt.trim()
   }
 
   const payload = await backendRequestJson<MemoryApiResponse>(`/memories/${encodeURIComponent(memoryId)}`, {

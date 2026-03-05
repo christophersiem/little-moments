@@ -11,6 +11,13 @@ interface FamilyIdResponse {
   familyId: string
 }
 
+interface FamilySummaryApiResponse {
+  familyId: string
+  familyName: string
+  role: 'OWNER' | 'MEMBER' | string
+  joinedAt: string
+}
+
 interface ChildIdResponse {
   childId: string | null
 }
@@ -48,6 +55,13 @@ export interface FamilyMember {
 
 export type FamilyMemberRole = 'OWNER' | 'MEMBER'
 
+export interface FamilySummary {
+  familyId: string
+  familyName: string
+  role: FamilyMemberRole
+  joinedAt: string
+}
+
 export async function getFirstChildIdForFamily(familyId: string): Promise<string | null> {
   const payload = await backendRequestJson<ChildIdResponse>(
     `/families/${encodeURIComponent(familyId)}/children/first`,
@@ -72,6 +86,17 @@ export async function ensureDefaultChildForFamily(familyId: string): Promise<str
 
 function mapRole(role: string): FamilyMemberRole {
   return role === 'OWNER' ? 'OWNER' : 'MEMBER'
+}
+
+export async function listMyFamilies(): Promise<FamilySummary[]> {
+  const rows = await backendRequestJson<FamilySummaryApiResponse[]>('/families')
+
+  return (rows ?? []).map((row) => ({
+    familyId: String(row.familyId),
+    familyName: typeof row.familyName === 'string' && row.familyName.trim() ? row.familyName : 'Family',
+    role: mapRole(String(row.role)),
+    joinedAt: String(row.joinedAt),
+  }))
 }
 
 export async function listFamilyMembers(familyId: string): Promise<FamilyMember[]> {

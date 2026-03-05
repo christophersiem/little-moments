@@ -92,6 +92,8 @@ export function OverflowMenu({ actions, ariaLabel = 'Member actions', disabled =
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const wasOpenRef = useRef(false)
 
   useEffect(() => {
     if (!open) {
@@ -127,6 +129,13 @@ export function OverflowMenu({ actions, ariaLabel = 'Member actions', disabled =
     firstButton?.focus()
   }, [open])
 
+  useEffect(() => {
+    if (wasOpenRef.current && !open) {
+      triggerRef.current?.focus()
+    }
+    wasOpenRef.current = open
+  }, [open])
+
   if (actions.length === 0) {
     return null
   }
@@ -134,6 +143,7 @@ export function OverflowMenu({ actions, ariaLabel = 'Member actions', disabled =
   return (
     <Wrap ref={wrapRef}>
       <TriggerButton
+        ref={triggerRef}
         type="button"
         aria-label={ariaLabel}
         aria-haspopup="menu"
@@ -165,4 +175,3 @@ export function OverflowMenu({ actions, ariaLabel = 'Member actions', disabled =
     </Wrap>
   )
 }
-

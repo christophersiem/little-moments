@@ -67,6 +67,7 @@ public class SupabaseMemoryService {
         if (!StringUtils.hasText(request.childId())) {
             throw new ResponseStatusException(BAD_REQUEST, "childId is required");
         }
+        supabaseGatewayService.assertOwnerCanCreateMemory(authorizationHeader, request.childId().trim());
 
         Instant uploadTimestamp = request.recordedAt() != null ? request.recordedAt() : Instant.now();
         JsonNode processingRow = supabaseGatewayService.createProcessingMemory(
@@ -124,6 +125,7 @@ public class SupabaseMemoryService {
         String authorizationHeader,
         int page,
         int size,
+        String familyId,
         String month,
         List<String> tags
     ) {
@@ -151,11 +153,18 @@ public class SupabaseMemoryService {
             authorizationHeader,
             offset,
             safeSize,
+            normalizeFamilyId(familyId),
             fromIso,
             toIso,
             resolvedTags
         );
-        long totalElements = supabaseGatewayService.countMemories(authorizationHeader, fromIso, toIso, resolvedTags);
+        long totalElements = supabaseGatewayService.countMemories(
+            authorizationHeader,
+            normalizeFamilyId(familyId),
+            fromIso,
+            toIso,
+            resolvedTags
+        );
         int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / safeSize);
 
         List<MemoryListItemResponse> items = new ArrayList<>();
@@ -184,6 +193,7 @@ public class SupabaseMemoryService {
     }
 
     public MemoryResponse updateMemory(String authorizationHeader, UUID id, UpdateMemoryRequest request) {
+        supabaseGatewayService.assertOwnerCanManageMemory(authorizationHeader, id.toString());
         JsonNode current = supabaseGatewayService.getMemoryById(authorizationHeader, id.toString());
         java.util.Map<String, Object> patch = new java.util.LinkedHashMap<>();
 
@@ -193,6 +203,10 @@ public class SupabaseMemoryService {
 
         if (request.tags() != null) {
             patch.put("tags", resolveTagLabels(request.tags()));
+        }
+
+        if (request.recordedAt() != null) {
+            patch.put("recorded_at", request.recordedAt().toString());
         }
 
         if (request.transcript() != null) {
@@ -222,6 +236,7 @@ public class SupabaseMemoryService {
     }
 
     public void deleteMemory(String authorizationHeader, UUID id) {
+        supabaseGatewayService.assertOwnerCanManageMemory(authorizationHeader, id.toString());
         supabaseGatewayService.deleteMemoryById(authorizationHeader, id.toString());
     }
 
@@ -388,6 +403,13 @@ public class SupabaseMemoryService {
 
     private String normalizeTitle(String value) {
         return value == null ? null : value.trim();
+    }
+
+    private String normalizeFamilyId(String familyId) {
+        if (!StringUtils.hasText(familyId)) {
+            return null;
+        }
+        return familyId.trim();
     }
 
     private String normalizeTranscript(String value) {

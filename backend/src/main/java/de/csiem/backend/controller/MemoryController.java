@@ -59,6 +59,7 @@ public class MemoryController {
         @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
         @RequestParam(value = "page", defaultValue = "0") int page,
         @RequestParam(value = "size", defaultValue = "20") int size,
+        @RequestParam(value = "familyId", required = false) String familyId,
         @RequestParam(value = "month", required = false) String month,
         @RequestParam(value = "tags", required = false) List<String> tags
     ) {
@@ -67,6 +68,7 @@ public class MemoryController {
                 requireAuthorizationHeader(authorizationHeader),
                 page,
                 size,
+                familyId,
                 month,
                 tags
             );
