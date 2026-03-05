@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import styled from 'styled-components'
 import { Button } from '../components/Button'
+import { ConfirmDialog } from '../components/ConfirmDialog'
+import type { OverflowMenuAction } from '../components/OverflowMenu'
+import { FamilyMemberRow } from '../features/families/components/FamilyMemberRow'
 import {
   createInvitation,
   listFamilyMembers,
@@ -16,18 +19,31 @@ interface FamilyPageProps {
   navigate: (nextPath: string) => void
 }
 
+type ConfirmActionType = 'make-owner' | 'remove'
+
+interface ConfirmAction {
+  type: ConfirmActionType
+  member: FamilyMember
+}
+
 const Section = styled.section`
   width: 100%;
   padding-top: ${({ theme }) => theme.space.x3};
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.space.x3};
+  gap: ${({ theme }) => theme.space.x5};
 `
 
 const Heading = styled.h2`
   margin: 0;
   font-size: 2rem;
   color: ${({ theme }) => theme.colors.text};
+`
+
+const Block = styled.section`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.x3};
 `
 
 const Subheading = styled.h3`
@@ -43,65 +59,24 @@ const Card = styled.div`
   padding: ${({ theme }) => theme.space.x3};
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.space.x2};
+  gap: ${({ theme }) => theme.space.x3};
 `
 
-const MemberRow = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: ${({ theme }) => theme.space.x2};
-  color: ${({ theme }) => theme.colors.text};
-  font-size: ${({ theme }) => theme.typography.secondarySize};
-`
-
-const MemberRole = styled.span`
-  color: ${({ theme }) => theme.colors.textMuted};
-`
-
-const MemberMeta = styled.div`
+const MemberList = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.space.x1};
 `
 
-const ActionRow = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: ${({ theme }) => theme.space.x1};
-`
-
-const SmallActionButton = styled.button`
-  min-height: 34px;
-  border-radius: ${({ theme }) => theme.radii.pill};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  background: ${({ theme }) => theme.colors.surface};
-  color: ${({ theme }) => theme.colors.text};
-  padding: ${({ theme }) => `${theme.space.x1} ${theme.space.x2}`};
-  font-size: ${({ theme }) => theme.typography.secondarySize};
-  cursor: pointer;
-
-  &:disabled {
-    opacity: 0.55;
-    cursor: default;
-  }
-
-  &:focus-visible {
-    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
-    outline-offset: 2px;
-  }
-`
-
-const DangerActionButton = styled(SmallActionButton)`
-  color: ${({ theme }) => theme.colors.danger};
-  border-color: ${({ theme }) => theme.colors.danger};
+const RowDivider = styled.div`
+  height: 1px;
+  margin: 0 ${({ theme }) => theme.space.x2};
+  background: ${({ theme }) => theme.colors.border};
 `
 
 const InviteForm = styled.form`
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.space.x2};
+  gap: ${({ theme }) => theme.space.x3};
 `
 
 const InviteInput = styled.input`
@@ -112,6 +87,7 @@ const InviteInput = styled.input`
   background: ${({ theme }) => theme.colors.surface};
   color: ${({ theme }) => theme.colors.text};
   padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3}`};
+  font-size: ${({ theme }) => theme.typography.bodySize};
 
   &:focus-visible {
     outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
@@ -119,21 +95,28 @@ const InviteInput = styled.input`
   }
 `
 
-const InviteLink = styled.textarea`
+const LinkWrap = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.x2};
+`
+
+const InviteLinkField = styled.input`
   width: 100%;
-  min-height: 84px;
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
   border-radius: ${({ theme }) => theme.radii.md};
   border: 1px solid ${({ theme }) => theme.colors.border};
   background: ${({ theme }) => theme.colors.surface};
-  color: ${({ theme }) => theme.colors.text};
-  padding: ${({ theme }) => theme.space.x2};
-  resize: vertical;
+  color: ${({ theme }) => theme.colors.textMuted};
+  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3}`};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
 `
 
 const SmallText = styled.p`
   margin: 0;
   font-size: ${({ theme }) => theme.typography.secondarySize};
   color: ${({ theme }) => theme.colors.textMuted};
+  line-height: ${({ theme }) => theme.typography.bodyLineHeight};
 `
 
 const ErrorText = styled.p`
@@ -148,6 +131,10 @@ const SuccessText = styled.p`
   font-size: ${({ theme }) => theme.typography.secondarySize};
 `
 
+function displayName(member: FamilyMember): string {
+  return member.displayName?.trim() || 'Member'
+}
+
 export function FamilyPage({ familyId, navigate }: FamilyPageProps) {
   const [members, setMembers] = useState<FamilyMember[]>([])
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
@@ -155,6 +142,7 @@ export function FamilyPage({ familyId, navigate }: FamilyPageProps) {
   const [memberActionError, setMemberActionError] = useState('')
   const [memberActionMessage, setMemberActionMessage] = useState('')
   const [memberActionBusyKey, setMemberActionBusyKey] = useState<string | null>(null)
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
   const [email, setEmail] = useState('')
   const [inviteError, setInviteError] = useState('')
   const [inviteMessage, setInviteMessage] = useState('')
@@ -227,7 +215,6 @@ export function FamilyPage({ familyId, navigate }: FamilyPageProps) {
     }
   }, [familyId, navigate])
 
-  const ownerCount = useMemo(() => members.filter((member) => member.role === 'OWNER').length, [members])
   const isCurrentUserOwner = useMemo(() => {
     if (!currentUserId) {
       return false
@@ -288,6 +275,32 @@ export function FamilyPage({ familyId, navigate }: FamilyPageProps) {
     }
   }
 
+  const onConfirmMemberAction = async () => {
+    if (!confirmAction || !familyId) {
+      return
+    }
+
+    const { member, type } = confirmAction
+    if (type === 'make-owner') {
+      await runMemberAction(
+        `make-owner:${member.userId}`,
+        () => setMemberRole(familyId, member.userId, 'OWNER'),
+        'Owner updated.',
+        'Could not update role.',
+      )
+      setConfirmAction(null)
+      return
+    }
+
+    await runMemberAction(
+      `remove:${member.userId}`,
+      () => removeMember(familyId, member.userId),
+      'Member removed.',
+      'Could not remove member.',
+    )
+    setConfirmAction(null)
+  }
+
   const onCreateInvite = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!familyId) {
@@ -304,7 +317,7 @@ export function FamilyPage({ familyId, navigate }: FamilyPageProps) {
       const token = await createInvitation(familyId, email, 'MEMBER')
       const link = `${window.location.origin}/invite/accept?token=${encodeURIComponent(token)}`
       setInviteLink(link)
-      setInviteMessage('Invite link created. Share it with this email owner.')
+      setInviteMessage('Invite link created.')
       setEmail('')
     } catch (error) {
       if (isUnauthorizedError(error)) {
@@ -333,114 +346,114 @@ export function FamilyPage({ familyId, navigate }: FamilyPageProps) {
     }
   }
 
+  const confirmDialogTitle = confirmAction
+    ? confirmAction.type === 'make-owner'
+      ? `Make ${displayName(confirmAction.member)} the owner?`
+      : `Remove ${displayName(confirmAction.member)}?`
+    : ''
+
+  const confirmDialogBody = confirmAction
+    ? confirmAction.type === 'make-owner'
+      ? 'They will be able to manage members and invites.'
+      : 'They will lose access to memories in this family.'
+    : ''
+
+  const memberRows = members.map((member, index) => {
+    const isCurrentUser = member.userId === currentUserId
+    const menuActions: OverflowMenuAction[] =
+      isCurrentUserOwner && !isCurrentUser && member.role !== 'OWNER'
+        ? [
+            {
+              id: `make-owner:${member.userId}`,
+              label: 'Make owner',
+              onSelect: () => setConfirmAction({ type: 'make-owner', member }),
+            },
+            {
+              id: `remove:${member.userId}`,
+              label: 'Remove from family',
+              tone: 'destructive',
+              onSelect: () => setConfirmAction({ type: 'remove', member }),
+            },
+          ]
+        : []
+
+    return (
+      <div key={`${member.userId}-${member.joinedAt}`}>
+        <FamilyMemberRow
+          member={member}
+          isCurrentUser={isCurrentUser}
+          menuActions={menuActions}
+          actionsDisabled={memberActionBusyKey !== null}
+        />
+        {index < members.length - 1 && <RowDivider />}
+      </div>
+    )
+  })
+
   return (
-    <Section>
-      <Heading>Family</Heading>
+    <>
+      <Section>
+        <Heading>Family</Heading>
 
-      <Subheading>Members</Subheading>
-      <Card>
-        {loadingMembers && <SmallText>Loading members...</SmallText>}
-        {!loadingMembers && members.length === 0 && <SmallText>No members found.</SmallText>}
-        {!loadingMembers &&
-          members.map((member) => (
-            <MemberRow key={`${member.userId}-${member.joinedAt}`}>
-              <MemberMeta>
-                <span>{member.displayName || 'Member'}</span>
-                <MemberRole>
-                  {member.role}
-                  {member.userId === currentUserId ? ' (You)' : ''}
-                </MemberRole>
-              </MemberMeta>
-              {isCurrentUserOwner && member.userId !== currentUserId && (
-                <ActionRow>
-                  {member.role === 'MEMBER' ? (
-                    <SmallActionButton
-                      type="button"
-                      disabled={memberActionBusyKey !== null}
-                      onClick={() =>
-                        void runMemberAction(
-                          `promote:${member.userId}`,
-                          () => setMemberRole(familyId ?? '', member.userId, 'OWNER'),
-                          'Member promoted to owner.',
-                          'Could not promote member.',
-                        )
-                      }
-                    >
-                      Promote to OWNER
-                    </SmallActionButton>
-                  ) : (
-                    <SmallActionButton
-                      type="button"
-                      disabled={memberActionBusyKey !== null}
-                      onClick={() =>
-                        void runMemberAction(
-                          `demote:${member.userId}`,
-                          () => setMemberRole(familyId ?? '', member.userId, 'MEMBER'),
-                          'Owner changed to member.',
-                          'Could not demote owner.',
-                        )
-                      }
-                    >
-                      Demote to MEMBER
-                    </SmallActionButton>
-                  )}
-                  <DangerActionButton
-                    type="button"
-                    disabled={memberActionBusyKey !== null}
-                    onClick={() =>
-                      void runMemberAction(
-                        `remove:${member.userId}`,
-                        () => removeMember(familyId ?? '', member.userId),
-                        'Member removed.',
-                        'Could not remove member.',
-                      )
-                    }
-                  >
-                    Remove
-                  </DangerActionButton>
-                </ActionRow>
-              )}
-            </MemberRow>
-          ))}
-        {!loadingMembers && members.length > 0 && (
-          <SmallText>
-            {members.length} member(s), {ownerCount} owner(s)
-          </SmallText>
-        )}
-        {membersError && <ErrorText>{membersError}</ErrorText>}
-        {memberActionError && <ErrorText>{memberActionError}</ErrorText>}
-        {memberActionMessage && <SuccessText>{memberActionMessage}</SuccessText>}
-      </Card>
+        <Block>
+          <Subheading>Members</Subheading>
+          <Card>
+            {loadingMembers && <SmallText>Loading members...</SmallText>}
+            {!loadingMembers && members.length === 0 && <SmallText>No members found.</SmallText>}
+            {!loadingMembers && members.length > 0 && <MemberList>{memberRows}</MemberList>}
+            {membersError && <ErrorText>{membersError}</ErrorText>}
+            {memberActionError && <ErrorText>{memberActionError}</ErrorText>}
+            {memberActionMessage && <SuccessText>{memberActionMessage}</SuccessText>}
+          </Card>
+        </Block>
 
-      <Subheading>Invite member</Subheading>
-      <Card>
-        <InviteForm onSubmit={onCreateInvite}>
-          <InviteInput
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="Email address"
-            autoComplete="email"
-            required
-          />
-          <Button type="submit" variant="primary" disabled={creatingInvite || !familyId}>
-            {creatingInvite ? 'Creating...' : 'Create invite link'}
-          </Button>
-        </InviteForm>
+        <Block>
+          <Subheading>Invite another parent</Subheading>
+          <Card>
+            <SmallText>Share access so you can both capture memories.</SmallText>
+            <InviteForm onSubmit={onCreateInvite}>
+              <InviteInput
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="Email address"
+                autoComplete="email"
+                required
+              />
+              <Button type="submit" variant="primary" disabled={creatingInvite || !familyId} fullWidth>
+                {creatingInvite ? 'Creating invite link...' : 'Create invite link'}
+              </Button>
+            </InviteForm>
 
-        {inviteError && <ErrorText>{inviteError}</ErrorText>}
-        {inviteMessage && <SuccessText>{inviteMessage}</SuccessText>}
+            {inviteError && <ErrorText>{inviteError}</ErrorText>}
+            {inviteMessage && <SuccessText>{inviteMessage}</SuccessText>}
 
-        {inviteLink && (
-          <>
-            <InviteLink readOnly value={inviteLink} />
-            <Button type="button" onClick={() => void onCopyInvite()}>
-              Copy link
-            </Button>
-          </>
-        )}
-        <SmallText>No email is sent yet. Share this link manually.</SmallText>
-      </Card>
-    </Section>
+            {inviteLink && (
+              <LinkWrap>
+                <InviteLinkField readOnly value={inviteLink} aria-label="Invite link" />
+                <Button type="button" onClick={() => void onCopyInvite()} fullWidth>
+                  Copy link
+                </Button>
+              </LinkWrap>
+            )}
+
+            <SmallText>No email is sent automatically. Share this link manually.</SmallText>
+          </Card>
+        </Block>
+      </Section>
+
+      <ConfirmDialog
+        open={confirmAction !== null}
+        title={confirmDialogTitle}
+        body={confirmDialogBody}
+        cancelLabel="Cancel"
+        confirmLabel={confirmAction?.type === 'make-owner' ? 'Make owner' : 'Remove'}
+        confirmVariant={confirmAction?.type === 'remove' ? 'danger' : 'primary'}
+        busy={memberActionBusyKey !== null}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => void onConfirmMemberAction()}
+      />
+    </>
   )
 }
+

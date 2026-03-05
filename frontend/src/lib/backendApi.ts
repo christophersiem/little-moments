@@ -3,6 +3,8 @@ import { SupabaseRequestError } from './supabaseErrors'
 
 interface ApiErrorResponse {
   message?: string
+  error?: string
+  details?: string
 }
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL?.trim() || '/api').replace(/\/+$/, '')
@@ -32,13 +34,23 @@ async function getAuthorizationHeader(): Promise<string> {
 }
 
 async function parseError(response: Response): Promise<string> {
+  const rawBody = await response.text()
+
   try {
-    const payload = (await response.json()) as ApiErrorResponse
+    const payload = JSON.parse(rawBody) as ApiErrorResponse
     if (typeof payload?.message === 'string' && payload.message.trim().length > 0) {
       return payload.message
     }
+    if (typeof payload?.error === 'string' && payload.error.trim().length > 0) {
+      return payload.error
+    }
+    if (typeof payload?.details === 'string' && payload.details.trim().length > 0) {
+      return payload.details
+    }
   } catch {
-    // ignore
+    if (rawBody.trim().length > 0) {
+      return rawBody.trim()
+    }
   }
   return `Request failed with status ${response.status}.`
 }
