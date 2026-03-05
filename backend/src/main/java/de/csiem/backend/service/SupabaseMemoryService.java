@@ -279,6 +279,11 @@ public class SupabaseMemoryService {
 
     public void deleteMemory(String authorizationHeader, UUID id) {
         supabaseGatewayService.assertOwnerCanManageMemory(authorizationHeader, id.toString());
+        JsonNode current = supabaseGatewayService.getMemoryById(authorizationHeader, id.toString());
+        String audioPath = nullableText(current.get("audio_path"));
+        if (StringUtils.hasText(audioPath)) {
+            supabaseGatewayService.deleteMemoryAudio(audioPath);
+        }
         supabaseGatewayService.deleteMemoryById(authorizationHeader, id.toString());
     }
 

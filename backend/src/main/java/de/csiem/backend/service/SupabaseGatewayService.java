@@ -584,6 +584,33 @@ public class SupabaseGatewayService {
         }
     }
 
+    public void deleteMemoryAudio(String objectPath) {
+        if (!StringUtils.hasText(objectPath)) {
+            return;
+        }
+
+        String bucket = appProperties.getSupabase().getAudioBucket();
+        if (!StringUtils.hasText(bucket)) {
+            throw new ResponseStatusException(BAD_REQUEST, "SUPABASE_AUDIO_BUCKET is not configured");
+        }
+
+        String uri = "/storage/v1/object/" + bucket + "/" + objectPath;
+        try {
+            restClient().delete()
+                .uri(uri)
+                .headers(headers -> applyServiceRoleHeaders(headers, null))
+                .retrieve()
+                .toBodilessEntity();
+        } catch (RestClientResponseException ex) {
+            if (ex.getStatusCode().value() == 404) {
+                return;
+            }
+            throw mapException(ex, "Could not delete audio from storage");
+        } catch (Exception ex) {
+            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Could not delete audio from storage");
+        }
+    }
+
     private Map<String, String> fetchDisplayNames(String authorizationHeader, List<String> userIds) {
         if (userIds.isEmpty()) {
             return Map.of();
