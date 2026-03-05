@@ -14,7 +14,10 @@ Recommended order:
 8. `step9_supabase_multi_owner_management.sql`
 9. `step10_memories_owner_only_insert.sql`
 10. `step11_memories_owner_only_update.sql`
+11. `step12_supabase_audio_storage.sql`
 
 `step10_memories_owner_only_insert.sql` should be applied once the family/member/child RLS helpers are already present (from step5+). It tightens memory writes so only `OWNER` can insert and delete memories.
 
 `step11_memories_owner_only_update.sql` tightens memory updates so only `OWNER` can edit memories.
+
+`step12_supabase_audio_storage.sql` adds optional audio metadata fields to memories and creates the private `memory-audio` bucket used by the backend signed URL flow.
