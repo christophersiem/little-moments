@@ -29,7 +29,7 @@ public class MemoryInsightsService {
         "aber", "als", "am", "an", "auch", "auf", "aus", "bei", "bin", "bis", "da", "dann", "das",
         "dem", "den", "der", "des", "die", "doch", "du", "ein", "eine", "einem", "einer", "eines",
         "er", "es", "für", "hat", "habe", "haben", "ich", "im", "in", "ist", "mit", "nach", "nicht",
-        "oder", "sie", "so", "und", "uns", "unser", "war", "waren", "wie", "wir", "zu", "zum", "zur"
+        "noch", "oder", "sie", "sind", "so", "und", "uns", "unser", "war", "waren", "wie", "wir", "zu", "zum", "zur"
     );
     private static final Set<String> LANGUAGE_MARKERS_DE = Set.of(
         "der", "die", "das", "und", "nicht", "ein", "eine", "wir", "heute", "gestern", "woche", "kind"

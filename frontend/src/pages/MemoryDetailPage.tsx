@@ -4,6 +4,8 @@ import { Button } from '../components/Button'
 import { deleteMemory, updateMemory } from '../features/memories/api'
 import { MEMORY_TAG_OPTIONS, type Memory, type MemoryTag } from '../features/memories/types'
 import { useMemoryDetail } from '../features/memories/hooks'
+import { supabase } from '../lib/supabase'
+import { isForbiddenError, isUnauthorizedError } from '../lib/supabaseErrors'
 import { formatDateTime } from '../lib/utils'
 
 interface MemoryDetailPageProps {
@@ -366,8 +368,16 @@ export function MemoryDetailPage({ memoryId, navigate }: MemoryDetailPageProps) 
       setSaveNotice('Saved')
       return true
     } catch (saveFailure) {
-      const message = saveFailure instanceof Error ? saveFailure.message : 'Could not save changes.'
-      setSaveError(message)
+      if (isUnauthorizedError(saveFailure)) {
+        setSaveError('Your session expired. Please sign in again.')
+        void supabase?.auth.signOut()
+        navigate('/record')
+      } else if (isForbiddenError(saveFailure)) {
+        setSaveError('You are not authorized to update this memory.')
+      } else {
+        const message = saveFailure instanceof Error ? saveFailure.message : 'Could not save changes.'
+        setSaveError(message)
+      }
       return false
     } finally {
       setSaving(false)
@@ -411,8 +421,16 @@ export function MemoryDetailPage({ memoryId, navigate }: MemoryDetailPageProps) 
       await deleteMemory(currentMemory.id)
       navigate('/memories')
     } catch (failure) {
-      const message = failure instanceof Error ? failure.message : 'Could not delete this memory.'
-      setDeleteError(message)
+      if (isUnauthorizedError(failure)) {
+        setDeleteError('Your session expired. Please sign in again.')
+        void supabase?.auth.signOut()
+        navigate('/record')
+      } else if (isForbiddenError(failure)) {
+        setDeleteError('You are not authorized to delete this memory.')
+      } else {
+        const message = failure instanceof Error ? failure.message : 'Could not delete this memory.'
+        setDeleteError(message)
+      }
     } finally {
       setDeleting(false)
     }

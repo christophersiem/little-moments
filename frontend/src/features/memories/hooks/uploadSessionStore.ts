@@ -8,6 +8,7 @@ export interface ActiveUploadSession {
   clientId: string
   startedAt: string
   recordedAt: string
+  childId: string
   status: ActiveUploadStatus
   memoryId?: string
   ids: string[]
@@ -18,6 +19,7 @@ export interface ActiveUploadSession {
 let activeSession: ActiveUploadSession | null = null
 let activeBlob: Blob | null = null
 let activeRecordedAt = ''
+let activeChildId = ''
 let requestVersion = 0
 
 const listeners = new Set<() => void>()
@@ -74,8 +76,8 @@ function applyResponseToSession(
   }
 }
 
-function runUpload(version: number, audioBlob: Blob, recordedAtIso: string): void {
-  void createMemory(audioBlob, recordedAtIso)
+function runUpload(version: number, audioBlob: Blob, recordedAtIso: string, childId: string): void {
+  void createMemory(audioBlob, recordedAtIso, childId)
     .then((response) => {
       if (version !== requestVersion || !activeSession) {
         return
@@ -99,12 +101,13 @@ function runUpload(version: number, audioBlob: Blob, recordedAtIso: string): voi
     })
 }
 
-export function startMemoryUpload(audioBlob: Blob, recordedAtIso: string): ActiveUploadSession {
+export function startMemoryUpload(audioBlob: Blob, recordedAtIso: string, childId: string): ActiveUploadSession {
   requestVersion += 1
   const nextSession: ActiveUploadSession = {
     clientId: makeClientId(),
     startedAt: new Date().toISOString(),
     recordedAt: recordedAtIso,
+    childId,
     status: 'uploading',
     ids: [],
     count: 0,
@@ -113,14 +116,15 @@ export function startMemoryUpload(audioBlob: Blob, recordedAtIso: string): Activ
   activeSession = nextSession
   activeBlob = audioBlob
   activeRecordedAt = recordedAtIso
+  activeChildId = childId
   emit()
-  runUpload(requestVersion, audioBlob, recordedAtIso)
+  runUpload(requestVersion, audioBlob, recordedAtIso, childId)
 
   return nextSession
 }
 
 export function retryActiveMemoryUpload(): boolean {
-  if (!activeSession || !activeBlob || !activeRecordedAt) {
+  if (!activeSession || !activeBlob || !activeRecordedAt || !activeChildId) {
     return false
   }
   if (activeSession.status === 'uploading') {
@@ -138,7 +142,7 @@ export function retryActiveMemoryUpload(): boolean {
     count: 0,
   }
   emit()
-  runUpload(requestVersion, activeBlob, activeRecordedAt)
+  runUpload(requestVersion, activeBlob, activeRecordedAt, activeChildId)
   return true
 }
 
@@ -172,10 +176,10 @@ export function clearActiveUploadSession(): void {
   activeSession = null
   activeBlob = null
   activeRecordedAt = ''
+  activeChildId = ''
   emit()
 }
 
 export function useActiveMemoryUpload(): ActiveUploadSession | null {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
-

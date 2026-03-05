@@ -4,7 +4,9 @@ export type AppRoute =
   | { kind: 'record' }
   | { kind: 'memories' }
   | { kind: 'memory-detail'; memoryId: string }
+  | { kind: 'invite-accept' }
   | { kind: 'settings' }
+  | { kind: 'family' }
   | { kind: 'account' }
   | { kind: 'privacy' }
   | { kind: 'not-found' }
@@ -32,8 +34,14 @@ function resolveRoute(pathname: string): AppRoute {
   if (pathname === '/memories') {
     return { kind: 'memories' }
   }
+  if (pathname === '/invite/accept') {
+    return { kind: 'invite-accept' }
+  }
   if (pathname === '/settings') {
     return { kind: 'settings' }
+  }
+  if (pathname === '/settings/family') {
+    return { kind: 'family' }
   }
   if (pathname === '/settings/account') {
     return { kind: 'account' }

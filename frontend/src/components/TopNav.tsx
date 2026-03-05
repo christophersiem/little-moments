@@ -35,16 +35,19 @@ const NavLabel = styled.span`
   font-size: 0.75rem;
 `
 
-function HomeIcon() {
+function RecordIcon() {
   return (
     <NavIcon viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M4 10.5L12 4L20 10.5V20H14.5V14H9.5V20H4V10.5Z"
+      <circle
+        cx="12"
+        cy="12"
+        r="6.75"
         stroke="currentColor"
         strokeWidth="1.7"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+      <circle cx="12" cy="12" r="1.7" fill="currentColor" />
     </NavIcon>
   )
 }
@@ -104,18 +107,6 @@ export function TopNav({ pathname, navigate, navigationLocked = false, onLockedN
     <Nav>
       <Button
         variant="nav"
-        active={pathname.startsWith('/record')}
-        onClick={() => onNavigate('/record')}
-        aria-disabled={navigationLocked && !pathname.startsWith('/record')}
-        style={{ opacity: navigationLocked && !pathname.startsWith('/record') ? 0.62 : 1 }}
-      >
-        <NavItem>
-          <HomeIcon />
-          <NavLabel>Home</NavLabel>
-        </NavItem>
-      </Button>
-      <Button
-        variant="nav"
         active={pathname.startsWith('/memories')}
         onClick={() => onNavigate('/memories')}
         aria-disabled={navigationLocked && !pathname.startsWith('/memories')}
@@ -124,6 +115,18 @@ export function TopNav({ pathname, navigate, navigationLocked = false, onLockedN
         <NavItem>
           <BookIcon />
           <NavLabel>Memories</NavLabel>
+        </NavItem>
+      </Button>
+      <Button
+        variant="nav"
+        active={pathname.startsWith('/record')}
+        onClick={() => onNavigate('/record')}
+        aria-disabled={navigationLocked && !pathname.startsWith('/record')}
+        style={{ opacity: navigationLocked && !pathname.startsWith('/record') ? 0.62 : 1 }}
+      >
+        <NavItem>
+          <RecordIcon />
+          <NavLabel>Record</NavLabel>
         </NavItem>
       </Button>
       <Button

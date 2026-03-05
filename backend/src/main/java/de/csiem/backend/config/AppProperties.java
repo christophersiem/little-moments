@@ -10,7 +10,7 @@ import java.util.UUID;
 public class AppProperties {
 
     private UUID defaultUserId = UUID.fromString("00000000-0000-0000-0000-000000000001");
-    private String corsAllowedOrigins = "http://localhost:5173";
+    private String corsAllowedOrigins = "http://localhost:5173,http://127.0.0.1:5173,https://*.ngrok-free.app";
     private final Transcription transcription = new Transcription();
     private final Insights insights = new Insights();
     private final Splitter splitter = new Splitter();

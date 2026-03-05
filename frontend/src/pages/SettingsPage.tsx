@@ -2,6 +2,7 @@ import styled from 'styled-components'
 
 interface SettingsPageProps {
   navigate: (nextPath: string) => void
+  onLogout: () => void
 }
 
 interface SettingsItemProps {
@@ -23,6 +24,10 @@ const List = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.space.x2};
+`
+
+const LogoutSection = styled.div`
+  margin-top: ${({ theme }) => theme.space.x5};
 `
 
 const Item = styled.button<SettingsItemProps>`
@@ -82,7 +87,21 @@ const Chevron = styled.span`
   line-height: 1;
 `
 
-export function SettingsPage({ navigate }: SettingsPageProps) {
+const LogoutItem = styled(Item)`
+  border-color: ${({ theme }) => theme.colors.danger};
+  background: ${({ theme }) => theme.colors.surface};
+`
+
+const LogoutIcon = styled(ItemIcon)`
+  border-color: ${({ theme }) => theme.colors.danger};
+  color: ${({ theme }) => theme.colors.danger};
+`
+
+const LogoutTitle = styled(ItemTitle)`
+  color: ${({ theme }) => theme.colors.danger};
+`
+
+export function SettingsPage({ navigate, onLogout }: SettingsPageProps) {
   return (
     <Section>
       <Heading>Settings</Heading>
@@ -113,7 +132,27 @@ export function SettingsPage({ navigate }: SettingsPageProps) {
           </ItemText>
           <Chevron>›</Chevron>
         </Item>
+
+        <Item type="button" $interactive onClick={() => navigate('/settings/family')}>
+          <ItemIcon>◒</ItemIcon>
+          <ItemText>
+            <ItemTitle>Family</ItemTitle>
+            <ItemSubtitle>Members & invite links</ItemSubtitle>
+          </ItemText>
+          <Chevron>›</Chevron>
+        </Item>
       </List>
+
+      <LogoutSection>
+        <LogoutItem type="button" $interactive onClick={onLogout}>
+          <LogoutIcon>↩</LogoutIcon>
+          <ItemText>
+            <LogoutTitle>Logout</LogoutTitle>
+            <ItemSubtitle>Sign out of your account</ItemSubtitle>
+          </ItemText>
+          <Chevron>›</Chevron>
+        </LogoutItem>
+      </LogoutSection>
     </Section>
   )
 }

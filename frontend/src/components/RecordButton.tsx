@@ -93,6 +93,7 @@ const Root = styled.div`
   --lm-accent: ${({ theme }) => theme.colors.accent};
   --lm-accent-strong: ${({ theme }) => theme.colors.accentStrong};
   --lm-accent-contrast: ${({ theme }) => theme.colors.onAccent};
+  --lm-bg: ${({ theme }) => theme.colors.background};
   --lm-surface: ${({ theme }) => theme.colors.surfaceStrong};
   --lm-border: ${({ theme }) => theme.colors.border};
   --lm-text: ${({ theme }) => theme.colors.text};
@@ -251,12 +252,7 @@ const LogoMark = styled(RippleLogo)<{ $size: number; $state: VisualState }>`
   width: ${({ $size }) => `${$size}px`};
   height: ${({ $size }) => `${$size}px`};
   display: block;
-  color: ${({ $state }) =>
-    $state === 'recording'
-      ? 'color-mix(in srgb, var(--lm-accent-contrast) 95%, white)'
-      : $state === 'stopped'
-        ? 'color-mix(in srgb, var(--lm-muted) 88%, var(--lm-text))'
-        : 'var(--lm-accent-contrast)'};
+  color: var(--lm-bg);
   opacity: ${({ $state }) => ($state === 'recording' ? 1 : 0.98)};
   transition: color 220ms ease, opacity 220ms ease;
 `

@@ -20,10 +20,12 @@ public final class SplitMemoriesPrompt {
             }
 
             Rules:
-            - Split only when moments are clearly distinct (different day/event/context, cues like "und dann", "außerdem").
+            - Be conservative. Split only when moments are clearly and unambiguously distinct.
+            - A sequence of steps from one outing/day stays ONE memory (for example: swimming, showering, eating, driving home).
+            - Use multiple memories only when there is strong evidence of separate moments, especially different days/times explicitly stated.
             - Do not invent details.
             - Each excerpt must be a contiguous span from the transcript.
-            - If unsure, return one memory with excerpt equal to the full transcript.
+            - If unsure, return exactly one memory with excerpt equal to the full transcript.
             - Limit to at most %d memories.
             - Keep excerpt length >= %d chars when possible.
             - Keep each excerpt concise but complete (roughly 1-6 sentences).

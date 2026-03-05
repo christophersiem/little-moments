@@ -6,9 +6,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -16,6 +20,8 @@ import java.util.regex.Pattern;
 public class OpenAiMemorySplittingService implements MemorySplittingService {
 
     private static final int MAX_INPUT_CHARS = 16000;
+    private static final ZoneId BERLIN = ZoneId.of("Europe/Berlin");
+    private static final double MIN_CONFIDENCE_FOR_MULTI_MEMORY = 0.78;
     private static final Pattern MEMORIES_ARRAY_PATTERN = Pattern.compile("\"memories\"\\s*:\\s*\\[(.*)]", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     private static final Pattern OBJECT_PATTERN = Pattern.compile("\\{([^{}]*)}", Pattern.DOTALL);
     private static final Pattern EXCERPT_PATTERN = Pattern.compile("\"excerpt\"\\s*:\\s*\"((?:\\\\.|[^\\\\\"])*)\"", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
@@ -59,13 +65,23 @@ public class OpenAiMemorySplittingService implements MemorySplittingService {
             return List.of(new SplitMemory(normalizedTranscript, uploadTimestamp, clampConfidence(sanitized.getFirst().confidence())));
         }
 
-        return sanitized.stream()
+        List<SplitMemory> resolved = sanitized.stream()
             .map(candidate -> new SplitMemory(
                 candidate.excerpt(),
                 dateResolver.resolveRecordedAt(candidate.dateText(), uploadTimestamp),
                 clampConfidence(candidate.confidence())
             ))
             .toList();
+
+        if (resolved.size() > 1 && !shouldKeepMultipleMemories(resolved)) {
+            return List.of(new SplitMemory(
+                normalizedTranscript,
+                uploadTimestamp,
+                strongestConfidence(resolved)
+            ));
+        }
+
+        return resolved;
     }
 
     private List<SplitCandidate> splitWithAi(
@@ -190,6 +206,44 @@ public class OpenAiMemorySplittingService implements MemorySplittingService {
             return 0.5;
         }
         return Math.max(0.0, Math.min(1.0, value));
+    }
+
+    static boolean shouldKeepMultipleMemories(List<SplitMemory> splitMemories) {
+        if (splitMemories == null || splitMemories.size() <= 1) {
+            return true;
+        }
+
+        Set<LocalDate> distinctDates = new HashSet<>();
+        for (SplitMemory splitMemory : splitMemories) {
+            if (splitMemory == null) {
+                return false;
+            }
+            if (normalizeExcerpt(splitMemory.excerpt()).isBlank()) {
+                return false;
+            }
+            if (splitMemory.confidence() < MIN_CONFIDENCE_FOR_MULTI_MEMORY) {
+                return false;
+            }
+            distinctDates.add(splitMemory.recordedAt().atZone(BERLIN).toLocalDate());
+        }
+
+        // Conservative Reduced-MVP rule: keep multiple memories only when distinct days are detected.
+        return distinctDates.size() >= 2;
+    }
+
+    private static String normalizeExcerpt(String excerpt) {
+        return excerpt == null ? "" : excerpt.trim().replaceAll("\\s+", " ");
+    }
+
+    private double strongestConfidence(List<SplitMemory> splitMemories) {
+        double highest = 0.5;
+        for (SplitMemory splitMemory : splitMemories) {
+            if (splitMemory == null) {
+                continue;
+            }
+            highest = Math.max(highest, clampConfidence(splitMemory.confidence()));
+        }
+        return highest;
     }
 
     private String extractJsonObject(String raw) {

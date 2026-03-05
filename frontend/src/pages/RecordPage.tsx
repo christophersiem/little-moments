@@ -13,6 +13,7 @@ import { formatDuration } from '../lib/utils'
 
 interface RecordPageProps {
   navigate: (nextPath: string) => void
+  childId: string
   onNavigationLockChange?: (locked: boolean) => void
 }
 
@@ -24,6 +25,14 @@ interface RecordingPayload {
 }
 
 const NOOP = () => undefined
+const MIN_RECORDING_SECONDS = 2
+const MIN_RECORDING_BYTES = 10000
+const SHORT_RECORDING_HINT = 'Recording too short. Please speak at least 5 words.'
+const SHORT_HINT_DISPLAY_MS = 5200
+
+function isLikelyTooShort(blob: Blob, elapsedSeconds: number): boolean {
+  return elapsedSeconds < MIN_RECORDING_SECONDS || blob.size < MIN_RECORDING_BYTES
+}
 
 const Stage = styled.section`
   width: 100%;
@@ -84,6 +93,19 @@ const BodyText = styled.p`
   font-size: ${({ theme }) => theme.typography.bodySize};
 `
 
+const HintBanner = styled.p`
+  width: min(360px, calc(100vw - 48px));
+  margin: ${({ theme }) => `${theme.space.x3} 0 0`};
+  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3}`};
+  border: 1px solid ${({ theme }) => theme.colors.danger};
+  border-radius: ${({ theme }) => theme.radii.md};
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  color: ${({ theme }) => theme.colors.danger};
+  font-size: ${({ theme }) => theme.typography.bodySize};
+  line-height: ${({ theme }) => theme.typography.bodyLineHeight};
+  text-align: center;
+`
+
 const PrivacyText = styled.p`
   max-width: 320px;
   color: ${({ theme }) => theme.colors.textMuted};
@@ -140,7 +162,7 @@ const SheetActions = styled.div`
   gap: ${({ theme }) => theme.space.x2};
 `
 
-export function RecordPage({ navigate, onNavigationLockChange }: RecordPageProps) {
+export function RecordPage({ navigate, childId, onNavigationLockChange }: RecordPageProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -172,6 +194,14 @@ export function RecordPage({ navigate, onNavigationLockChange }: RecordPageProps
       cleanupStream()
     }
   }, [])
+
+  useEffect(() => {
+    if (phase !== 'idle' || !errorMessage) {
+      return
+    }
+    const timer = window.setTimeout(() => setErrorMessage(''), SHORT_HINT_DISPLAY_MS)
+    return () => window.clearTimeout(timer)
+  }, [errorMessage, phase])
 
   useEffect(() => {
     onNavigationLockChange?.(phase === 'recording')
@@ -266,8 +296,23 @@ export function RecordPage({ navigate, onNavigationLockChange }: RecordPageProps
         setPhase('error')
         return
       }
+      if (!childId) {
+        setErrorMessage('No child selected for this memory.')
+        setPhase('error')
+        return
+      }
 
-      const session = startMemoryUpload(latestRecordingRef.current.blob, latestRecordingRef.current.recordedAt)
+      if (isLikelyTooShort(latestRecordingRef.current.blob, elapsedSeconds)) {
+        latestRecordingRef.current = null
+        chunksRef.current = []
+        setStopDecisionState('hidden')
+        setPhase('idle')
+        setElapsedSeconds(0)
+        setErrorMessage(SHORT_RECORDING_HINT)
+        return
+      }
+
+      const session = startMemoryUpload(latestRecordingRef.current.blob, latestRecordingRef.current.recordedAt, childId)
       latestRecordingRef.current = null
       chunksRef.current = []
       setStopDecisionState('hidden')
@@ -382,6 +427,7 @@ export function RecordPage({ navigate, onNavigationLockChange }: RecordPageProps
           onStop={NOOP}
           diameter={188}
         />
+        {errorMessage && <HintBanner role="status">{errorMessage}</HintBanner>}
       </CenterHero>
     </CenterStage>
   )
