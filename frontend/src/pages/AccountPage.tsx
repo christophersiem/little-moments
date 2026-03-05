@@ -1,13 +1,21 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import styled from 'styled-components'
 import { Button } from '../components/Button'
-import { ensureOwnProfileForSession, getOwnProfile, updateOwnDisplayName } from '../features/profiles/api'
+import { getOwnProfile, updateOwnDisplayName } from '../features/profiles/api'
 import { supabase } from '../lib/supabase'
 import { isUnauthorizedError } from '../lib/supabaseErrors'
 
 interface AccountPageProps {
   navigate: (nextPath: string) => void
+  userEmail?: string
 }
+
+interface AccountPageCache {
+  displayName: string
+  email: string
+}
+
+let accountPageCache: AccountPageCache | null = null
 
 const Section = styled.section`
   width: 100%;
@@ -87,12 +95,12 @@ const SuccessText = styled.p`
   color: ${({ theme }) => theme.colors.accentStrong};
 `
 
-export function AccountPage({ navigate }: AccountPageProps) {
-  const [loading, setLoading] = useState(true)
+export function AccountPage({ navigate, userEmail = '' }: AccountPageProps) {
+  const [loading, setLoading] = useState(!accountPageCache)
   const [loadError, setLoadError] = useState('')
 
-  const [displayName, setDisplayName] = useState('')
-  const [email, setEmail] = useState('')
+  const [displayName, setDisplayName] = useState(accountPageCache?.displayName ?? 'Member')
+  const [email, setEmail] = useState(accountPageCache?.email ?? userEmail)
   const [newPassword, setNewPassword] = useState('')
   const [repeatNewPassword, setRepeatNewPassword] = useState('')
 
@@ -108,6 +116,12 @@ export function AccountPage({ navigate }: AccountPageProps) {
   const [savingPassword, setSavingPassword] = useState(false)
 
   useEffect(() => {
+    if (!accountPageCache && userEmail) {
+      setEmail(userEmail)
+    }
+  }, [userEmail])
+
+  useEffect(() => {
     let disposed = false
 
     const load = async () => {
@@ -120,31 +134,25 @@ export function AccountPage({ navigate }: AccountPageProps) {
       }
 
       setLoadError('')
-      setLoading(true)
+      if (!accountPageCache) {
+        setLoading(true)
+      }
 
       try {
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser()
-
-        if (userError) {
-          throw userError
-        }
-        if (!user) {
-          navigate('/record')
-          return
-        }
-
-        await ensureOwnProfileForSession(user)
         const profile = await getOwnProfile()
 
         if (disposed) {
           return
         }
 
-        setEmail(user.email ?? '')
-        setDisplayName(profile?.displayName ?? 'Member')
+        const nextDisplayName = profile?.displayName ?? 'Member'
+        const nextEmail = userEmail || accountPageCache?.email || ''
+        accountPageCache = {
+          displayName: nextDisplayName,
+          email: nextEmail,
+        }
+        setEmail(nextEmail)
+        setDisplayName(nextDisplayName)
       } catch (error) {
         if (disposed) {
           return
@@ -167,7 +175,7 @@ export function AccountPage({ navigate }: AccountPageProps) {
     return () => {
       disposed = true
     }
-  }, [navigate])
+  }, [navigate, userEmail])
 
   const onSaveDisplayName = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -182,6 +190,10 @@ export function AccountPage({ navigate }: AccountPageProps) {
     setSavingName(true)
     try {
       await updateOwnDisplayName(displayName)
+      accountPageCache = {
+        displayName: displayName.trim(),
+        email,
+      }
       setNameSuccess('Display name saved.')
     } catch (error) {
       if (isUnauthorizedError(error)) {
@@ -257,15 +269,6 @@ export function AccountPage({ navigate }: AccountPageProps) {
     }
   }
 
-  if (loading) {
-    return (
-      <Section>
-        <Heading>Account</Heading>
-        <HelperText>Loading account details...</HelperText>
-      </Section>
-    )
-  }
-
   return (
     <Section>
       <Heading>Account</Heading>
@@ -287,7 +290,7 @@ export function AccountPage({ navigate }: AccountPageProps) {
           </FieldLabel>
           {nameError && <ErrorText>{nameError}</ErrorText>}
           {nameSuccess && <SuccessText>{nameSuccess}</SuccessText>}
-          <Button variant="primary" type="submit" disabled={savingName}>
+          <Button variant="primary" type="submit" disabled={savingName || loading}>
             {savingName ? 'Saving...' : 'Save display name'}
           </Button>
         </Form>
@@ -309,7 +312,7 @@ export function AccountPage({ navigate }: AccountPageProps) {
           <HelperText>Supabase may require confirmation for email changes.</HelperText>
           {emailError && <ErrorText>{emailError}</ErrorText>}
           {emailSuccess && <SuccessText>{emailSuccess}</SuccessText>}
-          <Button variant="primary" type="submit" disabled={savingEmail}>
+          <Button variant="primary" type="submit" disabled={savingEmail || loading}>
             {savingEmail ? 'Saving...' : 'Save email'}
           </Button>
         </Form>
@@ -342,7 +345,7 @@ export function AccountPage({ navigate }: AccountPageProps) {
           </FieldLabel>
           {passwordError && <ErrorText>{passwordError}</ErrorText>}
           {passwordSuccess && <SuccessText>{passwordSuccess}</SuccessText>}
-          <Button variant="primary" type="submit" disabled={savingPassword}>
+          <Button variant="primary" type="submit" disabled={savingPassword || loading}>
             {savingPassword ? 'Saving...' : 'Save password'}
           </Button>
         </Form>

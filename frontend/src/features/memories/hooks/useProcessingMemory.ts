@@ -58,7 +58,7 @@ export function useProcessingMemory({
     }
 
     try {
-      const memory = await getMemory(activeMemoryId)
+      const memory = await getMemory(activeMemoryId, { bypassCache: true })
       setStatus(memory.status)
       setError('')
     } catch (refreshError) {
@@ -101,7 +101,7 @@ export function useProcessingMemory({
       }
 
       try {
-        const memory = await getMemory(activeMemoryId)
+        const memory = await getMemory(activeMemoryId, { bypassCache: true })
         if (disposed) {
           return
         }
