@@ -339,10 +339,14 @@ public class SupabaseGatewayService {
         if (!StringUtils.hasText(baseUrl)) {
             throw new ResponseStatusException(BAD_REQUEST, "SUPABASE_URL is not configured");
         }
-        if (signedPath.startsWith("/")) {
-            return baseUrl + signedPath;
+        String normalizedPath = signedPath.startsWith("/") ? signedPath : "/" + signedPath;
+        if (normalizedPath.startsWith("/storage/v1/")) {
+            return baseUrl + normalizedPath;
         }
-        return baseUrl + "/" + signedPath;
+        if (normalizedPath.startsWith("/object/")) {
+            return baseUrl + "/storage/v1" + normalizedPath;
+        }
+        return baseUrl + "/storage/v1" + normalizedPath;
     }
 
     public void assertOwnerCanManageMemory(String authorizationHeader, String memoryId) {
