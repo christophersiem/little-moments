@@ -32,7 +32,7 @@ const Scrim = styled.button`
   border: none;
   margin: 0;
   padding: 0;
-  background: ${({ theme }) => theme.colors.overlay};
+  background: transparent;
   cursor: default;
 `
 
@@ -41,8 +41,8 @@ const Popover = styled.aside<{ $top: number; $right: number }>`
   top: ${({ $top }) => `${$top}px`};
   right: ${({ $right }) => `${$right}px`};
   z-index: 21;
-  width: min(360px, calc(100% - 24px));
-  max-height: min(68vh, 560px);
+  width: min(320px, 92vw);
+  max-height: 60vh;
   background: ${({ theme }) => theme.colors.surfaceStrong};
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: ${({ theme }) => theme.radii.lg};
@@ -88,10 +88,10 @@ const CloseButton = styled.button`
 
 const Content = styled.div`
   overflow-y: auto;
-  padding: ${({ theme }) => `${theme.space.x3}`};
+  padding: ${({ theme }) => `${theme.space.x3} ${theme.space.x3} ${theme.space.x2}`};
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.space.x4};
+  gap: ${({ theme }) => theme.space.x3};
 `
 
 const Section = styled.section`
@@ -104,44 +104,6 @@ const Label = styled.p`
   margin: 0;
   font-size: ${({ theme }) => theme.typography.secondarySize};
   color: ${({ theme }) => theme.colors.textMuted};
-`
-
-const MonthList = styled.div`
-  display: flex;
-  flex-direction: column;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: ${({ theme }) => theme.radii.md};
-  overflow: hidden;
-`
-
-const MonthOptionButton = styled.button<{ $active: boolean }>`
-  border: none;
-  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
-  background: ${({ theme, $active }) => ($active ? theme.colors.surface : 'transparent')};
-  color: ${({ theme, $active }) => ($active ? theme.colors.text : theme.colors.textMuted)};
-  min-height: ${({ theme }) => theme.layout.minTouchTarget};
-  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3}`};
-  text-align: left;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: ${({ theme }) => theme.space.x2};
-  font-size: ${({ theme }) => theme.typography.bodySize};
-
-  &:last-child {
-    border-bottom: none;
-  }
-
-  &:focus-visible {
-    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
-    outline-offset: -2px;
-  }
-`
-
-const SelectedMark = styled.span`
-  color: ${({ theme }) => theme.colors.accentStrong};
-  font-size: ${({ theme }) => theme.typography.secondarySize};
 `
 
 const TagsHeader = styled.div`
@@ -159,6 +121,12 @@ const AddTagButton = styled.button`
   padding: 0;
   cursor: pointer;
   font-size: ${({ theme }) => theme.typography.secondarySize};
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
+    outline-offset: 2px;
+    border-radius: ${({ theme }) => theme.radii.sm};
+  }
 `
 
 const SelectedTagList = styled.div`
@@ -198,12 +166,62 @@ const TagPill = styled.button<{ $active: boolean }>`
   cursor: pointer;
 `
 
+const MonthRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.space.x2};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.md};
+  background: ${({ theme }) => theme.colors.surface};
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  padding: ${({ theme }) => `0 ${theme.space.x3}`};
+`
+
+const MonthValue = styled.span`
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+`
+
+const MonthSelect = styled.select`
+  border: none;
+  background: transparent;
+  color: ${({ theme }) => theme.colors.text};
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  text-align: right;
+  cursor: pointer;
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+  padding-right: ${({ theme }) => theme.space.x4};
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
+    outline-offset: 2px;
+    border-radius: ${({ theme }) => theme.radii.sm};
+  }
+`
+
+const ClearFiltersButton = styled.button`
+  border: none;
+  background: transparent;
+  color: ${({ theme }) => theme.colors.accentStrong};
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  padding: 0;
+  cursor: pointer;
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+`
+
 const ActionBar = styled.div`
   border-top: 1px solid ${({ theme }) => theme.colors.border};
   background: ${({ theme }) => theme.colors.surfaceStrong};
-  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3}`};
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3} ${theme.space.x3}`};
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: ${({ theme }) => theme.space.x2};
 `
 
@@ -233,7 +251,7 @@ export function FilterSheet({
   const [draftTags, setDraftTags] = useState<MemoryTag[]>(selectedTags)
   const [tagsExpanded, setTagsExpanded] = useState(false)
   const dialogRef = useRef<HTMLElement | null>(null)
-  const firstMonthOptionRef = useRef<HTMLButtonElement | null>(null)
+  const firstControlRef = useRef<HTMLButtonElement | null>(null)
 
   useEffect(() => {
     if (!open) {
@@ -245,7 +263,7 @@ export function FilterSheet({
     setTagsExpanded(selectedTags.length > 0)
 
     const focusTimer = window.setTimeout(() => {
-      firstMonthOptionRef.current?.focus()
+      firstControlRef.current?.focus()
     }, 0)
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -336,39 +354,13 @@ export function FilterSheet({
           <SrStatus aria-live="polite">{activeCountLabel}</SrStatus>
 
           <Section>
-            <Label>Month</Label>
-            <MonthList role="radiogroup" aria-label="Month filter">
-              <MonthOptionButton
-                ref={firstMonthOptionRef}
-                type="button"
-                role="radio"
-                aria-checked={draftMonth === 'all'}
-                $active={draftMonth === 'all'}
-                onClick={() => setDraftMonth('all')}
-              >
-                <span>All months</span>
-                {draftMonth === 'all' ? <SelectedMark aria-hidden>●</SelectedMark> : null}
-              </MonthOptionButton>
-              {monthOptions.map((option) => (
-                <MonthOptionButton
-                  key={option.key}
-                  type="button"
-                  role="radio"
-                  aria-checked={draftMonth === option.key}
-                  $active={draftMonth === option.key}
-                  onClick={() => setDraftMonth(option.key)}
-                >
-                  <span>{option.label}</span>
-                  {draftMonth === option.key ? <SelectedMark aria-hidden>●</SelectedMark> : null}
-                </MonthOptionButton>
-              ))}
-            </MonthList>
-          </Section>
-
-          <Section>
             <TagsHeader>
               <Label>Tags ({draftTags.length})</Label>
-              <AddTagButton type="button" onClick={() => setTagsExpanded((value) => !value)}>
+              <AddTagButton
+                ref={firstControlRef}
+                type="button"
+                onClick={() => setTagsExpanded((value) => !value)}
+              >
                 {tagsExpanded ? 'Done' : 'Add tag'}
               </AddTagButton>
             </TagsHeader>
@@ -399,10 +391,28 @@ export function FilterSheet({
               </TagGrid>
             ) : null}
           </Section>
+
+          <Section>
+            <MonthRow>
+              <MonthValue>Month</MonthValue>
+              <MonthSelect
+                aria-label="Month filter"
+                value={draftMonth}
+                onChange={(event) => setDraftMonth(event.target.value)}
+              >
+                <option value="all">All months</option>
+                {monthOptions.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </MonthSelect>
+            </MonthRow>
+          </Section>
         </Content>
 
         <ActionBar>
-          <Button
+          <ClearFiltersButton
             type="button"
             onClick={() => {
               setDraftMonth('all')
@@ -410,8 +420,8 @@ export function FilterSheet({
             }}
             disabled={!hasDraftFilters}
           >
-            Clear
-          </Button>
+            Clear filters
+          </ClearFiltersButton>
           <Button
             type="button"
             variant="primary"
