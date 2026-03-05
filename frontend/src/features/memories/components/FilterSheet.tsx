@@ -20,6 +20,8 @@ interface FilterSheetProps {
   onClose: () => void
 }
 
+type FilterView = 'main' | 'month'
+
 const Overlay = styled.div`
   position: absolute;
   inset: 0;
@@ -83,6 +85,25 @@ const CloseButton = styled.button`
   &:focus-visible {
     outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
     outline-offset: 2px;
+  }
+`
+
+const BackButton = styled.button`
+  border: none;
+  background: transparent;
+  color: ${({ theme }) => theme.colors.accentStrong};
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.x1};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
+    outline-offset: 2px;
+    border-radius: ${({ theme }) => theme.radii.sm};
   }
 `
 
@@ -166,38 +187,80 @@ const TagPill = styled.button<{ $active: boolean }>`
   cursor: pointer;
 `
 
-const MonthRow = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: ${({ theme }) => theme.space.x2};
+const MonthTriggerRow = styled.button`
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: ${({ theme }) => theme.radii.md};
   background: ${({ theme }) => theme.colors.surface};
   min-height: ${({ theme }) => theme.layout.minTouchTarget};
   padding: ${({ theme }) => `0 ${theme.space.x3}`};
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.space.x2};
+  cursor: pointer;
 `
 
-const MonthValue = styled.span`
+const MonthTriggerLabel = styled.span`
   color: ${({ theme }) => theme.colors.textMuted};
   font-size: ${({ theme }) => theme.typography.secondarySize};
 `
 
-const MonthSelect = styled.select`
-  border: none;
-  background: transparent;
+const MonthTriggerValue = styled.span`
   color: ${({ theme }) => theme.colors.text};
-  min-height: ${({ theme }) => theme.layout.minTouchTarget};
-  text-align: right;
-  cursor: pointer;
   font-size: ${({ theme }) => theme.typography.secondarySize};
-  padding-right: ${({ theme }) => theme.space.x4};
+`
+
+const Chevron = styled.span`
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+`
+
+const MonthList = styled.div`
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.md};
+  overflow: hidden;
+`
+
+const MonthOptionRow = styled.button<{ $active: boolean }>`
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+  background: ${({ theme, $active }) => ($active ? theme.colors.surface : 'transparent')};
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3}`};
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.space.x2};
+  color: ${({ theme, $active }) => ($active ? theme.colors.text : theme.colors.textMuted)};
+  font-size: ${({ theme }) => theme.typography.bodySize};
+  text-align: left;
+  cursor: pointer;
+
+  &:last-child {
+    border-bottom: none;
+  }
 
   &:focus-visible {
     outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
-    outline-offset: 2px;
-    border-radius: ${({ theme }) => theme.radii.sm};
+    outline-offset: -2px;
   }
+`
+
+const CheckMark = styled.span`
+  color: ${({ theme }) => theme.colors.accentStrong};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+`
+
+const ActionBar = styled.div`
+  border-top: 1px solid ${({ theme }) => theme.colors.border};
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3} ${theme.space.x3}`};
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.space.x2};
 `
 
 const ClearFiltersButton = styled.button`
@@ -213,16 +276,6 @@ const ClearFiltersButton = styled.button`
     opacity: 0.45;
     cursor: default;
   }
-`
-
-const ActionBar = styled.div`
-  border-top: 1px solid ${({ theme }) => theme.colors.border};
-  background: ${({ theme }) => theme.colors.surfaceStrong};
-  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3} ${theme.space.x3}`};
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: ${({ theme }) => theme.space.x2};
 `
 
 const SrStatus = styled.p`
@@ -247,17 +300,20 @@ export function FilterSheet({
   onApply,
   onClose,
 }: FilterSheetProps) {
+  const [view, setView] = useState<FilterView>('main')
   const [draftMonth, setDraftMonth] = useState(selectedMonth)
   const [draftTags, setDraftTags] = useState<MemoryTag[]>(selectedTags)
   const [tagsExpanded, setTagsExpanded] = useState(false)
   const dialogRef = useRef<HTMLElement | null>(null)
   const firstControlRef = useRef<HTMLButtonElement | null>(null)
+  const firstMonthOptionRef = useRef<HTMLButtonElement | null>(null)
 
   useEffect(() => {
     if (!open) {
       return
     }
 
+    setView('main')
     setDraftMonth(selectedMonth)
     setDraftTags(selectedTags)
     setTagsExpanded(selectedTags.length > 0)
@@ -311,10 +367,27 @@ export function FilterSheet({
     }
   }, [onClose, open, selectedMonth, selectedTags])
 
+  useEffect(() => {
+    if (!open || view !== 'month') {
+      return
+    }
+    const timer = window.setTimeout(() => {
+      firstMonthOptionRef.current?.focus()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [open, view])
+
   const activeCountLabel = useMemo(
     () => buildFilterCountLabel(draftMonth, draftTags),
     [draftMonth, draftTags],
   )
+
+  const selectedMonthLabel = useMemo(() => {
+    if (draftMonth === 'all') {
+      return 'All months'
+    }
+    return monthOptions.find((option) => option.key === draftMonth)?.label || 'All months'
+  }, [draftMonth, monthOptions])
 
   if (!open) {
     return null
@@ -332,6 +405,11 @@ export function FilterSheet({
     setDraftTags((current) => current.filter((value) => value !== tag))
   }
 
+  const selectMonth = (monthKey: string) => {
+    setDraftMonth(monthKey)
+    setView('main')
+  }
+
   return (
     <Overlay role="presentation">
       <Scrim type="button" onClick={onClose} aria-label="Close filters panel" />
@@ -339,100 +417,138 @@ export function FilterSheet({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Filters"
+        aria-label={view === 'main' ? 'Filters' : 'Select month'}
         $top={Math.max(anchorTop, 0)}
         $right={Math.max(anchorRight, 0)}
       >
         <Header>
-          <Title>Filters</Title>
-          <CloseButton type="button" onClick={onClose} aria-label="Close filters">
-            ✕
-          </CloseButton>
+          {view === 'main' ? (
+            <>
+              <Title>Filters</Title>
+              <CloseButton type="button" onClick={onClose} aria-label="Close filters">
+                ✕
+              </CloseButton>
+            </>
+          ) : (
+            <>
+              <BackButton type="button" onClick={() => setView('main')} aria-label="Back to filters">
+                <span aria-hidden>‹</span>
+                <span>Back</span>
+              </BackButton>
+              <Title>Select month</Title>
+              <CloseButton type="button" onClick={onClose} aria-label="Close filters">
+                ✕
+              </CloseButton>
+            </>
+          )}
         </Header>
 
-        <Content>
-          <SrStatus aria-live="polite">{activeCountLabel}</SrStatus>
+        {view === 'main' ? (
+          <>
+            <Content>
+              <SrStatus aria-live="polite">{activeCountLabel}</SrStatus>
 
-          <Section>
-            <TagsHeader>
-              <Label>Tags ({draftTags.length})</Label>
-              <AddTagButton
-                ref={firstControlRef}
-                type="button"
-                onClick={() => setTagsExpanded((value) => !value)}
-              >
-                {tagsExpanded ? 'Done' : 'Add tag'}
-              </AddTagButton>
-            </TagsHeader>
-
-            {draftTags.length > 0 ? (
-              <SelectedTagList>
-                {draftTags.map((tag) => (
-                  <SelectedTagPill key={tag} type="button" onClick={() => removeTag(tag)}>
-                    <span>{tag}</span>
-                    <span aria-hidden>×</span>
-                  </SelectedTagPill>
-                ))}
-              </SelectedTagList>
-            ) : null}
-
-            {tagsExpanded ? (
-              <TagGrid>
-                {MEMORY_TAG_OPTIONS.map((tag) => (
-                  <TagPill
-                    key={tag}
+              <Section>
+                <TagsHeader>
+                  <Label>Tags ({draftTags.length})</Label>
+                  <AddTagButton
                     type="button"
-                    $active={draftTags.includes(tag)}
-                    onClick={() => toggleTag(tag)}
+                    onClick={() => setTagsExpanded((value) => !value)}
                   >
-                    {tag}
-                  </TagPill>
-                ))}
-              </TagGrid>
-            ) : null}
-          </Section>
+                    {tagsExpanded ? 'Done' : 'Add tag'}
+                  </AddTagButton>
+                </TagsHeader>
 
-          <Section>
-            <MonthRow>
-              <MonthValue>Month</MonthValue>
-              <MonthSelect
-                aria-label="Month filter"
-                value={draftMonth}
-                onChange={(event) => setDraftMonth(event.target.value)}
+                {draftTags.length > 0 ? (
+                  <SelectedTagList>
+                    {draftTags.map((tag) => (
+                      <SelectedTagPill key={tag} type="button" onClick={() => removeTag(tag)}>
+                        <span>{tag}</span>
+                        <span aria-hidden>×</span>
+                      </SelectedTagPill>
+                    ))}
+                  </SelectedTagList>
+                ) : null}
+
+                {tagsExpanded ? (
+                  <TagGrid>
+                    {MEMORY_TAG_OPTIONS.map((tag) => (
+                      <TagPill
+                        key={tag}
+                        type="button"
+                        $active={draftTags.includes(tag)}
+                        onClick={() => toggleTag(tag)}
+                      >
+                        {tag}
+                      </TagPill>
+                    ))}
+                  </TagGrid>
+                ) : null}
+              </Section>
+
+              <Section>
+                <MonthTriggerRow ref={firstControlRef} type="button" onClick={() => setView('month')}>
+                  <MonthTriggerLabel>Month</MonthTriggerLabel>
+                  <MonthTriggerValue>
+                    {selectedMonthLabel} <Chevron aria-hidden>›</Chevron>
+                  </MonthTriggerValue>
+                </MonthTriggerRow>
+              </Section>
+            </Content>
+
+            <ActionBar>
+              <ClearFiltersButton
+                type="button"
+                onClick={() => {
+                  setDraftMonth('all')
+                  setDraftTags([])
+                }}
+                disabled={!hasDraftFilters}
               >
-                <option value="all">All months</option>
-                {monthOptions.map((option) => (
-                  <option key={option.key} value={option.key}>
-                    {option.label}
-                  </option>
-                ))}
-              </MonthSelect>
-            </MonthRow>
-          </Section>
-        </Content>
-
-        <ActionBar>
-          <ClearFiltersButton
-            type="button"
-            onClick={() => {
-              setDraftMonth('all')
-              setDraftTags([])
-            }}
-            disabled={!hasDraftFilters}
-          >
-            Clear filters
-          </ClearFiltersButton>
-          <Button
-            type="button"
-            variant="primary"
-            onClick={() => {
-              onApply(draftMonth, draftTags)
-              onClose()
-            }}
-          >
-            Apply
-          </Button>
-        </ActionBar>
+                Clear filters
+              </ClearFiltersButton>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => {
+                  onApply(draftMonth, draftTags)
+                  onClose()
+                }}
+              >
+                Apply
+              </Button>
+            </ActionBar>
+          </>
+        ) : (
+          <Content>
+            <MonthList role="listbox" aria-label="Select month">
+              <MonthOptionRow
+                ref={firstMonthOptionRef}
+                type="button"
+                role="option"
+                aria-selected={draftMonth === 'all'}
+                $active={draftMonth === 'all'}
+                onClick={() => selectMonth('all')}
+              >
+                <span>All months</span>
+                {draftMonth === 'all' ? <CheckMark aria-hidden>✓</CheckMark> : null}
+              </MonthOptionRow>
+              {monthOptions.map((option) => (
+                <MonthOptionRow
+                  key={option.key}
+                  type="button"
+                  role="option"
+                  aria-selected={draftMonth === option.key}
+                  $active={draftMonth === option.key}
+                  onClick={() => selectMonth(option.key)}
+                >
+                  <span>{option.label}</span>
+                  {draftMonth === option.key ? <CheckMark aria-hidden>✓</CheckMark> : null}
+                </MonthOptionRow>
+              ))}
+            </MonthList>
+          </Content>
+        )}
       </Popover>
     </Overlay>
   )
