@@ -931,7 +931,10 @@ public class SupabaseGatewayService {
             return MediaType.APPLICATION_OCTET_STREAM;
         }
         try {
-            return MediaType.parseMediaType(value);
+            MediaType parsed = MediaType.parseMediaType(value);
+            // Supabase storage MIME allow-list checks only the base type/subtype.
+            // Strip optional parameters (for example codecs=opus) before upload.
+            return new MediaType(parsed.getType(), parsed.getSubtype());
         } catch (InvalidMediaTypeException ignored) {
             return MediaType.APPLICATION_OCTET_STREAM;
         }
