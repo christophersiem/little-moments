@@ -3,6 +3,7 @@ import styled from 'styled-components'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
 import { RecordButton } from '../components/RecordButton'
+import { ToggleSwitch } from '../components/ToggleSwitch'
 import { MAX_RECORDING_SECONDS } from '../features/memories/constants'
 import { startMemoryUpload } from '../features/memories/hooks/uploadSessionStore'
 import {
@@ -71,6 +72,7 @@ const CenterHero = styled.div`
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: ${({ theme }) => theme.space.x2};
   padding-bottom: calc(${({ theme }) => theme.layout.bottomNavHeight} + ${({ theme }) => theme.space.x2});
 `
 
@@ -192,18 +194,9 @@ const SheetActions = styled.div`
   gap: ${({ theme }) => theme.space.x2};
 `
 
-const KeepAudioControl = styled.label`
-  display: inline-flex;
-  align-items: center;
-  gap: ${({ theme }) => theme.space.x2};
-  margin-top: ${({ theme }) => theme.space.x3};
-  color: ${({ theme }) => theme.colors.textMuted};
-  font-size: ${({ theme }) => theme.typography.bodySize};
-`
-
-const KeepAudioCheckbox = styled.input`
-  width: 18px;
-  height: 18px;
+const PreferenceRow = styled(ToggleSwitch)`
+  width: min(320px, calc(100vw - 48px));
+  margin-top: clamp(36px, 6vh, 44px);
 `
 
 export function RecordPage({ navigate, childId, onNavigationLockChange }: RecordPageProps) {
@@ -514,15 +507,12 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
           onStop={NOOP}
           diameter={188}
         />
-        <KeepAudioControl>
-          <KeepAudioCheckbox
-            type="checkbox"
-            checked={keepAudio}
-            onChange={(event) => setKeepAudio(event.target.checked)}
-          />
-          Keep audio
-        </KeepAudioControl>
-        <HelperText>{`Max ${MAX_RECORDING_SECONDS}s. Lets you replay the original voice.`}</HelperText>
+        <PreferenceRow
+          checked={keepAudio}
+          onChange={setKeepAudio}
+          label="Keep audio"
+          description={`Max ${MAX_RECORDING_SECONDS} seconds. Keeps the original voice so you can replay it later.`}
+        />
         {recordingNotice && <InlineNotice role="status">{recordingNotice}</InlineNotice>}
         {errorMessage && <HintBanner role="status">{errorMessage}</HintBanner>}
       </CenterHero>

@@ -36,6 +36,7 @@ export const theme: DefaultTheme = {
     surface: 'var(--color-surface)',
     surfaceStrong: 'var(--color-surface-strong)',
     border: 'var(--color-border)',
+    borderSoft: 'var(--color-border-soft)',
     text: 'var(--color-text)',
     textMuted: 'var(--color-text-muted)',
     accent: 'var(--color-accent)',

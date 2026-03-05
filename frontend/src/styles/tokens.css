@@ -30,6 +30,7 @@
   --color-surface: #f8f5f2;
   --color-surface-strong: #fbf9f7;
   --color-border: #e7e1dc;
+  --color-border-soft: rgba(143, 131, 120, 0.2);
   --color-text: #433931;
   --color-text-muted: #8f8378;
   --color-accent: #c49a76;
