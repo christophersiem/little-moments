@@ -157,6 +157,7 @@ export default function App() {
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [families, setFamilies] = useState<FamilySummary[]>([])
   const [bootstrapTick, setBootstrapTick] = useState(0)
+  const sessionUserId = session?.user.id ?? null
 
   useEffect(() => {
     if (route.kind !== 'record') {
@@ -206,7 +207,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!session) {
+    if (!sessionUserId) {
       setFamilies([])
       setFamilyId(null)
       setChildId(null)
@@ -225,7 +226,9 @@ export default function App() {
     const bootstrapFamilyContext = async () => {
       try {
         try {
-          await ensureOwnProfileForSession(session.user)
+          if (session?.user) {
+            await ensureOwnProfileForSession(session.user)
+          }
         } catch {
           // Keep onboarding robust if profile sync is temporarily unavailable.
         }
@@ -298,7 +301,7 @@ export default function App() {
     return () => {
       disposed = true
     }
-  }, [bootstrapTick, session])
+  }, [bootstrapTick, sessionUserId])
 
   useEffect(() => {
     if (!familyReady || familyError) {
@@ -479,7 +482,7 @@ export default function App() {
       />
     )
   } else if (route.kind === 'account') {
-    content = <AccountPage navigate={navigate} />
+    content = <AccountPage navigate={navigate} userEmail={session.user.email ?? ''} />
   } else if (route.kind === 'privacy') {
     content = <PrivacyPage navigate={navigate} />
   } else {
