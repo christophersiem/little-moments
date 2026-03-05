@@ -512,7 +512,7 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
           />
           Keep audio
         </KeepAudioControl>
-        <HelperText>Max 60s. Lets you replay the original voice.</HelperText>
+        <HelperText>{`Max ${MAX_RECORDING_SECONDS}s. Lets you replay the original voice.`}</HelperText>
         {recordingNotice && <InlineNotice role="status">{recordingNotice}</InlineNotice>}
         {errorMessage && <HintBanner role="status">{errorMessage}</HintBanner>}
       </CenterHero>
