@@ -21,3 +21,5 @@ Recommended order:
 `step11_memories_owner_only_update.sql` tightens memory updates so only `OWNER` can edit memories.
 
 `step12_supabase_audio_storage.sql` adds optional audio metadata fields to memories and creates the private `memory-audio` bucket used by the backend signed URL flow.
+
+For signed playback URLs, set `SUPABASE_SERVICE_ROLE_KEY` in the backend environment. Never expose this key to the frontend.
