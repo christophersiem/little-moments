@@ -29,6 +29,8 @@ interface ConfirmAction {
   member: FamilyMember
 }
 
+const familyMembersCache = new Map<string, FamilyMember[]>()
+
 const Section = styled.section`
   width: 100%;
   padding-top: ${({ theme }) => theme.space.x3};
@@ -193,12 +195,19 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
     }
 
     let disposed = false
-    setLoadingMembers(true)
+    const cachedMembers = familyMembersCache.get(familyId)
+    if (cachedMembers) {
+      setMembers(cachedMembers)
+      setLoadingMembers(false)
+    } else {
+      setLoadingMembers(true)
+    }
     setMembersError('')
 
     void listFamilyMembers(familyId)
       .then((payload) => {
         if (!disposed) {
+          familyMembersCache.set(familyId, payload)
           setMembers(payload)
         }
       })
@@ -261,6 +270,7 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
       return
     }
     const payload = await listFamilyMembers(familyId)
+    familyMembersCache.set(familyId, payload)
     setMembers(payload)
   }
 

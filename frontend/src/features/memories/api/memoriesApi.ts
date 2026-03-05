@@ -164,8 +164,14 @@ export async function listMemories({
   }
 }
 
-export async function getMemory(memoryId: string): Promise<Memory> {
-  const payload = await backendRequestJson<MemoryApiResponse>(`/memories/${encodeURIComponent(memoryId)}`)
+interface GetMemoryOptions {
+  bypassCache?: boolean
+}
+
+export async function getMemory(memoryId: string, options: GetMemoryOptions = {}): Promise<Memory> {
+  const payload = await backendRequestJson<MemoryApiResponse>(`/memories/${encodeURIComponent(memoryId)}`, {
+    bypassCache: options.bypassCache,
+  })
   return mapMemory(payload)
 }
 

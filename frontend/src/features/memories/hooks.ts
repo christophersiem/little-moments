@@ -2,6 +2,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { getMemory, listMemories } from './api'
 import type { Memory, MemoryListItem } from './types'
 
+interface CachedMemoryDetail {
+  memory: Memory
+  cachedAt: number
+}
+
+const MEMORY_DETAIL_CACHE_TTL_MS = 300_000
+const memoryDetailCache = new Map<string, CachedMemoryDetail>()
+
 export interface MemoriesListState {
   loading: boolean
   error: string
@@ -60,9 +68,12 @@ export function useMemoriesList(): MemoriesListState {
 }
 
 export function useMemoryDetail(memoryId: string): MemoryDetailState {
-  const [loading, setLoading] = useState(true)
+  const cachedDetail = memoryDetailCache.get(memoryId)
+  const hasFreshCache =
+    Boolean(cachedDetail) && Date.now() - (cachedDetail?.cachedAt ?? 0) < MEMORY_DETAIL_CACHE_TTL_MS
+  const [loading, setLoading] = useState(!hasFreshCache)
   const [error, setError] = useState('')
-  const [memory, setMemory] = useState<Memory | null>(null)
+  const [memory, setMemory] = useState<Memory | null>(hasFreshCache ? (cachedDetail?.memory ?? null) : null)
   const [reloadIndex, setReloadIndex] = useState(0)
 
   const reload = useCallback(() => {
@@ -73,11 +84,31 @@ export function useMemoryDetail(memoryId: string): MemoryDetailState {
     let isMounted = true
 
     const load = async () => {
-      setLoading(true)
+      const shouldForceRefresh = reloadIndex > 0
+      const currentCached = memoryDetailCache.get(memoryId)
+      const canUseCached =
+        Boolean(currentCached) &&
+        !shouldForceRefresh &&
+        Date.now() - (currentCached?.cachedAt ?? 0) < MEMORY_DETAIL_CACHE_TTL_MS
+
+      if (canUseCached && currentCached) {
+        setMemory(currentCached.memory)
+        setLoading(false)
+        setError('')
+        return
+      }
+
+      if (!currentCached || shouldForceRefresh) {
+        setLoading(true)
+      }
       setError('')
       try {
         const payload = await getMemory(memoryId)
         if (isMounted) {
+          memoryDetailCache.set(memoryId, {
+            memory: payload,
+            cachedAt: Date.now(),
+          })
           setMemory(payload)
         }
       } catch (loadError) {
