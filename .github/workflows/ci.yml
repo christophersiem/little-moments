@@ -36,10 +36,17 @@ jobs:
 
       - name: Build backend
         working-directory: backend
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: ./mvnw -q test
 
       - name: Build frontend Docker image
-        run: docker build -t little-moments-frontend:ci -f frontend/Dockerfile frontend
+        run: |
+          docker build \
+            --build-arg VITE_SUPABASE_URL="${{ secrets.VITE_SUPABASE_URL }}" \
+            --build-arg VITE_SUPABASE_ANON_KEY="${{ secrets.VITE_SUPABASE_ANON_KEY }}" \
+            -t little-moments-frontend:ci \
+            -f frontend/Dockerfile frontend
 
       - name: Build backend Docker image
         run: docker build -t little-moments-backend:ci -f backend/Dockerfile backend
