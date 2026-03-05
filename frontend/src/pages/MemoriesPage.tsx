@@ -3,9 +3,10 @@ import styled from 'styled-components'
 import { Button } from '../components/Button'
 import { PageContainer } from '../components/PageContainer'
 import { StatusBanner } from '../components/StatusBanner'
-import { FilterSheet } from '../features/memories/components/FilterSheet'
+import { FilterChipBar } from '../features/memories/components/FilterChipBar'
 import { MemoryListItemCard } from '../features/memories/components/MemoryListItemCard'
-import { buildFilterSummary, getActiveFilterCount } from '../features/memories/filterSummary'
+import { MonthPickerSheet } from '../features/memories/components/MonthPickerSheet'
+import { TagPickerSheet } from '../features/memories/components/TagPickerSheet'
 import { setActiveUploadStatusFromPolling, retryActiveMemoryUpload, useActiveMemoryUpload } from '../features/memories/hooks/uploadSessionStore'
 import { usePaginatedMemories } from '../features/memories/hooks/usePaginatedMemories'
 import { useProcessingMemory } from '../features/memories/hooks/useProcessingMemory'
@@ -33,94 +34,34 @@ const Section = styled.section`
   padding-top: ${({ theme }) => theme.space.x3};
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.space.x5};
+  gap: ${({ theme }) => theme.space.x4};
 `
 
 const PageShell = styled.div`
-  position: relative;
   min-height: 100vh;
+`
+
+const StickyHeader = styled.div`
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: ${({ theme }) => theme.colors.background};
+  padding: ${({ theme }) => `${theme.space.x1} 0 ${theme.space.x2}`};
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.x2};
 `
 
 const HeadingRow = styled.div`
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: ${({ theme }) => theme.space.x3};
+  justify-content: flex-start;
 `
 
 const Heading = styled.h2`
   margin: 0;
   font-size: ${({ theme }) => theme.typography.h1Size};
   color: ${({ theme }) => theme.colors.text};
-`
-
-const FilterToggle = styled.button`
-  position: relative;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  background: ${({ theme }) => theme.colors.surface};
-  color: ${({ theme }) => theme.colors.textMuted};
-  border-radius: 50%;
-  cursor: pointer;
-  min-height: ${({ theme }) => theme.layout.minTouchTarget};
-  min-width: ${({ theme }) => theme.layout.minTouchTarget};
-  width: ${({ theme }) => theme.layout.minTouchTarget};
-  height: ${({ theme }) => theme.layout.minTouchTarget};
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  &:focus-visible {
-    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
-    outline-offset: 2px;
-  }
-`
-
-const FilterIcon = styled.svg`
-  width: 18px;
-  height: 18px;
-  display: block;
-`
-
-const FilterSummaryRow = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: ${({ theme }) => theme.space.x2};
-  margin-top: calc(${({ theme }) => theme.space.x2} * -1);
-`
-
-const FilterSummaryText = styled.p`
-  margin: 0;
-  font-size: ${({ theme }) => theme.typography.secondarySize};
-  color: ${({ theme }) => theme.colors.textMuted};
-`
-
-const FilterToggleBadge = styled.span`
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  min-width: 16px;
-  height: 16px;
-  border-radius: 999px;
-  background: ${({ theme }) => theme.colors.accentStrong};
-  color: ${({ theme }) => theme.colors.onAccent};
-  font-size: 0.65rem;
-  line-height: 1;
-  padding: 0 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-`
-
-const ClearFilters = styled.button`
-  border: none;
-  background: transparent;
-  color: ${({ theme }) => theme.colors.accentStrong};
-  cursor: pointer;
-  min-height: 32px;
-  padding: 0;
-  font-size: ${({ theme }) => theme.typography.secondarySize};
 `
 
 const Group = styled.div`
@@ -244,7 +185,8 @@ function groupByMonth(items: MemoryListItem[]): MonthGroup[] {
 }
 
 export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
-  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false)
+  const [tagPickerOpen, setTagPickerOpen] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState('all')
   const [selectedTags, setSelectedTags] = useState<MemoryTag[]>([])
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null)
@@ -315,14 +257,15 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
   const groups = useMemo(() => groupByMonth(displayItems), [displayItems])
 
   const hasActiveFilters = selectedMonth !== 'all' || selectedTags.length > 0
-  const activeFilterCount = useMemo(
-    () => getActiveFilterCount(selectedMonth, selectedTags),
-    [selectedMonth, selectedTags],
-  )
-  const filterSummary = useMemo(
-    () => buildFilterSummary(selectedMonth, selectedMonthLabel, selectedTags),
-    [selectedMonth, selectedMonthLabel, selectedTags],
-  )
+  const tagsChipLabel = useMemo(() => {
+    if (selectedTags.length === 0) {
+      return 'All tags'
+    }
+    if (selectedTags.length === 1) {
+      return selectedTags[0]
+    }
+    return `${selectedTags[0]} +${selectedTags.length - 1}`
+  }, [selectedTags])
 
   const clearFilters = () => {
     setSelectedMonth('all')
@@ -488,19 +431,51 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
     return null
   })()
 
+  const headerBlock = (
+    <StickyHeader>
+      <HeadingRow>
+        <Heading>Memories</Heading>
+      </HeadingRow>
+      <FilterChipBar
+        monthLabel={selectedMonthLabel}
+        tagsLabel={tagsChipLabel}
+        hasActiveFilters={hasActiveFilters}
+        onOpenMonth={() => setMonthPickerOpen(true)}
+        onOpenTags={() => setTagPickerOpen(true)}
+        onClear={clearFilters}
+      />
+    </StickyHeader>
+  )
+
   if (loadingInitial) {
     return (
       <PageContainer>
-        <Section>
-          <Heading>Memories</Heading>
-          {processingBanner}
-          <EmptyText>Loading your moments...</EmptyText>
-          <LoadingSkeleton />
-          <LoadingSkeleton />
-          <LoadingSkeleton />
-          <LoadingSkeleton />
-          <LoadingSkeleton />
-        </Section>
+        <PageShell>
+          <Section>
+            {headerBlock}
+            {processingBanner}
+            <EmptyText>Loading your moments...</EmptyText>
+            <LoadingSkeleton />
+            <LoadingSkeleton />
+            <LoadingSkeleton />
+            <LoadingSkeleton />
+            <LoadingSkeleton />
+          </Section>
+          <MonthPickerSheet
+            open={monthPickerOpen}
+            monthOptions={monthOptions}
+            selectedMonth={selectedMonth}
+            onSelect={setSelectedMonth}
+            onClose={() => setMonthPickerOpen(false)}
+          />
+          <TagPickerSheet
+            open={tagPickerOpen}
+            availableTags={MEMORY_TAG_OPTIONS}
+            selectedTags={selectedTags}
+            onDone={setSelectedTags}
+            onClose={() => setTagPickerOpen(false)}
+          />
+        </PageShell>
       </PageContainer>
     )
   }
@@ -508,14 +483,30 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
   if (error && items.length === 0) {
     return (
       <PageContainer>
-        <Section>
-          <Heading>Memories</Heading>
-          {processingBanner}
-          <ErrorText>{error}</ErrorText>
-          <Button variant="primary" onClick={reload}>
-            Try again
-          </Button>
-        </Section>
+        <PageShell>
+          <Section>
+            {headerBlock}
+            {processingBanner}
+            <ErrorText>{error}</ErrorText>
+            <Button variant="primary" onClick={reload}>
+              Try again
+            </Button>
+          </Section>
+          <MonthPickerSheet
+            open={monthPickerOpen}
+            monthOptions={monthOptions}
+            selectedMonth={selectedMonth}
+            onSelect={setSelectedMonth}
+            onClose={() => setMonthPickerOpen(false)}
+          />
+          <TagPickerSheet
+            open={tagPickerOpen}
+            availableTags={MEMORY_TAG_OPTIONS}
+            selectedTags={selectedTags}
+            onDone={setSelectedTags}
+            onClose={() => setTagPickerOpen(false)}
+          />
+        </PageShell>
       </PageContainer>
     )
   }
@@ -524,102 +515,75 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
     <PageContainer>
       <PageShell>
         <Section>
-        <HeadingRow>
-          <Heading>Memories</Heading>
-          <FilterToggle
-            type="button"
-            onClick={() => setFiltersOpen(true)}
-            aria-label="Open filters"
-            aria-expanded={filtersOpen}
-          >
-            <FilterIcon viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path
-                d="M4 6H20L14 13V18L10 20V13L4 6Z"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </FilterIcon>
-            {activeFilterCount > 0 && (
-              <FilterToggleBadge aria-hidden>{activeFilterCount > 9 ? '9+' : activeFilterCount}</FilterToggleBadge>
-            )}
-          </FilterToggle>
-        </HeadingRow>
-        <FilterSummaryRow>
-          <FilterSummaryText>{filterSummary}</FilterSummaryText>
-          {hasActiveFilters && (
-            <ClearFilters type="button" onClick={clearFilters}>
-              Clear
-            </ClearFilters>
+          {headerBlock}
+          {processingBanner}
+
+          {groups.length === 0 ? (
+            <EmptyState>
+              <EmptyText>No moments match these filters.</EmptyText>
+              <Button variant="primary" onClick={() => navigate('/record')}>
+                Record moment
+              </Button>
+            </EmptyState>
+          ) : (
+            <>
+              <Groups>
+                {groups.map((group) => (
+                  <Group key={group.key}>
+                    <GroupTitle>{group.label}</GroupTitle>
+                    {group.items.map((item, index) => (
+                      <MemoryListItemCard
+                        key={item.id}
+                        item={item}
+                        isLastInGroup={index === group.items.length - 1}
+                        onOpen={(id) => {
+                          if (id.startsWith(PENDING_MEMORY_PREFIX)) {
+                            return
+                          }
+                          navigate(`/memories/${id}`)
+                        }}
+                      />
+                    ))}
+                  </Group>
+                ))}
+              </Groups>
+
+              <FooterArea aria-live="polite">
+                {showLoadMoreHint && hasMore && !loadingMore && !loadMoreError && (
+                  <FooterText>Scroll to load more</FooterText>
+                )}
+
+                {loadingMore && <FooterText>Loading more...</FooterText>}
+
+                {!loadingMore && loadMoreError && (
+                  <>
+                    <FooterText>{loadMoreError}</FooterText>
+                    <RetryLoadMoreButton type="button" onClick={retryLoadMore}>
+                      Retry
+                    </RetryLoadMoreButton>
+                  </>
+                )}
+
+                {!hasMore && !loadingMore && <FooterText>You&apos;re all caught up.</FooterText>}
+
+                <ScrollSentinel ref={loadMoreSentinelRef} aria-hidden />
+              </FooterArea>
+            </>
           )}
-        </FilterSummaryRow>
-
-        {processingBanner}
-
-        {groups.length === 0 ? (
-          <EmptyState>
-            <EmptyText>No moments match these filters.</EmptyText>
-            <Button variant="primary" onClick={() => navigate('/record')}>
-              Record moment
-            </Button>
-          </EmptyState>
-        ) : (
-          <>
-            <Groups>
-              {groups.map((group) => (
-                <Group key={group.key}>
-                  <GroupTitle>{group.label}</GroupTitle>
-                  {group.items.map((item, index) => (
-                    <MemoryListItemCard
-                      key={item.id}
-                      item={item}
-                      isLastInGroup={index === group.items.length - 1}
-                      onOpen={(id) => {
-                        if (id.startsWith(PENDING_MEMORY_PREFIX)) {
-                          return
-                        }
-                        navigate(`/memories/${id}`)
-                      }}
-                    />
-                  ))}
-                </Group>
-              ))}
-            </Groups>
-
-            <FooterArea aria-live="polite">
-              {showLoadMoreHint && hasMore && !loadingMore && !loadMoreError && (
-                <FooterText>Scroll to load more</FooterText>
-              )}
-
-              {loadingMore && <FooterText>Loading more...</FooterText>}
-
-              {!loadingMore && loadMoreError && (
-                <>
-                  <FooterText>{loadMoreError}</FooterText>
-                  <RetryLoadMoreButton type="button" onClick={retryLoadMore}>
-                    Retry
-                  </RetryLoadMoreButton>
-                </>
-              )}
-
-              {!hasMore && !loadingMore && <FooterText>You&apos;re all caught up.</FooterText>}
-
-              <ScrollSentinel ref={loadMoreSentinelRef} aria-hidden />
-            </FooterArea>
-          </>
-        )}
         </Section>
-        <FilterSheet
-          open={filtersOpen}
+        <MonthPickerSheet
+          open={monthPickerOpen}
           monthOptions={monthOptions}
           selectedMonth={selectedMonth}
+          onSelect={setSelectedMonth}
+          onClose={() => setMonthPickerOpen(false)}
+        />
+        <TagPickerSheet
+          open={tagPickerOpen}
+          availableTags={MEMORY_TAG_OPTIONS}
           selectedTags={selectedTags}
-          onApply={(month, tags) => {
-            setSelectedMonth(month)
-            setSelectedTags(tags)
-          }}
-          onClose={() => setFiltersOpen(false)}
+          onDone={setSelectedTags}
+          onClose={() => setTagPickerOpen(false)}
         />
       </PageShell>
     </PageContainer>
