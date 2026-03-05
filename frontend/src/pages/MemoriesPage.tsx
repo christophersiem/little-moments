@@ -247,6 +247,10 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState('all')
   const [selectedTags, setSelectedTags] = useState<MemoryTag[]>([])
+  const [filterAnchorTop, setFilterAnchorTop] = useState(0)
+  const [filterAnchorRight, setFilterAnchorRight] = useState(0)
+  const pageShellRef = useRef<HTMLDivElement | null>(null)
+  const filterToggleRef = useRef<HTMLButtonElement | null>(null)
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null)
   const hasShownLoadMoreHintRef = useRef(false)
   const [nearListEnd, setNearListEnd] = useState(false)
@@ -328,6 +332,35 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
     setSelectedMonth('all')
     setSelectedTags([])
   }
+
+  const updateFilterAnchor = () => {
+    const shell = pageShellRef.current
+    const toggle = filterToggleRef.current
+    if (!shell || !toggle) {
+      return
+    }
+    const shellRect = shell.getBoundingClientRect()
+    const toggleRect = toggle.getBoundingClientRect()
+    const top = toggleRect.bottom - shellRect.top + 8
+    const right = shellRect.right - toggleRect.right
+    setFilterAnchorTop(Math.max(top, 0))
+    setFilterAnchorRight(Math.max(right, 0))
+  }
+
+  useEffect(() => {
+    if (!filtersOpen) {
+      return
+    }
+    updateFilterAnchor()
+
+    const handleViewportChange = () => updateFilterAnchor()
+    window.addEventListener('resize', handleViewportChange)
+    window.addEventListener('orientationchange', handleViewportChange)
+    return () => {
+      window.removeEventListener('resize', handleViewportChange)
+      window.removeEventListener('orientationchange', handleViewportChange)
+    }
+  }, [filtersOpen])
 
   useEffect(() => {
     hasShownLoadMoreHintRef.current = false
@@ -522,13 +555,17 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
 
   return (
     <PageContainer>
-      <PageShell>
+      <PageShell ref={pageShellRef}>
         <Section>
         <HeadingRow>
           <Heading>Memories</Heading>
           <FilterToggle
+            ref={filterToggleRef}
             type="button"
-            onClick={() => setFiltersOpen(true)}
+            onClick={() => {
+              updateFilterAnchor()
+              setFiltersOpen(true)
+            }}
             aria-label="Open filters"
             aria-expanded={filtersOpen}
           >
@@ -615,6 +652,8 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
           monthOptions={monthOptions}
           selectedMonth={selectedMonth}
           selectedTags={selectedTags}
+          anchorTop={filterAnchorTop}
+          anchorRight={filterAnchorRight}
           onApply={(month, tags) => {
             setSelectedMonth(month)
             setSelectedTags(tags)

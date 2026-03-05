@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { Button } from '../../../components/Button'
 import { MEMORY_TAG_OPTIONS, type MemoryTag } from '../types'
@@ -14,67 +14,66 @@ interface FilterSheetProps {
   monthOptions: MonthOption[]
   selectedMonth: string
   selectedTags: MemoryTag[]
+  anchorTop: number
+  anchorRight: number
   onApply: (month: string, tags: MemoryTag[]) => void
   onClose: () => void
 }
 
-const Scrim = styled.div`
+const Overlay = styled.div`
   position: absolute;
   inset: 0;
-  background: ${({ theme }) => theme.colors.overlay};
   z-index: 20;
 `
 
-const Sheet = styled.aside`
+const Scrim = styled.button`
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 21;
-  max-height: min(70vh, 640px);
-  background: ${({ theme }) => theme.colors.surfaceStrong};
-  border-top-left-radius: ${({ theme }) => theme.radii.xl};
-  border-top-right-radius: ${({ theme }) => theme.radii.xl};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-bottom: none;
-  box-shadow: ${({ theme }) => theme.shadows.sheet};
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  inset: 0;
+  border: none;
+  margin: 0;
+  padding: 0;
+  background: ${({ theme }) => theme.colors.overlay};
+  cursor: default;
 `
 
-const Header = styled.div`
-  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3}`};
+const Popover = styled.aside<{ $top: number; $right: number }>`
+  position: absolute;
+  top: ${({ $top }) => `${$top}px`};
+  right: ${({ $right }) => `${$right}px`};
+  z-index: 21;
+  width: min(360px, calc(100% - 24px));
+  max-height: min(68vh, 560px);
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.lg};
+  box-shadow: ${({ theme }) => theme.shadows.sheet};
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+`
+
+const Header = styled.header`
+  padding: ${({ theme }) => `${theme.space.x3} ${theme.space.x3} ${theme.space.x2}`};
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: ${({ theme }) => theme.space.x2};
-`
-
-const Handle = styled.div`
-  position: absolute;
-  top: ${({ theme }) => theme.space.x2};
-  left: 50%;
-  transform: translateX(-50%);
-  width: 38px;
-  height: 4px;
-  border-radius: ${({ theme }) => theme.radii.pill};
-  background: ${({ theme }) => theme.colors.border};
+  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
 `
 
 const Title = styled.h3`
-  margin: ${({ theme }) => `${theme.space.x3} 0 0`};
+  margin: 0;
   font-size: ${({ theme }) => theme.typography.h2Size};
   color: ${({ theme }) => theme.colors.text};
 `
 
-const IconButton = styled.button`
+const CloseButton = styled.button`
   border: 1px solid ${({ theme }) => theme.colors.border};
   background: ${({ theme }) => theme.colors.surface};
   color: ${({ theme }) => theme.colors.textMuted};
   border-radius: 999px;
-  min-width: ${({ theme }) => theme.layout.minTouchTarget};
   min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  min-width: ${({ theme }) => theme.layout.minTouchTarget};
   padding: 0;
   cursor: pointer;
   display: inline-flex;
@@ -89,10 +88,10 @@ const IconButton = styled.button`
 
 const Content = styled.div`
   overflow-y: auto;
-  padding: ${({ theme }) => `${theme.space.x1} ${theme.space.x3} ${theme.space.x3}`};
+  padding: ${({ theme }) => `${theme.space.x3}`};
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.space.x3};
+  gap: ${({ theme }) => theme.space.x4};
 `
 
 const Section = styled.section`
@@ -107,41 +106,79 @@ const Label = styled.p`
   color: ${({ theme }) => theme.colors.textMuted};
 `
 
-const MonthScroller = styled.div`
+const MonthList = styled.div`
   display: flex;
-  gap: ${({ theme }) => theme.space.x2};
-  overflow-x: auto;
-  padding-bottom: ${({ theme }) => theme.space.x1};
-  scrollbar-width: none;
-
-  &::-webkit-scrollbar {
-    display: none;
-  }
+  flex-direction: column;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.md};
+  overflow: hidden;
 `
 
-const MonthPill = styled.button<{ $active: boolean }>`
-  border-radius: ${({ theme }) => theme.radii.pill};
-  border: 1px solid ${({ theme, $active }) => ($active ? theme.colors.accent : theme.colors.border)};
-  background: ${({ theme, $active }) => ($active ? theme.colors.accent : theme.colors.surface)};
-  color: ${({ theme, $active }) => ($active ? theme.colors.onAccent : theme.colors.text)};
-  min-height: 34px;
-  padding: ${({ theme }) => `0 ${theme.space.x2}`};
-  font-size: ${({ theme }) => theme.typography.secondarySize};
-  white-space: nowrap;
-  cursor: pointer;
-`
-
-const AccordionButton = styled.button`
-  width: 100%;
+const MonthOptionButton = styled.button<{ $active: boolean }>`
   border: none;
-  background: transparent;
-  padding: ${({ theme }) => `${theme.space.x1} 0`};
-  color: ${({ theme }) => theme.colors.text};
+  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+  background: ${({ theme, $active }) => ($active ? theme.colors.surface : 'transparent')};
+  color: ${({ theme, $active }) => ($active ? theme.colors.text : theme.colors.textMuted)};
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3}`};
+  text-align: left;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  cursor: pointer;
+  gap: ${({ theme }) => theme.space.x2};
   font-size: ${({ theme }) => theme.typography.bodySize};
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
+    outline-offset: -2px;
+  }
+`
+
+const SelectedMark = styled.span`
+  color: ${({ theme }) => theme.colors.accentStrong};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+`
+
+const TagsHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.space.x2};
+`
+
+const AddTagButton = styled.button`
+  border: none;
+  background: transparent;
+  color: ${({ theme }) => theme.colors.accentStrong};
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  padding: 0;
+  cursor: pointer;
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+`
+
+const SelectedTagList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.space.x2};
+`
+
+const SelectedTagPill = styled.button`
+  border-radius: ${({ theme }) => theme.radii.pill};
+  border: 1px solid ${({ theme }) => theme.colors.accent};
+  background: ${({ theme }) => theme.colors.accent};
+  color: ${({ theme }) => theme.colors.onAccent};
+  min-height: 30px;
+  padding: ${({ theme }) => `0 ${theme.space.x2}`};
+  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.x1};
+  cursor: pointer;
 `
 
 const TagGrid = styled.div`
@@ -161,23 +198,10 @@ const TagPill = styled.button<{ $active: boolean }>`
   cursor: pointer;
 `
 
-const ExpandButton = styled.button`
-  border: none;
-  background: transparent;
-  color: ${({ theme }) => theme.colors.accentStrong};
-  font-size: ${({ theme }) => theme.typography.secondarySize};
-  padding: 0;
-  text-align: left;
-  cursor: pointer;
-  margin-top: ${({ theme }) => theme.space.x2};
-`
-
 const ActionBar = styled.div`
-  position: sticky;
-  bottom: 0;
   border-top: 1px solid ${({ theme }) => theme.colors.border};
   background: ${({ theme }) => theme.colors.surfaceStrong};
-  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3} calc(${theme.space.x2} + env(safe-area-inset-bottom, 0px))`};
+  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3}`};
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: ${({ theme }) => theme.space.x2};
@@ -195,37 +219,76 @@ const SrStatus = styled.p`
   border: 0;
 `
 
-const VISIBLE_TAG_COUNT = 6
-
 export function FilterSheet({
   open,
   monthOptions,
   selectedMonth,
   selectedTags,
+  anchorTop,
+  anchorRight,
   onApply,
   onClose,
 }: FilterSheetProps) {
   const [draftMonth, setDraftMonth] = useState(selectedMonth)
   const [draftTags, setDraftTags] = useState<MemoryTag[]>(selectedTags)
   const [tagsExpanded, setTagsExpanded] = useState(false)
-  const [showAllTags, setShowAllTags] = useState(false)
+  const dialogRef = useRef<HTMLElement | null>(null)
+  const firstMonthOptionRef = useRef<HTMLButtonElement | null>(null)
 
   useEffect(() => {
     if (!open) {
       return
     }
+
     setDraftMonth(selectedMonth)
     setDraftTags(selectedTags)
-    setTagsExpanded(false)
-    setShowAllTags(false)
+    setTagsExpanded(selectedTags.length > 0)
+
+    const focusTimer = window.setTimeout(() => {
+      firstMonthOptionRef.current?.focus()
+    }, 0)
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        event.preventDefault()
         onClose()
+        return
+      }
+
+      if (event.key !== 'Tab') {
+        return
+      }
+
+      const dialogNode = dialogRef.current
+      if (!dialogNode) {
+        return
+      }
+
+      const focusable = Array.from(
+        dialogNode.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      )
+      if (focusable.length === 0) {
+        return
+      }
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      const active = document.activeElement as HTMLElement | null
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault()
+        first.focus()
       }
     }
+
     window.addEventListener('keydown', onKeyDown)
     return () => {
+      window.clearTimeout(focusTimer)
       window.removeEventListener('keydown', onKeyDown)
     }
   }, [onClose, open, selectedMonth, selectedTags])
@@ -239,26 +302,34 @@ export function FilterSheet({
     return null
   }
 
+  const hasDraftFilters = draftMonth !== 'all' || draftTags.length > 0
+
   const toggleTag = (tag: MemoryTag) => {
     setDraftTags((current) =>
       current.includes(tag) ? current.filter((value) => value !== tag) : [...current, tag],
     )
   }
 
-  const visibleTags = showAllTags ? MEMORY_TAG_OPTIONS : MEMORY_TAG_OPTIONS.slice(0, VISIBLE_TAG_COUNT)
-  const hasMoreTags = MEMORY_TAG_OPTIONS.length > VISIBLE_TAG_COUNT
-  const hasDraftFilters = draftMonth !== 'all' || draftTags.length > 0
+  const removeTag = (tag: MemoryTag) => {
+    setDraftTags((current) => current.filter((value) => value !== tag))
+  }
 
   return (
-    <>
-      <Scrim onClick={onClose} aria-hidden />
-      <Sheet role="dialog" aria-modal="true" aria-label="Filters">
-        <Handle aria-hidden />
+    <Overlay role="presentation">
+      <Scrim type="button" onClick={onClose} aria-label="Close filters panel" />
+      <Popover
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Filters"
+        $top={Math.max(anchorTop, 0)}
+        $right={Math.max(anchorRight, 0)}
+      >
         <Header>
           <Title>Filters</Title>
-          <IconButton type="button" onClick={onClose} aria-label="Close filters" autoFocus>
+          <CloseButton type="button" onClick={onClose} aria-label="Close filters">
             ✕
-          </IconButton>
+          </CloseButton>
         </Header>
 
         <Content>
@@ -266,59 +337,67 @@ export function FilterSheet({
 
           <Section>
             <Label>Month</Label>
-            <MonthScroller>
-              <MonthPill
+            <MonthList role="radiogroup" aria-label="Month filter">
+              <MonthOptionButton
+                ref={firstMonthOptionRef}
                 type="button"
+                role="radio"
+                aria-checked={draftMonth === 'all'}
                 $active={draftMonth === 'all'}
                 onClick={() => setDraftMonth('all')}
               >
-                All months
-              </MonthPill>
+                <span>All months</span>
+                {draftMonth === 'all' ? <SelectedMark aria-hidden>●</SelectedMark> : null}
+              </MonthOptionButton>
               {monthOptions.map((option) => (
-                <MonthPill
+                <MonthOptionButton
                   key={option.key}
                   type="button"
+                  role="radio"
+                  aria-checked={draftMonth === option.key}
                   $active={draftMonth === option.key}
                   onClick={() => setDraftMonth(option.key)}
                 >
-                  {option.label}
-                </MonthPill>
+                  <span>{option.label}</span>
+                  {draftMonth === option.key ? <SelectedMark aria-hidden>●</SelectedMark> : null}
+                </MonthOptionButton>
               ))}
-            </MonthScroller>
+            </MonthList>
           </Section>
 
           <Section>
-            <AccordionButton
-              type="button"
-              aria-expanded={tagsExpanded}
-              aria-controls="filter-tags-section"
-              onClick={() => setTagsExpanded((value) => !value)}
-            >
-              <span>Tags ({draftTags.length})</span>
-              <span aria-hidden>{tagsExpanded ? '−' : '+'}</span>
-            </AccordionButton>
+            <TagsHeader>
+              <Label>Tags ({draftTags.length})</Label>
+              <AddTagButton type="button" onClick={() => setTagsExpanded((value) => !value)}>
+                {tagsExpanded ? 'Done' : 'Add tag'}
+              </AddTagButton>
+            </TagsHeader>
 
-            {tagsExpanded && (
-              <div id="filter-tags-section">
-                <TagGrid>
-                  {visibleTags.map((tag) => (
-                    <TagPill
-                      key={tag}
-                      type="button"
-                      $active={draftTags.includes(tag)}
-                      onClick={() => toggleTag(tag)}
-                    >
-                      {tag}
-                    </TagPill>
-                  ))}
-                </TagGrid>
-                {hasMoreTags && (
-                  <ExpandButton type="button" onClick={() => setShowAllTags((value) => !value)}>
-                    {showAllTags ? 'Show less' : 'Show more'}
-                  </ExpandButton>
-                )}
-              </div>
-            )}
+            {draftTags.length > 0 ? (
+              <SelectedTagList>
+                {draftTags.map((tag) => (
+                  <SelectedTagPill key={tag} type="button" onClick={() => removeTag(tag)}>
+                    <span>{tag}</span>
+                    <span aria-hidden>×</span>
+                  </SelectedTagPill>
+                ))}
+              </SelectedTagList>
+            ) : null}
+
+            {tagsExpanded ? (
+              <TagGrid>
+                {MEMORY_TAG_OPTIONS.map((tag) => (
+                  <TagPill
+                    key={tag}
+                    type="button"
+                    $active={draftTags.includes(tag)}
+                    onClick={() => toggleTag(tag)}
+                  >
+                    {tag}
+                  </TagPill>
+                ))}
+              </TagGrid>
+            ) : null}
           </Section>
         </Content>
 
@@ -341,10 +420,10 @@ export function FilterSheet({
               onClose()
             }}
           >
-            Done
+            Apply
           </Button>
         </ActionBar>
-      </Sheet>
-    </>
+      </Popover>
+    </Overlay>
   )
 }
