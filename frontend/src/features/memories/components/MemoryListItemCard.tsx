@@ -115,7 +115,8 @@ const TagChip = styled.span`
 
 const HighlightButton = styled.button<{ $active: boolean }>`
   position: absolute;
-  top: ${({ theme }) => theme.space.x3};
+  top: ${({ theme }) =>
+    `calc(${theme.space.x3} + ${theme.typography.secondarySize} + ${theme.space.x2})`};
   right: 0;
   width: ${({ theme }) => theme.layout.minTouchTarget};
   height: ${({ theme }) => theme.layout.minTouchTarget};
