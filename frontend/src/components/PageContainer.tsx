@@ -3,9 +3,10 @@ import styled from 'styled-components'
 
 const Container = styled.div`
   width: 100%;
-  max-width: 540px;
+  max-width: 100%;
   margin: 0 auto;
   padding-inline: ${({ theme }) => `clamp(${theme.space.x4}, 5vw, ${theme.space.x5})`};
+  overflow-x: hidden;
 `
 
 export type PageContainerProps = HTMLAttributes<HTMLElement>

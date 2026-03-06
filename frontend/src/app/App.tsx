@@ -35,6 +35,7 @@ import { SettingsPage } from '../pages/SettingsPage'
 import { useAppRouter } from './router'
 
 const Shell = styled.div`
+  width: 100%;
   max-width: ${({ theme }) => theme.layout.maxWidth};
   margin: 0 auto;
   min-height: 100vh;
@@ -43,6 +44,7 @@ const Shell = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.space.x3};
+  overflow-x: hidden;
 `
 
 const Header = styled.header`
@@ -85,33 +87,38 @@ const Divider = styled.div`
 const Content = styled.main`
   flex: 1;
   display: flex;
+  min-width: 0;
+  width: 100%;
 `
 
 const NavDock = styled.div`
   position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
+  left: ${({ theme }) => theme.space.x3};
+  right: ${({ theme }) => theme.space.x3};
   bottom: calc(${({ theme }) => theme.space.x3} + env(safe-area-inset-bottom, 0px));
-  width: min(
-    calc(${({ theme }) => theme.layout.maxWidth} - (${({ theme }) => theme.space.x3} * 2)),
-    calc(100vw - (${({ theme }) => theme.space.x3} * 2))
-  );
+  width: auto;
+  max-width: calc(${({ theme }) => theme.layout.maxWidth} - (${({ theme }) => theme.space.x3} * 2));
+  margin: 0 auto;
   z-index: 12;
 `
 
 const NavigationHint = styled.div`
   position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
+  left: ${({ theme }) => theme.space.x3};
+  right: ${({ theme }) => theme.space.x3};
   bottom: calc(
     ${({ theme }) => theme.layout.bottomNavHeight} + ${({ theme }) => theme.space.x4} + env(safe-area-inset-bottom, 0px)
   );
+  width: auto;
+  max-width: calc(${({ theme }) => theme.layout.maxWidth} - (${({ theme }) => theme.space.x3} * 2));
+  margin: 0 auto;
   background: ${({ theme }) => theme.colors.surfaceStrong};
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: ${({ theme }) => theme.radii.pill};
   color: ${({ theme }) => theme.colors.text};
   padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3}`};
   font-size: ${({ theme }) => theme.typography.secondarySize};
+  text-align: center;
   box-shadow: ${({ theme }) => theme.shadows.card};
   z-index: 13;
 `
