@@ -9,13 +9,15 @@ export const GlobalStyle = createGlobalStyle`
   html,
   body,
   #root {
+    width: 100%;
+    max-width: 100%;
     height: 100%;
     min-height: 100%;
+    overflow-x: hidden;
   }
 
   body {
     margin: 0;
-    min-width: 320px;
     font-family: ${({ theme }) => theme.typography.bodyFamily};
     font-size: ${({ theme }) => theme.typography.bodySize};
     color: ${({ theme }) => theme.colors.text};

@@ -101,6 +101,7 @@ const Root = styled.div`
   --lm-shadow-rgb: var(--lm-shadow);
 
   width: 100%;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -111,6 +112,8 @@ const Root = styled.div`
 const TapTarget = styled.button<{ $hitSize: number; $disabled: boolean }>`
   width: ${({ $hitSize }) => `${$hitSize}px`};
   height: ${({ $hitSize }) => `${$hitSize}px`};
+  max-width: 100%;
+  max-height: 100%;
   min-width: 72px;
   min-height: 72px;
   border: none;
@@ -246,6 +249,7 @@ const Core = styled.span<{ $state: VisualState; $disabled: boolean }>`
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 `
 
 const LogoMark = styled(RippleLogo)<{ $size: number; $state: VisualState }>`

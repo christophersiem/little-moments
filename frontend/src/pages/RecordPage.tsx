@@ -55,15 +55,18 @@ const Hero = styled.div`
 `
 
 const CenterHero = styled.div`
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  padding-inline: ${({ theme }) => theme.space.x3};
   padding-bottom: calc(${({ theme }) => theme.layout.bottomNavHeight} + ${({ theme }) => theme.space.x2});
 `
 
 const RecordAnchor = styled.div`
   position: relative;
+  width: 100%;
   display: inline-flex;
   flex-direction: column;
   align-items: center;
@@ -74,7 +77,8 @@ const RecordingMeta = styled.div`
   top: calc(100% + ${({ theme }) => theme.space.x4});
   left: 50%;
   transform: translateX(-50%);
-  width: min(320px, calc(100vw - 48px));
+  width: min(320px, calc(100dvw - 48px));
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -94,7 +98,8 @@ const BodyText = styled.p`
 `
 
 const HintBanner = styled.p`
-  width: min(360px, calc(100vw - 48px));
+  width: min(360px, calc(100dvw - 48px));
+  max-width: 100%;
   margin: ${({ theme }) => `${theme.space.x3} 0 0`};
   padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3}`};
   border: 1px solid ${({ theme }) => theme.colors.danger};
@@ -173,6 +178,12 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
   const [stopDecisionState, setStopDecisionState] = useState<StopDecisionState>('hidden')
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [errorMessage, setErrorMessage] = useState('')
+  const [viewportWidth, setViewportWidth] = useState(
+    typeof window === 'undefined' ? 390 : window.innerWidth,
+  )
+
+  const largeButtonDiameter = viewportWidth < 390 ? 168 : 188
+  const stoppedButtonDiameter = viewportWidth < 390 ? 88 : 96
 
   const cleanupStream = () => {
     if (streamRef.current) {
@@ -193,6 +204,12 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
       stopTimer()
       cleanupStream()
     }
+  }, [])
+
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
   }, [])
 
   useEffect(() => {
@@ -348,7 +365,7 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
               maxDurationSec={60}
               onStart={NOOP}
               onStop={stopRecording}
-              diameter={188}
+              diameter={largeButtonDiameter}
             />
             <RecordingMeta>
               <Timer>{formatDuration(elapsedSeconds)}</Timer>
@@ -371,7 +388,7 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
               maxDurationSec={60}
               onStart={NOOP}
               onStop={NOOP}
-              diameter={96}
+              diameter={stoppedButtonDiameter}
             />
             <BodyText>Your recording is ready to save.</BodyText>
           </Hero>
@@ -425,7 +442,7 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
           maxDurationSec={60}
           onStart={() => void startRecording()}
           onStop={NOOP}
-          diameter={188}
+          diameter={largeButtonDiameter}
         />
         {errorMessage && <HintBanner role="status">{errorMessage}</HintBanner>}
       </CenterHero>
