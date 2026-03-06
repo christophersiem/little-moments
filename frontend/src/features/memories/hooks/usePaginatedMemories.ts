@@ -19,6 +19,7 @@ interface PaginatedMemoriesQuery {
   familyId?: string
   month?: string
   tags?: MemoryTag[]
+  highlightsOnly?: boolean
   pageSize?: number
 }
 
@@ -67,14 +68,16 @@ export function usePaginatedMemories({
   familyId,
   month,
   tags = [],
+  highlightsOnly = false,
   pageSize = DEFAULT_PAGE_SIZE,
 }: PaginatedMemoriesQuery = {}): PaginatedMemoriesState {
   const normalizedTags = useMemo(() => normalizeTags(tags), [tags])
   const normalizedFamilyId = familyId?.trim() || undefined
   const normalizedMonth = month && month !== 'all' ? month : undefined
   const queryKey = useMemo(
-    () => `${normalizedFamilyId ?? ''}::${normalizedMonth ?? ''}::${normalizedTags.join('|')}::${pageSize}`,
-    [normalizedFamilyId, normalizedMonth, normalizedTags, pageSize],
+    () =>
+      `${normalizedFamilyId ?? ''}::${normalizedMonth ?? ''}::${normalizedTags.join('|')}::${highlightsOnly}::${pageSize}`,
+    [highlightsOnly, normalizedFamilyId, normalizedMonth, normalizedTags, pageSize],
   )
   const cachedState = useMemo(() => readCachedState(queryKey), [queryKey])
 
@@ -153,6 +156,7 @@ export function usePaginatedMemories({
         familyId: normalizedFamilyId,
         month: normalizedMonth,
         tags: normalizedTags,
+        highlights: highlightsOnly,
       })
       if (requestVersion !== requestVersionRef.current) {
         return
@@ -184,7 +188,7 @@ export function usePaginatedMemories({
         setLoadingInitial(false)
       }
     }
-  }, [normalizedFamilyId, normalizedMonth, normalizedTags, pageSize, queryKey])
+  }, [highlightsOnly, normalizedFamilyId, normalizedMonth, normalizedTags, pageSize, queryKey])
 
   const loadMore = useCallback(async () => {
     if (loadingInitial || loadingMoreRef.current || !hasMoreRef.current) {
@@ -203,6 +207,7 @@ export function usePaginatedMemories({
         familyId: normalizedFamilyId,
         month: normalizedMonth,
         tags: normalizedTags,
+        highlights: highlightsOnly,
       })
       if (requestVersion !== requestVersionRef.current) {
         return
@@ -238,7 +243,7 @@ export function usePaginatedMemories({
         setLoadingMore(false)
       }
     }
-  }, [loadingInitial, normalizedFamilyId, normalizedMonth, normalizedTags, pageSize, queryKey])
+  }, [highlightsOnly, loadingInitial, normalizedFamilyId, normalizedMonth, normalizedTags, pageSize, queryKey])
 
   const retryLoadMore = useCallback(() => {
     void loadMore()

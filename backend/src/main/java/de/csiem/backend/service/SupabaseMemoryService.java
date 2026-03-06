@@ -127,7 +127,8 @@ public class SupabaseMemoryService {
         int size,
         String familyId,
         String month,
-        List<String> tags
+        List<String> tags,
+        boolean highlightsOnly
     ) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
@@ -156,14 +157,16 @@ public class SupabaseMemoryService {
             normalizeFamilyId(familyId),
             fromIso,
             toIso,
-            resolvedTags
+            resolvedTags,
+            highlightsOnly
         );
         long totalElements = supabaseGatewayService.countMemories(
             authorizationHeader,
             normalizeFamilyId(familyId),
             fromIso,
             toIso,
-            resolvedTags
+            resolvedTags,
+            highlightsOnly
         );
         int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / safeSize);
 
@@ -176,6 +179,7 @@ public class SupabaseMemoryService {
                         instant(row.get("created_at")),
                         instantOrFallback(row.get("recorded_at"), row.get("created_at")),
                         toStatus(text(row.get("status"))),
+                        asBoolean(row.get("is_highlight")),
                         nullableText(row.get("title")),
                         snippet(nullableText(row.get("transcript"))),
                         readTags(row.get("tags"))
@@ -207,6 +211,10 @@ public class SupabaseMemoryService {
 
         if (request.recordedAt() != null) {
             patch.put("recorded_at", request.recordedAt().toString());
+        }
+
+        if (request.isHighlight() != null) {
+            patch.put("is_highlight", request.isHighlight());
         }
 
         if (request.transcript() != null) {
@@ -341,12 +349,17 @@ public class SupabaseMemoryService {
             instant(row.get("created_at")),
             instantOrFallback(row.get("recorded_at"), row.get("created_at")),
             toStatus(text(row.get("status"))),
+            asBoolean(row.get("is_highlight")),
             nullableText(row.get("title")),
             nullableText(row.get("summary")),
             nullableText(row.get("transcript")),
             nullableText(row.get("error_message")),
             readTags(row.get("tags"))
         );
+    }
+
+    private boolean asBoolean(JsonNode value) {
+        return value != null && !value.isNull() && value.asBoolean(false);
     }
 
     private MemoryStatus toStatus(String value) {

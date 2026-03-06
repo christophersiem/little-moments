@@ -16,6 +16,7 @@ interface ListMemoriesParams {
   familyId?: string
   month?: string
   tags?: MemoryTag[]
+  highlights?: boolean
 }
 
 interface CreateMemoryApiResponse {
@@ -35,6 +36,7 @@ interface MemoryListItemApiResponse {
   createdAt: string
   recordedAt: string
   status: MemoryStatus
+  isHighlight?: boolean
   title: string | null
   transcriptSnippet: string | null
   tags: string[] | null
@@ -53,6 +55,7 @@ interface MemoryApiResponse {
   createdAt: string
   recordedAt: string
   status: MemoryStatus
+  isHighlight?: boolean
   title: string | null
   summary: string | null
   transcript: string | null
@@ -96,6 +99,7 @@ function mapListItem(payload: MemoryListItemApiResponse): MemoryListItem {
     createdAt: String(payload.createdAt),
     recordedAt: String(payload.recordedAt || payload.createdAt),
     status: toMemoryStatus(payload.status),
+    isHighlight: payload.isHighlight === true,
     title: payload.title ?? null,
     transcriptSnippet: payload.transcriptSnippet || '',
     tags: normalizeTags(payload.tags),
@@ -108,6 +112,7 @@ function mapMemory(payload: MemoryApiResponse): Memory {
     createdAt: String(payload.createdAt),
     recordedAt: String(payload.recordedAt || payload.createdAt),
     status: toMemoryStatus(payload.status),
+    isHighlight: payload.isHighlight === true,
     title: payload.title ?? null,
     summary: payload.summary ?? null,
     transcript: payload.transcript ?? null,
@@ -140,6 +145,7 @@ export async function listMemories({
   familyId,
   month,
   tags = [],
+  highlights = false,
 }: ListMemoriesParams = {}): Promise<MemoriesListResponse> {
   const query = new URLSearchParams()
   query.set('page', String(Math.max(page, 0)))
@@ -152,6 +158,9 @@ export async function listMemories({
   }
   for (const tag of tags) {
     query.append('tags', tag)
+  }
+  if (highlights) {
+    query.set('highlights', 'true')
   }
 
   const payload = await backendRequestJson<MemoriesListApiResponse>(`/memories?${query.toString()}`)
@@ -188,6 +197,9 @@ export async function updateMemory(memoryId: string, request: UpdateMemoryReques
   }
   if (typeof request.recordedAt === 'string' && request.recordedAt.trim().length > 0) {
     patch.recordedAt = request.recordedAt.trim()
+  }
+  if (typeof request.isHighlight === 'boolean') {
+    patch.isHighlight = request.isHighlight
   }
 
   const payload = await backendRequestJson<MemoryApiResponse>(`/memories/${encodeURIComponent(memoryId)}`, {

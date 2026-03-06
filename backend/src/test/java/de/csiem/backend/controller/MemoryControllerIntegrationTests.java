@@ -426,6 +426,63 @@ class MemoryControllerIntegrationTests {
     }
 
     @Test
+    void togglesHighlightAndFiltersListByHighlights() throws Exception {
+        stubTranscriptionService.setFailure(null);
+        MockMultipartFile audioFile = new MockMultipartFile(
+            "audio",
+            "moment.webm",
+            "audio/webm",
+            "fake-audio".getBytes()
+        );
+
+        stubTranscriptionService.setTranscript("First memory for highlight.");
+        MvcResult firstCreateResult = mockMvc.perform(
+                multipart("/api/memories")
+                    .file(audioFile)
+                    .param("recordedAt", "2044-02-26T18:20:00Z")
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+            )
+            .andExpect(status().isCreated())
+            .andReturn();
+        String highlightId = extractId(firstCreateResult.getResponse().getContentAsString());
+
+        stubTranscriptionService.setTranscript("Second memory without highlight.");
+        mockMvc.perform(
+                multipart("/api/memories")
+                    .file(audioFile)
+                    .param("recordedAt", "2044-02-27T18:20:00Z")
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+            )
+            .andExpect(status().isCreated());
+
+        mockMvc.perform(
+                patch("/api/memories/{id}", highlightId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "isHighlight": true
+                        }
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.isHighlight").value(true));
+
+        mockMvc.perform(get("/api/memories/{id}", highlightId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.isHighlight").value(true));
+
+        mockMvc.perform(
+                get("/api/memories")
+                    .param("month", "2044-02")
+                    .param("highlights", "true")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].id").value(highlightId))
+            .andExpect(jsonPath("$.items[0].isHighlight").value(true));
+    }
+
+    @Test
     void deletesMemoryAndRemovesItFromDetailAndList() throws Exception {
         stubTranscriptionService.setFailure(null);
         stubTranscriptionService.setTranscript("Today we built a long train track.");

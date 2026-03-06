@@ -25,6 +25,7 @@ function makeItem(id: string): MemoryListItem {
     createdAt: '2026-01-01T10:00:00Z',
     recordedAt: '2026-01-01T10:00:00Z',
     status: 'READY',
+    isHighlight: false,
     title: id,
     transcriptSnippet: `${id} snippet`,
     tags: [],

@@ -4,9 +4,11 @@ import { FilterChip } from './FilterChip'
 interface FilterChipBarProps {
   monthLabel: string
   tagsLabel: string
+  highlightsActive: boolean
   hasActiveFilters: boolean
   onOpenMonth: () => void
   onOpenTags: () => void
+  onToggleHighlights: () => void
   onClear: () => void
 }
 
@@ -26,9 +28,11 @@ const Bar = styled.div`
 export function FilterChipBar({
   monthLabel,
   tagsLabel,
+  highlightsActive,
   hasActiveFilters,
   onOpenMonth,
   onOpenTags,
+  onToggleHighlights,
   onClear,
 }: FilterChipBarProps) {
   return (
@@ -44,6 +48,12 @@ export function FilterChipBar({
         active={tagsLabel !== 'All tags'}
         onClick={onOpenTags}
         ariaLabel="Filter by tags"
+      />
+      <FilterChip
+        label="Highlights"
+        active={highlightsActive}
+        onClick={onToggleHighlights}
+        ariaLabel={highlightsActive ? 'Disable Highlights filter' : 'Enable Highlights filter'}
       />
       {hasActiveFilters ? (
         <FilterChip label="Clear" onClick={onClear} ariaLabel="Clear all filters" />

@@ -34,6 +34,7 @@ final class MemoryMapper {
             memory.getCreatedAt(),
             memory.getRecordedAt(),
             memory.getStatus(),
+            memory.isHighlight(),
             memory.getTitle(),
             transcriptSnippet,
             toTagLabels(memory)
@@ -46,6 +47,7 @@ final class MemoryMapper {
             memory.getCreatedAt(),
             memory.getRecordedAt(),
             memory.getStatus(),
+            memory.isHighlight(),
             memory.getTitle(),
             memory.getSummary(),
             memory.getTranscript(),

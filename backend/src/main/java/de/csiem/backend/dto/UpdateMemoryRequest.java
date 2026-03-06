@@ -7,6 +7,7 @@ public record UpdateMemoryRequest(
     String title,
     String transcript,
     List<String> tags,
-    Instant recordedAt
+    Instant recordedAt,
+    Boolean isHighlight
 ) {
 }

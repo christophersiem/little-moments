@@ -3,6 +3,7 @@ import styled from 'styled-components'
 import { Button } from '../components/Button'
 import { PageContainer } from '../components/PageContainer'
 import { StatusBanner } from '../components/StatusBanner'
+import { updateMemory } from '../features/memories/api'
 import { FilterChipBar } from '../features/memories/components/FilterChipBar'
 import { MemoryListItemCard } from '../features/memories/components/MemoryListItemCard'
 import { MonthPickerSheet } from '../features/memories/components/MonthPickerSheet'
@@ -99,6 +100,13 @@ const EmptyText = styled.p`
   color: ${({ theme }) => theme.colors.textMuted};
 `
 
+const EmptyTitle = styled.h3`
+  margin: 0;
+  font-family: ${({ theme }) => theme.typography.headingFamily};
+  color: ${({ theme }) => theme.colors.text};
+  font-size: ${({ theme }) => theme.typography.h2Size};
+`
+
 const ErrorText = styled.p`
   color: ${({ theme }) => theme.colors.danger};
 `
@@ -189,6 +197,10 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
   const [tagPickerOpen, setTagPickerOpen] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState('all')
   const [selectedTags, setSelectedTags] = useState<MemoryTag[]>([])
+  const [highlightsOnly, setHighlightsOnly] = useState(false)
+  const [highlightOverrides, setHighlightOverrides] = useState<Record<string, boolean>>({})
+  const [highlightPendingById, setHighlightPendingById] = useState<Record<string, boolean>>({})
+  const [highlightError, setHighlightError] = useState('')
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null)
   const hasShownLoadMoreHintRef = useRef(false)
   const [nearListEnd, setNearListEnd] = useState(false)
@@ -219,6 +231,7 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
     familyId: familyId ?? undefined,
     month: monthFilter,
     tags: selectedTags,
+    highlightsOnly,
     pageSize: 5,
   })
 
@@ -237,6 +250,7 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
       createdAt: activeUpload.startedAt,
       recordedAt: activeUpload.recordedAt,
       status: 'PROCESSING',
+      isHighlight: false,
       title: null,
       transcriptSnippet: 'Saving your moment…',
       tags: [],
@@ -245,7 +259,19 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
     return [pendingItem, ...items]
   }, [activeUpload, items])
 
-  const monthOptions = useMemo(() => collectMonthOptions(displayItems), [displayItems])
+  const effectiveItems = useMemo(
+    () =>
+      displayItems.map((item) => {
+        const override = highlightOverrides[item.id]
+        if (typeof override !== 'boolean' || override === item.isHighlight) {
+          return item
+        }
+        return { ...item, isHighlight: override }
+      }),
+    [displayItems, highlightOverrides],
+  )
+
+  const monthOptions = useMemo(() => collectMonthOptions(effectiveItems), [effectiveItems])
 
   const selectedMonthLabel = useMemo(() => {
     if (selectedMonth === 'all') {
@@ -254,9 +280,14 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
     return monthOptions.find((option) => option.key === selectedMonth)?.label || selectedMonth
   }, [monthOptions, selectedMonth])
 
-  const groups = useMemo(() => groupByMonth(displayItems), [displayItems])
+  const timelineItems = useMemo(
+    () => (highlightsOnly ? effectiveItems.filter((item) => item.isHighlight) : effectiveItems),
+    [effectiveItems, highlightsOnly],
+  )
 
-  const hasActiveFilters = selectedMonth !== 'all' || selectedTags.length > 0
+  const groups = useMemo(() => groupByMonth(timelineItems), [timelineItems])
+
+  const hasActiveFilters = selectedMonth !== 'all' || selectedTags.length > 0 || highlightsOnly
   const tagsChipLabel = useMemo(() => {
     if (selectedTags.length === 0) {
       return 'All tags'
@@ -270,12 +301,40 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
   const clearFilters = () => {
     setSelectedMonth('all')
     setSelectedTags([])
+    setHighlightsOnly(false)
   }
 
   useEffect(() => {
     hasShownLoadMoreHintRef.current = false
     setShowLoadMoreHint(false)
-  }, [monthFilter, selectedTags])
+  }, [highlightsOnly, monthFilter, selectedTags])
+
+  useEffect(() => {
+    const baseById = new Map(displayItems.map((item) => [item.id, item.isHighlight]))
+    setHighlightOverrides((current) => {
+      const next: Record<string, boolean> = {}
+      for (const [memoryId, value] of Object.entries(current)) {
+        const baseValue = baseById.get(memoryId)
+        if (typeof baseValue !== 'boolean') {
+          continue
+        }
+        if (baseValue !== value) {
+          next[memoryId] = value
+        }
+      }
+      const currentEntries = Object.entries(current)
+      const nextEntries = Object.entries(next)
+      if (currentEntries.length !== nextEntries.length) {
+        return next
+      }
+      for (const [memoryId, value] of currentEntries) {
+        if (next[memoryId] !== value) {
+          return next
+        }
+      }
+      return current
+    })
+  }, [displayItems])
 
   useEffect(() => {
     if (!activeUpload || activeUpload.status !== 'processing' || !activeUpload.memoryId) {
@@ -382,6 +441,34 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
     void reload()
   }
 
+  const onToggleHighlight = async (memoryId: string, nextValue: boolean) => {
+    if (memoryId.startsWith(PENDING_MEMORY_PREFIX)) {
+      return
+    }
+
+    setHighlightError('')
+    setHighlightOverrides((current) => ({ ...current, [memoryId]: nextValue }))
+    setHighlightPendingById((current) => ({ ...current, [memoryId]: true }))
+
+    try {
+      await updateMemory(memoryId, { isHighlight: nextValue })
+    } catch (toggleError) {
+      const message = toggleError instanceof Error ? toggleError.message : 'Could not update highlight.'
+      setHighlightError(message)
+      setHighlightOverrides((current) => {
+        const next = { ...current }
+        delete next[memoryId]
+        return next
+      })
+    } finally {
+      setHighlightPendingById((current) => {
+        const next = { ...current }
+        delete next[memoryId]
+        return next
+      })
+    }
+  }
+
   const processingBanner = (() => {
     if (!activeUpload) {
       return null
@@ -439,9 +526,11 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
       <FilterChipBar
         monthLabel={selectedMonthLabel}
         tagsLabel={tagsChipLabel}
+        highlightsActive={highlightsOnly}
         hasActiveFilters={hasActiveFilters}
         onOpenMonth={() => setMonthPickerOpen(true)}
         onOpenTags={() => setTagPickerOpen(true)}
+        onToggleHighlights={() => setHighlightsOnly((current) => !current)}
         onClear={clearFilters}
       />
     </StickyHeader>
@@ -517,10 +606,18 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
         <Section>
           {headerBlock}
           {processingBanner}
+          {highlightError ? <ErrorText>{highlightError}</ErrorText> : null}
 
           {groups.length === 0 ? (
             <EmptyState>
-              <EmptyText>No moments match these filters.</EmptyText>
+              {highlightsOnly ? (
+                <>
+                  <EmptyTitle>No highlights yet</EmptyTitle>
+                  <EmptyText>Mark meaningful memories with the heart icon to find them here later.</EmptyText>
+                </>
+              ) : (
+                <EmptyText>No moments match these filters.</EmptyText>
+              )}
               <Button variant="primary" onClick={() => navigate('/record')}>
                 Record moment
               </Button>
@@ -542,6 +639,10 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
                           }
                           navigate(`/memories/${id}`)
                         }}
+                        onToggleHighlight={onToggleHighlight}
+                        highlightBusy={
+                          Boolean(highlightPendingById[item.id]) || item.id.startsWith(PENDING_MEMORY_PREFIX)
+                        }
                       />
                     ))}
                   </Group>
