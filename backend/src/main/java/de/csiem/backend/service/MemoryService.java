@@ -124,11 +124,16 @@ public class MemoryService {
 
     @Transactional(readOnly = true)
     public MemoryListResponse getMemories(int page, int size) {
-        return getMemories(page, size, null, List.of());
+        return getMemories(page, size, null, List.of(), false);
     }
 
     @Transactional(readOnly = true)
     public MemoryListResponse getMemories(int page, int size, String month, List<String> tags) {
+        return getMemories(page, size, month, tags, false);
+    }
+
+    @Transactional(readOnly = true)
+    public MemoryListResponse getMemories(int page, int size, String month, List<String> tags, boolean highlightsOnly) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
         Pageable pageable = PageRequest.of(
@@ -181,6 +186,9 @@ public class MemoryService {
                 predicates.add(root.joinSet("tags", JoinType.INNER).in(tagFilter));
                 query.distinct(true);
             }
+            if (highlightsOnly) {
+                predicates.add(criteriaBuilder.isTrue(root.get("highlight")));
+            }
 
             return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
         };
@@ -222,6 +230,10 @@ public class MemoryService {
 
         if (request.recordedAt() != null) {
             memory.setRecordedAt(request.recordedAt());
+        }
+
+        if (request.isHighlight() != null) {
+            memory.setHighlight(request.isHighlight());
         }
 
         if (request.transcript() != null) {

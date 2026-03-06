@@ -41,6 +41,7 @@ export interface MemoryListItem {
   createdAt: string
   recordedAt: string
   status: MemoryStatus
+  isHighlight: boolean
   title: string | null
   transcriptSnippet: string
   tags: MemoryTag[]
@@ -59,6 +60,7 @@ export interface Memory {
   createdAt: string
   recordedAt: string
   status: MemoryStatus
+  isHighlight: boolean
   title: string | null
   summary: string | null
   transcript: string | null
@@ -71,4 +73,5 @@ export interface UpdateMemoryRequest {
   transcript?: string
   tags?: MemoryTag[]
   recordedAt?: string
+  isHighlight?: boolean
 }
