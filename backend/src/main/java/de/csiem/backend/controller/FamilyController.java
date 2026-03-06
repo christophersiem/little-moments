@@ -89,6 +89,9 @@ public class FamilyController {
             throw new ResponseStatusException(BAD_REQUEST, "Email is required");
         }
         String role = StringUtils.hasText(request.role()) ? request.role().trim().toUpperCase() : "MEMBER";
+        if (!"OWNER".equals(role) && !"MEMBER".equals(role)) {
+            throw new ResponseStatusException(BAD_REQUEST, "Role must be OWNER or MEMBER");
+        }
         return new TokenResponse(
             supabaseGatewayService.createInvitation(authorizationHeader, familyId, request.email().trim(), role)
         );

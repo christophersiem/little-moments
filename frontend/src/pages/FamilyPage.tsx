@@ -6,6 +6,7 @@ import type { OverflowMenuAction } from '../components/OverflowMenu'
 import { FamilyMemberRow } from '../features/families/components/FamilyMemberRow'
 import {
   createInvitation,
+  type FamilyMemberRole,
   listFamilyMembers,
   removeMember,
   setMemberRole,
@@ -95,6 +96,43 @@ const InviteForm = styled.form`
   gap: ${({ theme }) => theme.space.x3};
 `
 
+const RoleSelector = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.x2};
+`
+
+const RoleOption = styled.button<{ $selected: boolean }>`
+  width: 100%;
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  border-radius: ${({ theme }) => theme.radii.md};
+  border: 1px solid
+    ${({ theme, $selected }) => ($selected ? theme.colors.accentStrong : theme.colors.border)};
+  background: ${({ theme, $selected }) => ($selected ? theme.colors.surface : theme.colors.surfaceStrong)};
+  color: ${({ theme }) => theme.colors.text};
+  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3}`};
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
+    outline-offset: 2px;
+  }
+`
+
+const RoleTitle = styled.span`
+  font-size: ${({ theme }) => theme.typography.bodySize};
+  font-weight: 600;
+`
+
+const RoleDescription = styled.span`
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+  color: ${({ theme }) => theme.colors.textMuted};
+`
+
 const InviteInput = styled.input`
   width: 100%;
   min-height: ${({ theme }) => theme.layout.minTouchTarget};
@@ -160,6 +198,7 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
   const [memberActionBusyKey, setMemberActionBusyKey] = useState<string | null>(null)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
   const [email, setEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<FamilyMemberRole>('MEMBER')
   const [inviteError, setInviteError] = useState('')
   const [inviteMessage, setInviteMessage] = useState('')
   const [inviteLink, setInviteLink] = useState('')
@@ -342,6 +381,10 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
       setInviteError('Family is not ready yet.')
       return
     }
+    if (!isCurrentUserOwner) {
+      setInviteError('Only owners can create invites.')
+      return
+    }
 
     setInviteError('')
     setInviteMessage('')
@@ -349,7 +392,7 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
     setCreatingInvite(true)
 
     try {
-      const token = await createInvitation(familyId, email, 'MEMBER')
+      const token = await createInvitation(familyId, email, inviteRole)
       const link = `${window.location.origin}/invite/accept?token=${encodeURIComponent(token)}`
       setInviteLink(link)
       setInviteMessage('Invite link created.')
@@ -479,10 +522,28 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
 
         {isCurrentUserOwner ? (
           <Block>
-            <Subheading>Invite another parent</Subheading>
+            <Subheading>Invite someone</Subheading>
             <Card>
-              <SmallText>Share access so you can both capture memories.</SmallText>
+              <SmallText>Invite someone to access this family space.</SmallText>
               <InviteForm onSubmit={onCreateInvite}>
+                <RoleSelector aria-label="Invite role">
+                  <RoleOption
+                    type="button"
+                    $selected={inviteRole === 'MEMBER'}
+                    onClick={() => setInviteRole('MEMBER')}
+                  >
+                    <RoleTitle>Member</RoleTitle>
+                    <RoleDescription>Can view memories</RoleDescription>
+                  </RoleOption>
+                  <RoleOption
+                    type="button"
+                    $selected={inviteRole === 'OWNER'}
+                    onClick={() => setInviteRole('OWNER')}
+                  >
+                    <RoleTitle>Owner</RoleTitle>
+                    <RoleDescription>Full access, including invites and member management</RoleDescription>
+                  </RoleOption>
+                </RoleSelector>
                 <InviteInput
                   type="email"
                   value={email}
@@ -511,14 +572,7 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
               <SmallText>No email is sent automatically. Share this link manually.</SmallText>
             </Card>
           </Block>
-        ) : (
-          <Block>
-            <Subheading>Invite another parent</Subheading>
-            <Card>
-              <SmallText>Only owners can invite new members.</SmallText>
-            </Card>
-          </Block>
-        )}
+        ) : null}
       </Section>
 
       <ConfirmDialog
