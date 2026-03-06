@@ -205,7 +205,7 @@ export function AuthGate({ configurationError }: AuthGateProps) {
             </FieldWrap>
             {mode === 'register' && (
               <FieldWrap>
-                Display name
+                Your name
                 <Input
                   type="text"
                   name="displayName"

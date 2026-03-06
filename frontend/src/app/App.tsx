@@ -146,6 +146,7 @@ export default function App() {
   const { pathname, route, navigate } = useAppRouter()
   const [navigationLocked, setNavigationLocked] = useState(false)
   const [showNavigationHint, setShowNavigationHint] = useState(false)
+  const [redirectToRecordOnLogin, setRedirectToRecordOnLogin] = useState(false)
   const [session, setSession] = useState<Session | null>(null)
   const [authReady, setAuthReady] = useState(!isSupabaseConfigured)
   const [authError, setAuthError] = useState('')
@@ -196,7 +197,13 @@ export default function App() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'SIGNED_IN') {
+        setRedirectToRecordOnLogin(true)
+      }
+      if (event === 'SIGNED_OUT') {
+        setRedirectToRecordOnLogin(false)
+      }
       setSession(nextSession)
     })
 
@@ -320,10 +327,19 @@ export default function App() {
       return
     }
 
+    if (redirectToRecordOnLogin) {
+      const loginTarget = canRecord ? '/record' : '/memories'
+      if (route.kind !== (canRecord ? 'record' : 'memories')) {
+        navigate(loginTarget)
+      }
+      setRedirectToRecordOnLogin(false)
+      return
+    }
+
     if (!canRecord && route.kind === 'record') {
       navigate('/memories')
     }
-  }, [canRecord, familyError, familyReady, navigate, needsOnboarding, route.kind])
+  }, [canRecord, familyError, familyReady, navigate, needsOnboarding, redirectToRecordOnLogin, route.kind])
 
   const onLockedNavigationAttempt = () => {
     setShowNavigationHint(true)
