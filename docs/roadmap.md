@@ -1,6 +1,12 @@
-# Little Moments Roadmap (Reduced MVP)
+# Little Moments Roadmap (Historical Snapshot)
 
-As of February 27, 2026. Based on current repository code and docs under `/docs`.
+As of February 27, 2026. This file is a historical planning snapshot and is not the source of truth for current runtime behavior.
+
+For current implemented behavior, use:
+- `docs/api.md`
+- `docs/data-model.md`
+- `docs/tech.md`
+- `docs/specs/*`
 
 ## Top 5 next steps
 1. **R1: Add strict audio upload validation and limits (frontend + backend).**  

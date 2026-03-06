@@ -1,87 +1,66 @@
-# Little Moments — UI Flows (Reduced MVP)
+# Little Moments — UI Flows (Current)
 
-## Screens (Reduced MVP)
-- Record
-- Processing
-- Saved confirmation
-- Memories list
-- Memory detail
+## Main Routes
+- `/record`
+- `/memories`
+- `/memories/:id`
+- `/onboarding`
+- `/invite/accept`
+- `/settings`
+- `/settings/account`
+- `/settings/family`
+- `/settings/privacy`
 
-Global rules:
-- Each screen has exactly one primary CTA.
-- Back navigation never loses a saved memory.
-- Avoid multi-step decisions except Stop → Save/Discard.
+## 1) Authentication + Bootstrap
+- No session -> AuthGate (sign in/register).
+- Session available -> bootstrap family and child context.
+- No memberships -> onboarding flow.
+- Membership exists:
+  - owner lands on `/record`
+  - member lands on `/memories`
 
----
+## 2) Record Flow
+- Idle -> recording -> stopped.
+- On stop, show Save/Discard sheet.
+- Discard requires confirmation.
+- Save starts upload only after explicit confirmation.
+- After Save, app navigates directly to `/memories`.
 
-## 1) Record Screen
-Goal: Start recording with one tap.
+## 3) Processing Experience on Memories Page
+- Top status banner communicates upload/processing state.
+- Pending row can appear immediately at top of list.
+- Polling updates PROCESSING -> READY/FAILED.
+- Retry path is available on failure.
 
-UI:
-- Primary element: large record button centered
-- Secondary: small hint text ("Tap to record")
-- Optional: timer during recording
+## 4) Memories List
+- Reverse chronological, grouped by month.
+- Sticky compact header with inline filter chips:
+  - Month (single select)
+  - Tags (multi-select)
+  - Clear (shown only when active)
+- Infinite scroll with load-more sentinel.
+- Empty states:
+  - no memories
+  - no matches for active filters
 
-States:
-A) Idle:
-- Primary: "Record"
-  B) Recording:
-- Primary: "Stop"
-- Show elapsed time
-  C) Stopped (audio captured):
-- Show bottom sheet: "Save" (primary) / "Discard" (secondary)
+## 5) Memory Detail
+- Displays title, date/time, tags, summary, transcript.
+- Owner actions are in overflow menu:
+  - edit title/date/transcript/tags
+  - delete memory (with confirmation)
+- Members are read-only.
 
-Stop behavior:
-- On Stop, never start upload/transcription automatically.
-- Present Save/Discard sheet.
+## 6) Family and Invite Flow
+- Family page shows member list + role badges.
+- Owner can:
+  - invite via link (email + role)
+  - promote/demote
+  - remove members (with guardrails)
+- Member can view list but cannot manage invites or roles.
 
----
-
-## 2) Discard Flow
-- User taps "Discard" → confirmation dialog:
-  Title: "Discard recording?"
-  Body: "This cannot be undone."
-  Buttons: "Discard" (destructive), "Cancel" (secondary)
-- If confirmed:
-    - delete local audio blob from state
-    - return to Idle record screen
-
----
-
-## 3) Save → Processing Screen
-- User taps "Save" → transition immediately to Processing
-  Copy:
-- Title: "Saving your moment…"
-- Secondary: "This can take a moment."
-
-Rules:
-- Upload starts only after Save.
-- Disable navigation that would duplicate uploads (or make upload idempotent).
-
----
-
-## 4) Saved Confirmation
-Content:
-- Title: "Saved"
-- Show 1–2 line transcript preview
-  CTA:
-- Primary: "View all moments" (go to list)
-  Secondary:
-- Optional: "Record another"
-
----
-
-## 5) Memories List
-- Reverse chronological.
-- Each item: date + 1–2 line snippet.
-- Tap opens detail.
-  Empty state:
-- "No moments yet. Record your first one." + button "Record"
-
----
-
-## 6) Memory Detail
-- Date/time at top
-- Full transcript read-only
-- No edit in Reduced MVP
-- No share/export
+## 7) Settings and Account
+- Settings entries: Account, Family, Privacy, Logout.
+- Account page supports:
+  - display name update
+  - email update
+  - password update
