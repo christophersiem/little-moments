@@ -280,7 +280,12 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
     return monthOptions.find((option) => option.key === selectedMonth)?.label || selectedMonth
   }, [monthOptions, selectedMonth])
 
-  const groups = useMemo(() => groupByMonth(effectiveItems), [effectiveItems])
+  const timelineItems = useMemo(
+    () => (highlightsOnly ? effectiveItems.filter((item) => item.isHighlight) : effectiveItems),
+    [effectiveItems, highlightsOnly],
+  )
+
+  const groups = useMemo(() => groupByMonth(timelineItems), [timelineItems])
 
   const hasActiveFilters = selectedMonth !== 'all' || selectedTags.length > 0 || highlightsOnly
   const tagsChipLabel = useMemo(() => {
@@ -447,7 +452,6 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
 
     try {
       await updateMemory(memoryId, { isHighlight: nextValue })
-      void reload()
     } catch (toggleError) {
       const message = toggleError instanceof Error ? toggleError.message : 'Could not update highlight.'
       setHighlightError(message)

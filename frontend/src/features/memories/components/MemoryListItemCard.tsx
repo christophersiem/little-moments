@@ -82,21 +82,11 @@ const Content = styled.div`
 const MetaRow = styled.div`
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: ${({ theme }) => theme.space.x3};
 `
 
 const DateText = styled.span`
   font-size: ${({ theme }) => theme.typography.secondarySize};
   color: ${({ theme }) => theme.colors.textMuted};
-`
-
-const Chevron = styled.span`
-  color: ${({ theme }) => theme.colors.textMuted};
-  font-size: 1.2rem;
-  line-height: 1;
-  padding-right: ${({ theme }) => theme.space.x1};
-  opacity: 0.72;
 `
 
 const Title = styled.div`
@@ -202,7 +192,6 @@ export function MemoryListItemCard({
         <Content>
           <MetaRow>
             <DateText>{formatMonthDay(eventDate)}</DateText>
-            <Chevron>›</Chevron>
           </MetaRow>
           <Title>{title}</Title>
           {previewTags.length > 0 && (
