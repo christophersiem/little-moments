@@ -236,7 +236,7 @@ public class SupabaseGatewayService {
             .build(true)
             .toUriString();
 
-        callPost(uri, body, authorizationHeader, "resolution=merge-duplicates,return=minimal");
+        callPost(uri, body, authorizationHeader, "resolution=ignore-duplicates,return=minimal");
     }
 
     public ProfileResponse getOwnProfile(String authorizationHeader) {
