@@ -31,6 +31,7 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { AccountPage } from '../pages/AccountPage'
 import { AcceptInvitePage } from '../pages/AcceptInvitePage'
 import { FamilyPage } from '../pages/FamilyPage'
+import { InsightsPage } from '../pages/InsightsPage'
 import { MemoriesPage } from '../pages/MemoriesPage'
 import { MemoryDetailPage } from '../pages/MemoryDetailPage'
 import { OnboardingPage } from '../pages/OnboardingPage'
@@ -55,24 +56,32 @@ const Shell = styled.div`
 const Header = styled.header`
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: ${({ theme }) => theme.space.x2};
   padding-top: ${({ theme }) => theme.space.x1};
 `
 
 const Brand = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+`
+
+const BrandCenter = styled.div<{ $compact?: boolean }>`
   display: inline-flex;
   align-items: center;
   gap: ${({ theme }) => theme.space.x2};
   color: ${({ theme }) => theme.colors.textMuted};
+  opacity: ${({ $compact }) => ($compact ? 0.86 : 1)};
 `
 
-const Title = styled.h1`
+const Title = styled.h1<{ $compact?: boolean }>`
   margin: 0;
-  font-size: 1.95rem;
+  font-size: ${({ $compact }) => ($compact ? '1.22rem' : '1.65rem')};
   color: currentColor;
   font-family: ${({ theme }) => theme.typography.headingFamily};
-  font-weight: 500;
+  font-weight: ${({ $compact }) => ($compact ? 500 : 400)};
   letter-spacing: 0.02em;
 `
 
@@ -87,6 +96,36 @@ const Divider = styled.div`
   width: 100%;
   height: 1px;
   background: ${({ theme }) => theme.colors.border};
+`
+
+const HeaderActionButton = styled.button`
+  position: absolute;
+  right: 0;
+  width: ${({ theme }) => theme.layout.minTouchTarget};
+  height: ${({ theme }) => theme.layout.minTouchTarget};
+  border-radius: ${({ theme }) => theme.radii.pill};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  color: ${({ theme }) => theme.colors.textMuted};
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
+    outline-offset: 2px;
+  }
+`
+
+const HeaderActionIcon = styled.svg`
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 `
 
 const Content = styled.main`
@@ -159,6 +198,15 @@ function resolveActiveFamily(memberships: FamilySummary[], preferredFamilyId?: s
   }
 
   return memberships[0].familyId
+}
+
+function SettingsIcon() {
+  return (
+    <HeaderActionIcon viewBox="0 0 24 24" aria-hidden>
+      <path d="M12 8.8a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4Z" />
+      <path d="M19.2 12c0-.5-.1-1-.2-1.4l1.4-1.1-1.5-2.6-1.7.6a7.1 7.1 0 0 0-1.5-.9L15.4 4h-2.8l-.3 1.9c-.5.2-1 .5-1.5.9l-1.7-.6-1.5 2.6 1.4 1.1c-.1.4-.2.9-.2 1.4s.1 1 .2 1.4l-1.4 1.1 1.5 2.6 1.7-.6c.5.4 1 .7 1.5.9l.3 1.9h2.8l.3-1.9c.5-.2 1-.5 1.5-.9l1.7.6 1.5-2.6-1.4-1.1c.1-.4.2-.9.2-1.4Z" />
+    </HeaderActionIcon>
+  )
 }
 
 export default function App() {
@@ -532,6 +580,8 @@ export default function App() {
     content = <RecordPage navigate={navigate} childId={childId ?? ''} onNavigationLockChange={setNavigationLocked} />
   } else if (route.kind === 'memories') {
     content = <MemoriesPage navigate={navigate} familyId={familyId} />
+  } else if (route.kind === 'insights') {
+    content = <InsightsPage />
   } else if (route.kind === 'invite-accept') {
     content = <AcceptInvitePage navigate={navigate} onAccepted={onInviteAccepted} />
   } else if (route.kind === 'memory-detail') {
@@ -555,12 +605,32 @@ export default function App() {
     content = <RouteNotFound navigate={navigate} />
   }
 
+  const showHeaderSettings = route.kind !== 'settings' && route.kind !== 'account' && route.kind !== 'privacy'
+  const compactBrand = route.kind === 'memories'
+
   return (
     <Shell data-family-id={familyId ?? undefined} data-child-id={childId ?? undefined}>
       <Header>
         <Brand>
-          <BrandLogo animate="stopped" />
-          <Title>Little Moments</Title>
+          <BrandCenter $compact={compactBrand}>
+            {!compactBrand ? <BrandLogo animate="stopped" /> : null}
+            <Title $compact={compactBrand}>Little Moments</Title>
+          </BrandCenter>
+          {showHeaderSettings && (
+            <HeaderActionButton
+              type="button"
+              aria-label="Open settings"
+              onClick={() => {
+                if (navigationLocked) {
+                  onLockedNavigationAttempt()
+                  return
+                }
+                navigate('/settings')
+              }}
+            >
+              <SettingsIcon />
+            </HeaderActionButton>
+          )}
         </Brand>
         <Divider />
       </Header>

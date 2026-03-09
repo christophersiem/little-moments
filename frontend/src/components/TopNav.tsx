@@ -19,10 +19,6 @@ const Nav = styled.nav`
   background: ${({ theme }) => theme.colors.surfaceStrong};
 `
 
-const NavTwoColumns = styled(Nav)`
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-`
-
 const NavItem = styled.span`
   display: flex;
   flex-direction: column;
@@ -78,18 +74,18 @@ function BookIcon() {
   )
 }
 
-function SettingsIcon() {
+function InsightsIcon() {
   return (
     <NavIcon viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
-        d="M12 8.75C10.21 8.75 8.75 10.21 8.75 12C8.75 13.79 10.21 15.25 12 15.25C13.79 15.25 15.25 13.79 15.25 12C15.25 10.21 13.79 8.75 12 8.75Z"
+        d="M5 17.5h14"
         stroke="currentColor"
         strokeWidth="1.7"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <path
-        d="M19 12C19 11.48 18.95 10.98 18.84 10.5L20.5 9.21L18.79 6.29L16.77 7.03C16.02 6.39 15.13 5.92 14.16 5.67L13.85 3.5H10.15L9.84 5.67C8.87 5.92 7.98 6.39 7.23 7.03L5.21 6.29L3.5 9.21L5.16 10.5C5.05 10.98 5 11.48 5 12C5 12.52 5.05 13.02 5.16 13.5L3.5 14.79L5.21 17.71L7.23 16.97C7.98 17.61 8.87 18.08 9.84 18.33L10.15 20.5H13.85L14.16 18.33C15.13 18.08 16.02 17.61 16.77 16.97L18.79 17.71L20.5 14.79L18.84 13.5C18.95 13.02 19 12.52 19 12Z"
+        d="M7.5 14V10.5M12 14V7.5M16.5 14V11.5"
         stroke="currentColor"
         strokeWidth="1.7"
         strokeLinecap="round"
@@ -102,14 +98,16 @@ function SettingsIcon() {
 export function TopNav({
   pathname,
   navigate,
-  canRecord = true,
+  canRecord = false,
   navigationLocked = false,
   onLockedNavigationAttempt,
 }: TopNavProps) {
-  const NavContainer = canRecord ? Nav : NavTwoColumns
-
   const onNavigate = (nextPath: string) => {
     if (navigationLocked && pathname !== nextPath) {
+      onLockedNavigationAttempt?.()
+      return
+    }
+    if (nextPath === '/record' && !canRecord) {
       onLockedNavigationAttempt?.()
       return
     }
@@ -117,7 +115,7 @@ export function TopNav({
   }
 
   return (
-    <NavContainer>
+    <Nav>
       <Button
         variant="nav"
         active={pathname.startsWith('/memories')}
@@ -130,32 +128,30 @@ export function TopNav({
           <NavLabel>Memories</NavLabel>
         </NavItem>
       </Button>
-      {canRecord && (
-        <Button
-          variant="nav"
-          active={pathname.startsWith('/record')}
-          onClick={() => onNavigate('/record')}
-          aria-disabled={navigationLocked && !pathname.startsWith('/record')}
-          style={{ opacity: navigationLocked && !pathname.startsWith('/record') ? 0.62 : 1 }}
-        >
-          <NavItem>
-            <RecordIcon />
-            <NavLabel>Record</NavLabel>
-          </NavItem>
-        </Button>
-      )}
       <Button
         variant="nav"
-        active={pathname.startsWith('/settings')}
-        onClick={() => onNavigate('/settings')}
-        aria-disabled={navigationLocked && !pathname.startsWith('/settings')}
-        style={{ opacity: navigationLocked && !pathname.startsWith('/settings') ? 0.62 : 1 }}
+        active={pathname.startsWith('/record')}
+        onClick={() => onNavigate('/record')}
+        aria-disabled={navigationLocked && !pathname.startsWith('/record')}
+        style={{ opacity: !canRecord || (navigationLocked && !pathname.startsWith('/record')) ? 0.62 : 1 }}
       >
         <NavItem>
-          <SettingsIcon />
-          <NavLabel>Settings</NavLabel>
+          <RecordIcon />
+          <NavLabel>Record</NavLabel>
         </NavItem>
       </Button>
-    </NavContainer>
+      <Button
+        variant="nav"
+        active={pathname.startsWith('/insights')}
+        onClick={() => onNavigate('/insights')}
+        aria-disabled={navigationLocked && !pathname.startsWith('/insights')}
+        style={{ opacity: navigationLocked && !pathname.startsWith('/insights') ? 0.62 : 1 }}
+      >
+        <NavItem>
+          <InsightsIcon />
+          <NavLabel>Insights</NavLabel>
+        </NavItem>
+      </Button>
+    </Nav>
   )
 }

@@ -4,6 +4,7 @@ export type AppRoute =
   | { kind: 'onboarding' }
   | { kind: 'record' }
   | { kind: 'memories' }
+  | { kind: 'insights' }
   | { kind: 'memory-detail'; memoryId: string }
   | { kind: 'invite-accept' }
   | { kind: 'settings' }
@@ -37,6 +38,9 @@ function resolveRoute(pathname: string): AppRoute {
   }
   if (pathname === '/memories') {
     return { kind: 'memories' }
+  }
+  if (pathname === '/insights') {
+    return { kind: 'insights' }
   }
   if (pathname === '/invite/accept') {
     return { kind: 'invite-accept' }

@@ -18,16 +18,16 @@ const CardShell = styled.div`
 const RowButton = styled.button<{ $revealed: boolean }>`
   width: 100%;
   border: none;
-  padding: ${({ theme }) => `${theme.space.x3} 0`};
+  padding: ${({ theme }) => `${theme.space.x2} 0`};
   background: transparent;
   text-align: left;
   cursor: pointer;
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-columns: 16px minmax(0, 1fr);
   column-gap: ${({ theme }) => theme.space.x3};
   opacity: ${({ $revealed }) => ($revealed ? 1 : 0)};
-  transform: translateY(${({ $revealed }) => ($revealed ? '0' : '6px')});
-  transition: opacity 280ms ease-out, transform 280ms ease-out;
+  transform: translateY(${({ $revealed }) => ($revealed ? '0' : '4px')});
+  transition: opacity 220ms ease-out, transform 220ms ease-out;
 
   &:focus-visible {
     outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
@@ -44,80 +44,97 @@ const RowButton = styled.button<{ $revealed: boolean }>`
 
 const MarkerColumn = styled.div`
   position: relative;
-  min-height: 88px;
+  min-height: 104px;
 `
 
 const MarkerDot = styled.span`
   position: absolute;
-  top: 11px;
-  left: 4px;
-  width: 10px;
-  height: 10px;
+  top: 16px;
+  left: 1px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  border: 2px solid ${({ theme }) => theme.colors.accent};
-  background: ${({ theme }) => theme.colors.background};
-  opacity: 0.84;
+  border: 1.25px solid
+    color-mix(in srgb, ${({ theme }) => theme.colors.accentStrong} 60%, ${({ theme }) => theme.colors.border});
+  background: ${({ theme }) => theme.colors.backgroundAlt};
+  opacity: 0.58;
 `
 
 const MarkerLine = styled.span<{ $hidden: boolean }>`
   position: absolute;
-  top: 25px;
-  left: 8px;
+  top: 29px;
+  left: 4px;
   width: 1px;
   bottom: 0;
   background: ${({ theme, $hidden }) => ($hidden ? 'transparent' : theme.colors.border)};
-  opacity: ${({ $hidden }) => ($hidden ? 0 : 0.52)};
+  opacity: ${({ $hidden }) => ($hidden ? 0 : 0.18)};
 `
 
 const Content = styled.div`
-  min-height: 88px;
-  padding-right: ${({ theme }) => theme.space.x6};
+  min-height: 104px;
+  padding: ${({ theme }) => `${theme.space.x2} 0 ${theme.space.x3}`};
+  padding-right: ${({ theme }) => theme.space.x1};
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.space.x2};
   border-bottom: 1px solid ${({ theme }) => theme.colors.border};
-  border-bottom-color: color-mix(in srgb, ${({ theme }) => theme.colors.border} 68%, transparent);
+  border-bottom-color: color-mix(in srgb, ${({ theme }) => theme.colors.border} 32%, transparent);
 `
 
-const MetaRow = styled.div`
-  display: flex;
+const Head = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
+  gap: ${({ theme }) => theme.space.x2};
+`
+
+const Meta = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: ${({ theme }) => theme.space.x1};
+  min-width: 0;
 `
 
 const DateText = styled.span`
   font-size: ${({ theme }) => theme.typography.secondarySize};
   color: ${({ theme }) => theme.colors.textMuted};
+  opacity: 0.92;
 `
 
 const Title = styled.div`
   font-family: ${({ theme }) => theme.typography.headingFamily};
   color: ${({ theme }) => theme.colors.text};
-  font-size: 1.15rem;
-  line-height: 1.35;
+  font-size: 1.22rem;
+  line-height: 1.25;
   font-weight: 600;
+`
+
+const Snippet = styled.p`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+  line-height: 1.35;
 `
 
 const Tags = styled.div`
   display: flex;
+  gap: ${({ theme }) => theme.space.x1};
   flex-wrap: wrap;
-  gap: ${({ theme }) => theme.space.x2};
 `
 
 const TagChip = styled.span`
-  padding: ${({ theme }) => `${theme.space.x1} ${theme.space.x2}`};
+  padding: 1px ${({ theme }) => theme.space.x2};
   border-radius: ${({ theme }) => theme.radii.pill};
   background: ${({ theme }) => theme.colors.surface};
   color: ${({ theme }) => theme.colors.textMuted};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  font-size: calc(${({ theme }) => theme.typography.secondarySize} - 1px);
-  line-height: 1.15;
+  border: 1px solid color-mix(in srgb, ${({ theme }) => theme.colors.border} 52%, transparent);
+  font-size: calc(${({ theme }) => theme.typography.secondarySize} - 2px);
+  line-height: 1.2;
+  opacity: 0.9;
 `
 
 const HighlightButton = styled.button<{ $active: boolean }>`
-  position: absolute;
-  top: ${({ theme }) =>
-    `calc(${theme.space.x3} + ${theme.typography.secondarySize} + ${theme.space.x2})`};
-  right: 0;
   width: ${({ theme }) => theme.layout.minTouchTarget};
   height: ${({ theme }) => theme.layout.minTouchTarget};
   border: none;
@@ -141,9 +158,9 @@ const HighlightButton = styled.button<{ $active: boolean }>`
   }
 `
 
-const HeartIcon = styled.svg`
-  width: 18px;
-  height: 18px;
+const HighlightIcon = styled.svg`
+  width: 17px;
+  height: 17px;
 `
 
 export function MemoryListItemCard({
@@ -156,50 +173,55 @@ export function MemoryListItemCard({
   const { ref, isInView } = useInViewOnce<HTMLButtonElement>()
   const eventDate = item.recordedAt || item.createdAt
   const title = item.title || item.transcriptSnippet || (item.status === 'FAILED' ? 'Transcription failed' : 'Processing...')
-  const previewTags = item.tags.slice(0, 2)
+  const snippet = item.title ? item.transcriptSnippet : ''
+  const previewTags = item.tags.slice(0, 1)
+  const extraTagCount = Math.max(0, item.tags.length - previewTags.length)
   const canToggleHighlight = typeof onToggleHighlight === 'function'
 
   return (
     <CardShell>
-      <HighlightButton
-        type="button"
-        $active={item.isHighlight}
-        disabled={highlightBusy || !canToggleHighlight}
-        aria-label={item.isHighlight ? 'Remove highlight' : 'Mark as highlight'}
-        onClick={(event) => {
-          event.stopPropagation()
-          if (!canToggleHighlight || highlightBusy) {
-            return
-          }
-          onToggleHighlight(item.id, !item.isHighlight)
-        }}
-      >
-        <HeartIcon viewBox="0 0 24 24" fill={item.isHighlight ? 'currentColor' : 'none'} aria-hidden>
-          <path
-            d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </HeartIcon>
-      </HighlightButton>
-
       <RowButton ref={ref} onClick={() => onOpen(item.id)} $revealed={isInView}>
         <MarkerColumn>
           <MarkerDot />
           <MarkerLine $hidden={isLastInGroup} />
         </MarkerColumn>
         <Content>
-          <MetaRow>
-            <DateText>{formatMonthDay(eventDate)}</DateText>
-          </MetaRow>
-          <Title>{title}</Title>
+          <Head>
+            <Meta>
+              <DateText>{formatMonthDay(eventDate)}</DateText>
+              <Title>{title}</Title>
+            </Meta>
+            <HighlightButton
+              type="button"
+              $active={item.isHighlight}
+              disabled={highlightBusy || !canToggleHighlight}
+              aria-label={item.isHighlight ? 'Remove highlight' : 'Mark as highlight'}
+              onClick={(event) => {
+                event.stopPropagation()
+                if (!canToggleHighlight || highlightBusy) {
+                  return
+                }
+                onToggleHighlight(item.id, !item.isHighlight)
+              }}
+            >
+              <HighlightIcon viewBox="0 0 24 24" fill={item.isHighlight ? 'currentColor' : 'none'} aria-hidden>
+                <path
+                  d="M7 4.8h10c.7 0 1.2.6 1.2 1.2V20l-6.2-3.3L5.8 20V6c0-.6.6-1.2 1.2-1.2Z"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </HighlightIcon>
+            </HighlightButton>
+          </Head>
+          {snippet ? <Snippet>{snippet}</Snippet> : null}
           {previewTags.length > 0 && (
             <Tags>
               {previewTags.map((tag) => (
                 <TagChip key={`${item.id}-${tag}`}>{tag}</TagChip>
               ))}
+              {extraTagCount > 0 ? <TagChip>+{extraTagCount}</TagChip> : null}
             </Tags>
           )}
         </Content>
