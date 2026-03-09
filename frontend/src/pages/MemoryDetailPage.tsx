@@ -4,7 +4,7 @@ import { Button } from '../components/Button'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { OverflowMenu, type OverflowMenuAction } from '../components/OverflowMenu'
 import { deleteMemory, updateMemory } from '../features/memories/api'
-import { updateMemoryInCache } from '../features/memories/hooks/usePaginatedMemories'
+import { removeMemoryFromCache, updateMemoryInCache } from '../features/memories/hooks/usePaginatedMemories'
 import { MEMORY_TAG_OPTIONS, type Memory, type MemoryTag } from '../features/memories/types'
 import { useMemoryDetail } from '../features/memories/hooks'
 import { supabase } from '../lib/supabase'
@@ -396,6 +396,7 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
     setDeleteError('')
     try {
       await deleteMemory(currentMemory.id)
+      removeMemoryFromCache(currentMemory.id)
       navigate('/memories')
     } catch (failure) {
       if (isUnauthorizedError(failure)) {

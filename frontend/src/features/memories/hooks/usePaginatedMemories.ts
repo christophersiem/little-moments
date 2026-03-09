@@ -84,6 +84,21 @@ export function updateMemoryInCache(memory: Memory): void {
   }
 }
 
+export function removeMemoryFromCache(memoryId: string): void {
+  for (const [queryKey, cached] of memoriesCache.entries()) {
+    const nextItems = cached.items.filter((item) => item.id !== memoryId)
+    if (nextItems.length === cached.items.length) {
+      continue
+    }
+
+    memoriesCache.set(queryKey, {
+      ...cached,
+      items: nextItems,
+      cachedAt: Date.now(),
+    })
+  }
+}
+
 interface PaginatedMemoriesQuery {
   familyId?: string
   month?: string
