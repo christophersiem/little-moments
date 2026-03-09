@@ -14,11 +14,17 @@ import {
   type FamilySummary,
 } from '../features/families/api'
 import {
+  clearActiveChildId,
   clearActiveFamilyId,
+  clearCanRecord,
+  getActiveChildId,
   clearPendingInviteToken,
   getActiveFamilyId,
+  getCanRecord,
   getPendingInviteToken,
   setActiveFamilyId as persistActiveFamilyId,
+  setActiveChildId as persistActiveChildId,
+  setCanRecord as persistCanRecord,
   setPendingInviteToken,
 } from '../features/families/localState'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
@@ -150,17 +156,20 @@ function resolveActiveFamily(memberships: FamilySummary[], preferredFamilyId?: s
 
 export default function App() {
   const { pathname, route, navigate } = useAppRouter()
+  const cachedFamilyId = getActiveFamilyId()
+  const cachedChildId = getActiveChildId()
+  const cachedCanRecord = getCanRecord()
   const [navigationLocked, setNavigationLocked] = useState(false)
   const [showNavigationHint, setShowNavigationHint] = useState(false)
   const [redirectToRecordOnLogin, setRedirectToRecordOnLogin] = useState(false)
   const [session, setSession] = useState<Session | null>(null)
   const [authReady, setAuthReady] = useState(!isSupabaseConfigured)
   const [authError, setAuthError] = useState('')
-  const [familyId, setFamilyId] = useState<string | null>(null)
-  const [childId, setChildId] = useState<string | null>(null)
-  const [familyReady, setFamilyReady] = useState(false)
+  const [familyId, setFamilyId] = useState<string | null>(cachedFamilyId)
+  const [childId, setChildId] = useState<string | null>(cachedChildId)
+  const [familyReady, setFamilyReady] = useState(Boolean(cachedFamilyId && cachedChildId))
   const [familyError, setFamilyError] = useState('')
-  const [canRecord, setCanRecord] = useState(true)
+  const [canRecord, setCanRecord] = useState(cachedCanRecord ?? true)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [families, setFamilies] = useState<FamilySummary[]>([])
   const [bootstrapTick, setBootstrapTick] = useState(0)
@@ -229,11 +238,14 @@ export default function App() {
       setCanRecord(false)
       setNeedsOnboarding(false)
       clearActiveFamilyId()
+      clearActiveChildId()
+      clearCanRecord()
       return
     }
 
     let disposed = false
-    setFamilyReady(false)
+    const hasCachedContext = Boolean(familyId && childId)
+    setFamilyReady(hasCachedContext)
     setFamilyError('')
 
     const bootstrapFamilyContext = async () => {
@@ -263,6 +275,8 @@ export default function App() {
           setFamilyId(null)
           setChildId(null)
           setCanRecord(false)
+          clearActiveChildId()
+          clearCanRecord()
           setFamilyReady(true)
           return
         }
@@ -291,6 +305,8 @@ export default function App() {
         setFamilyId(resolvedFamilyId)
         setChildId(resolvedChildId)
         setCanRecord(allowRecording)
+        persistActiveChildId(resolvedChildId)
+        persistCanRecord(allowRecording)
         setFamilyReady(true)
       } catch (error) {
         if (disposed) {
@@ -379,6 +395,9 @@ export default function App() {
 
   const onActiveFamilyChange = (nextFamilyId: string) => {
     persistActiveFamilyId(nextFamilyId)
+    clearActiveChildId()
+    setChildId(null)
+    setFamilyReady(false)
     rerunFamilyBootstrap()
   }
 
@@ -437,7 +456,9 @@ export default function App() {
     )
   }
 
-  if (!familyReady) {
+  const shouldBlockForFamilySetup = !familyReady && !(familyId && childId)
+
+  if (shouldBlockForFamilySetup) {
     return (
       <Shell>
         <Header>
