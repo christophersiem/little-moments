@@ -141,6 +141,13 @@ function parseInviteTokenFromUrl(): string | null {
   return token.length > 0 ? token : null
 }
 
+function isUnconfirmedSession(nextSession: Session | null): boolean {
+  if (!nextSession?.user) {
+    return false
+  }
+  return !nextSession.user.email_confirmed_at
+}
+
 function resolveActiveFamily(memberships: FamilySummary[], preferredFamilyId?: string | null): string | null {
   if (memberships.length === 0) {
     return null
@@ -206,14 +213,28 @@ export default function App() {
       if (error) {
         setAuthError(error.message)
       }
-      setSession(data.session ?? null)
+      if (isUnconfirmedSession(data.session ?? null)) {
+        setAuthError('Please confirm your email address before signing in.')
+        setSession(null)
+      } else {
+        setAuthError('')
+        setSession(data.session ?? null)
+      }
       setAuthReady(true)
     })
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'SIGNED_IN' && isUnconfirmedSession(nextSession)) {
+        setAuthError('Please confirm your email address before signing in.')
+        void supabase.auth.signOut()
+        setSession(null)
+        setRedirectToRecordOnLogin(false)
+        return
+      }
       if (event === 'SIGNED_IN') {
+        setAuthError('')
         setRedirectToRecordOnLogin(true)
       }
       if (event === 'SIGNED_OUT') {
