@@ -38,6 +38,7 @@ import { PrivacyPage } from '../pages/PrivacyPage'
 import { RecordPage } from '../pages/RecordPage'
 import { SettingsPage } from '../pages/SettingsPage'
 import { useAppRouter } from './router'
+import { APP_ROUTES } from './routes'
 
 const Shell = styled.div`
   width: 100%;
@@ -362,18 +363,18 @@ export default function App() {
 
     if (needsOnboarding) {
       if (route.kind !== 'onboarding' && route.kind !== 'invite-accept') {
-        navigate('/onboarding')
+        navigate(APP_ROUTES.onboarding)
       }
       return
     }
 
     if (route.kind === 'onboarding') {
-      navigate(canRecord ? '/record' : '/memories')
+      navigate(canRecord ? APP_ROUTES.record : APP_ROUTES.memories)
       return
     }
 
     if (redirectToRecordOnLogin) {
-      const loginTarget = canRecord ? '/record' : '/memories'
+      const loginTarget = canRecord ? APP_ROUTES.record : APP_ROUTES.memories
       if (route.kind !== (canRecord ? 'record' : 'memories')) {
         navigate(loginTarget)
       }
@@ -382,7 +383,7 @@ export default function App() {
     }
 
     if (!canRecord && route.kind === 'record') {
-      navigate('/memories')
+      navigate(APP_ROUTES.memories)
     }
   }, [canRecord, familyError, familyReady, navigate, needsOnboarding, redirectToRecordOnLogin, route.kind])
 

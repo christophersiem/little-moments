@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { APP_ROUTES } from '../app/routes'
 import { Button } from '../components/Button'
 
 interface PrivacyPageProps {
@@ -208,7 +209,7 @@ export function PrivacyPage({ navigate }: PrivacyPageProps) {
         </BulletList>
       </Block>
 
-      <Button onClick={() => navigate('/settings')}>Back to Settings</Button>
+      <Button onClick={() => navigate(APP_ROUTES.settings)}>Back to Settings</Button>
     </Section>
   )
 }

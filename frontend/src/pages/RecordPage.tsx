@@ -3,6 +3,8 @@ import styled from 'styled-components'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
 import { RecordButton } from '../components/RecordButton'
+import { APP_ROUTES } from '../app/routes'
+import { SHORT_TRANSCRIPT_MESSAGE } from '../features/memories/constants'
 import { startMemoryUpload } from '../features/memories/hooks/uploadSessionStore'
 import {
   transitionStopDecision,
@@ -27,7 +29,6 @@ interface RecordingPayload {
 const NOOP = () => undefined
 const MIN_RECORDING_SECONDS = 2
 const MIN_RECORDING_BYTES = 10000
-const SHORT_RECORDING_HINT = 'Recording too short. Please speak at least 8 words.'
 const SHORT_HINT_DISPLAY_MS = 5200
 
 function isLikelyTooShort(blob: Blob, elapsedSeconds: number): boolean {
@@ -325,7 +326,7 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
         setStopDecisionState('hidden')
         setPhase('idle')
         setElapsedSeconds(0)
-        setErrorMessage(SHORT_RECORDING_HINT)
+        setErrorMessage(SHORT_TRANSCRIPT_MESSAGE)
         return
       }
 
@@ -335,8 +336,12 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
       setStopDecisionState('hidden')
       setPhase('idle')
       setElapsedSeconds(0)
-      navigate('/memories')
-      window.history.replaceState({}, '', `/memories?pending=${encodeURIComponent(session.clientId)}`)
+      navigate(APP_ROUTES.memories)
+      window.history.replaceState(
+        {},
+        '',
+        `${APP_ROUTES.memories}?pending=${encodeURIComponent(session.clientId)}`,
+      )
     }
   }
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { APP_ROUTES } from './routes'
 
 export type AppRoute =
   | { kind: 'onboarding' }
@@ -23,38 +24,38 @@ function normalizePath(pathname: string): string {
   const normalized = withoutTrailingSlash.toLowerCase()
 
   if (normalized === '/') {
-    return '/record'
+    return APP_ROUTES.record
   }
   return normalized
 }
 
 function resolveRoute(pathname: string): AppRoute {
-  if (pathname === '/onboarding') {
+  if (pathname === APP_ROUTES.onboarding) {
     return { kind: 'onboarding' }
   }
-  if (pathname === '/record') {
+  if (pathname === APP_ROUTES.record) {
     return { kind: 'record' }
   }
-  if (pathname === '/memories') {
+  if (pathname === APP_ROUTES.memories) {
     return { kind: 'memories' }
   }
-  if (pathname === '/invite/accept') {
+  if (pathname === APP_ROUTES.inviteAccept) {
     return { kind: 'invite-accept' }
   }
-  if (pathname === '/settings') {
+  if (pathname === APP_ROUTES.settings) {
     return { kind: 'settings' }
   }
-  if (pathname === '/settings/family') {
+  if (pathname === APP_ROUTES.settingsFamily) {
     return { kind: 'family' }
   }
-  if (pathname === '/settings/account') {
+  if (pathname === APP_ROUTES.settingsAccount) {
     return { kind: 'account' }
   }
-  if (pathname === '/settings/privacy') {
+  if (pathname === APP_ROUTES.settingsPrivacy) {
     return { kind: 'privacy' }
   }
 
-  const detailMatch = pathname.match(/^\/memories\/([0-9a-f-]+)$/)
+  const detailMatch = pathname.match(new RegExp(`^${APP_ROUTES.memories}/([0-9a-f-]+)$`))
   if (detailMatch) {
     return { kind: 'memory-detail', memoryId: detailMatch[1] }
   }
@@ -66,12 +67,12 @@ export function useAppRouter() {
   const [pathname, setPathname] = useState<string>(() => normalizePath(window.location.pathname))
 
   useEffect(() => {
-    if (window.location.pathname === '/') {
-      window.history.replaceState({}, '', '/record')
+    if (window.location.pathname === APP_ROUTES.root) {
+      window.history.replaceState({}, '', APP_ROUTES.record)
     }
 
     const onPopState = () => {
-      setPathname(normalizePath(window.location.pathname || '/record'))
+      setPathname(normalizePath(window.location.pathname || APP_ROUTES.record))
     }
 
     window.addEventListener('popstate', onPopState)

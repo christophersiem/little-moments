@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { APP_ROUTES } from '../app/routes'
 
 interface SettingsPageProps {
   navigate: (nextPath: string) => void
@@ -155,7 +156,7 @@ export function SettingsPage({ navigate, onLogout }: SettingsPageProps) {
     <Section>
       <Heading>Settings</Heading>
       <List>
-        <Item type="button" $interactive onClick={() => navigate('/settings/account')}>
+        <Item type="button" $interactive onClick={() => navigate(APP_ROUTES.settingsAccount)}>
           <ItemIcon>
             <AccountIcon />
           </ItemIcon>
@@ -166,7 +167,7 @@ export function SettingsPage({ navigate, onLogout }: SettingsPageProps) {
           <Chevron>›</Chevron>
         </Item>
 
-        <Item type="button" $interactive onClick={() => navigate('/settings/family')}>
+        <Item type="button" $interactive onClick={() => navigate(APP_ROUTES.settingsFamily)}>
           <ItemIcon>
             <FamilyIcon />
           </ItemIcon>
@@ -177,7 +178,7 @@ export function SettingsPage({ navigate, onLogout }: SettingsPageProps) {
           <Chevron>›</Chevron>
         </Item>
 
-        <Item type="button" $interactive onClick={() => navigate('/settings/privacy')}>
+        <Item type="button" $interactive onClick={() => navigate(APP_ROUTES.settingsPrivacy)}>
           <ItemIcon>
             <PrivacyIcon />
           </ItemIcon>

@@ -1,4 +1,5 @@
 import styled from 'styled-components'
+import { APP_ROUTES } from '../app/routes'
 import { Button } from './Button'
 import { Card } from './Card'
 
@@ -15,7 +16,7 @@ export function RouteNotFound({ navigate }: RouteNotFoundProps) {
     <Card>
       <h2>Route not found</h2>
       <BodyText>The path does not match the reduced MVP routes.</BodyText>
-      <Button variant="primary" onClick={() => navigate('/record')}>
+      <Button variant="primary" onClick={() => navigate(APP_ROUTES.record)}>
         Back to Record
       </Button>
     </Card>
