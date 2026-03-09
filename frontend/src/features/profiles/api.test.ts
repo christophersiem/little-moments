@@ -28,8 +28,8 @@ test('resolveEnsureDisplayName uses pending value when explicit is empty', () =>
   assert(actual === 'Pending Name', `Expected "Pending Name", received "${actual}"`)
 })
 
-test('resolveEnsureDisplayName falls back to Member when no value is provided', () => {
+test('resolveEnsureDisplayName returns null when no value is provided', () => {
   const actual = resolveEnsureDisplayName(undefined, null)
-  assert(actual === 'Member', `Expected "Member", received "${actual}"`)
+  assert(actual === null, `Expected null, received "${String(actual)}"`)
 })
 

@@ -42,8 +42,11 @@ function clearPendingDisplayName(userId: string): void {
   window.localStorage.removeItem(getPendingDisplayNameKey(userId))
 }
 
-export function resolveEnsureDisplayName(preferredDisplayName?: string, pendingDisplayName?: string | null): string {
-  return normalizeDisplayName(preferredDisplayName) ?? normalizeDisplayName(pendingDisplayName) ?? 'Member'
+export function resolveEnsureDisplayName(
+  preferredDisplayName?: string,
+  pendingDisplayName?: string | null,
+): string | null {
+  return normalizeDisplayName(preferredDisplayName) ?? normalizeDisplayName(pendingDisplayName)
 }
 
 export function rememberPendingDisplayName(userId: string, displayName: string): void {
@@ -63,6 +66,9 @@ export async function ensureOwnProfileForSession(
 ): Promise<void> {
   requireSupabase()
   const fallbackDisplayName = resolveEnsureDisplayName(preferredDisplayName, readPendingDisplayName(user.id))
+  if (!fallbackDisplayName) {
+    return
+  }
 
   await backendRequestVoid('/profiles/ensure', {
     method: 'POST',
