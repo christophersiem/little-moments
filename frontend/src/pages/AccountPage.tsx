@@ -99,7 +99,7 @@ export function AccountPage({ navigate, userEmail = '' }: AccountPageProps) {
   const [loading, setLoading] = useState(!accountPageCache)
   const [loadError, setLoadError] = useState('')
 
-  const [displayName, setDisplayName] = useState(accountPageCache?.displayName ?? 'Member')
+  const [displayName, setDisplayName] = useState(accountPageCache?.displayName ?? '')
   const [email, setEmail] = useState(accountPageCache?.email ?? userEmail)
   const [newPassword, setNewPassword] = useState('')
   const [repeatNewPassword, setRepeatNewPassword] = useState('')
