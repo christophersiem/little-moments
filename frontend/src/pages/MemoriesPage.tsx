@@ -9,7 +9,7 @@ import { MemoryListItemCard } from '../features/memories/components/MemoryListIt
 import { MonthPickerSheet } from '../features/memories/components/MonthPickerSheet'
 import { TagPickerSheet } from '../features/memories/components/TagPickerSheet'
 import { setActiveUploadStatusFromPolling, retryActiveMemoryUpload, useActiveMemoryUpload } from '../features/memories/hooks/uploadSessionStore'
-import { usePaginatedMemories } from '../features/memories/hooks/usePaginatedMemories'
+import { updateMemoryHighlightInCache, usePaginatedMemories } from '../features/memories/hooks/usePaginatedMemories'
 import { useProcessingMemory } from '../features/memories/hooks/useProcessingMemory'
 import { MEMORY_TAG_OPTIONS, type MemoryListItem, type MemoryTag } from '../features/memories/types'
 import { formatMonthYear } from '../lib/utils'
@@ -452,6 +452,7 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
 
     try {
       await updateMemory(memoryId, { isHighlight: nextValue })
+      updateMemoryHighlightInCache(memoryId, nextValue)
     } catch (toggleError) {
       const message = toggleError instanceof Error ? toggleError.message : 'Could not update highlight.'
       setHighlightError(message)
