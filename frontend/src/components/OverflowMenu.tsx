@@ -88,7 +88,7 @@ const MenuItem = styled.button<{ $tone: 'default' | 'destructive' }>`
   }
 `
 
-export function OverflowMenu({ actions, ariaLabel = 'Member actions', disabled = false }: OverflowMenuProps) {
+export function OverflowMenu({ actions, ariaLabel = 'Viewer actions', disabled = false }: OverflowMenuProps) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)

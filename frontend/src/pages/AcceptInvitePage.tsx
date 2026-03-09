@@ -74,7 +74,7 @@ export function AcceptInvitePage({ navigate, onAccepted }: AcceptInvitePageProps
     try {
       const acceptedFamilyId = await acceptInvitation(token)
       clearPendingInviteToken()
-      setSuccess('Invitation accepted. You are now a member of this family.')
+      setSuccess('Invitation accepted. You are now a viewer in this family.')
       onAccepted?.(acceptedFamilyId)
       navigate('/memories')
     } catch (acceptError) {

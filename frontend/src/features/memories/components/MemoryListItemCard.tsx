@@ -51,23 +51,23 @@ const MarkerDot = styled.span`
   position: absolute;
   top: 16px;
   left: 1px;
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  border: 1.25px solid
-    color-mix(in srgb, ${({ theme }) => theme.colors.accentStrong} 60%, ${({ theme }) => theme.colors.border});
+  border: 1.5px solid color-mix(in srgb, ${({ theme }) => theme.colors.textMuted} 65%, ${({ theme }) => theme.colors.border});
   background: ${({ theme }) => theme.colors.backgroundAlt};
-  opacity: 0.58;
+  opacity: 0.72;
 `
 
 const MarkerLine = styled.span<{ $hidden: boolean }>`
   position: absolute;
   top: 29px;
-  left: 4px;
-  width: 1px;
+  left: 4.5px;
+  width: 1.5px;
   bottom: 0;
-  background: ${({ theme, $hidden }) => ($hidden ? 'transparent' : theme.colors.border)};
-  opacity: ${({ $hidden }) => ($hidden ? 0 : 0.18)};
+  background: ${({ theme, $hidden }) =>
+    $hidden ? 'transparent' : `color-mix(in srgb, ${theme.colors.textMuted} 45%, ${theme.colors.border})`};
+  opacity: ${({ $hidden }) => ($hidden ? 0 : 0.28)};
 `
 
 const Content = styled.div`

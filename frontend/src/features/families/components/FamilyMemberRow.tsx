@@ -94,7 +94,7 @@ export function FamilyMemberRow({
   menuActions,
   actionsDisabled = false,
 }: FamilyMemberRowProps) {
-  const safeName = member.displayName?.trim() || 'Member'
+  const safeName = member.displayName?.trim() || 'Viewer'
 
   return (
     <Row>
@@ -109,7 +109,7 @@ export function FamilyMemberRow({
           </MetaRow>
         </TextWrap>
       </Leading>
-      <OverflowMenu actions={menuActions} ariaLabel="Member actions" disabled={actionsDisabled} />
+      <OverflowMenu actions={menuActions} ariaLabel="Viewer actions" disabled={actionsDisabled} />
     </Row>
   )
 }
