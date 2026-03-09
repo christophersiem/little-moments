@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
+import { APP_ROUTES } from '../app/routes'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
 import { PageContainer } from '../components/PageContainer'
@@ -76,13 +77,13 @@ export function AcceptInvitePage({ navigate, onAccepted }: AcceptInvitePageProps
       clearPendingInviteToken()
       setSuccess('Invitation accepted. You are now a member of this family.')
       onAccepted?.(acceptedFamilyId)
-      navigate('/memories')
+      navigate(APP_ROUTES.memories)
     } catch (acceptError) {
       if (isUnauthorizedError(acceptError)) {
         setPendingInviteToken(token)
         setError('Your session expired. Please sign in again.')
         void supabase?.auth.signOut()
-        navigate('/record')
+        navigate(APP_ROUTES.record)
       } else if (isForbiddenError(acceptError)) {
         setError('You are not authorized to accept this invitation.')
       } else {
@@ -113,7 +114,7 @@ export function AcceptInvitePage({ navigate, onAccepted }: AcceptInvitePageProps
             <Button type="button" variant="primary" onClick={() => void onAccept()} disabled={isSubmitting}>
               {isSubmitting ? 'Accepting...' : 'Accept invitation'}
             </Button>
-            <Button type="button" onClick={() => navigate('/memories')}>
+            <Button type="button" onClick={() => navigate(APP_ROUTES.memories)}>
               Go to memories
             </Button>
           </Stack>

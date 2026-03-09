@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import styled from 'styled-components'
+import { APP_ROUTES, toMemoryDetailPath } from '../app/routes'
 import { Button } from '../components/Button'
 import { PageContainer } from '../components/PageContainer'
 import { MemoriesEmptyState } from '../features/memories/components/MemoriesEmptyState'
@@ -210,13 +211,13 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
           {highlightError ? <ErrorText>{highlightError}</ErrorText> : null}
 
           {groups.length === 0 ? (
-            <MemoriesEmptyState highlightsOnly={filters.highlightsOnly} onRecordMoment={() => navigate('/record')} />
+            <MemoriesEmptyState highlightsOnly={filters.highlightsOnly} onRecordMoment={() => navigate(APP_ROUTES.RECORD)} />
           ) : (
             <MemoriesTimeline
               groups={groups}
               pendingMemoryPrefix={PENDING_MEMORY_PREFIX}
               highlightPendingById={highlightPendingById}
-              onOpenMemory={(id) => navigate(`/memories/${id}`)}
+              onOpenMemory={(id) => navigate(toMemoryDetailPath(id))}
               onToggleHighlight={onToggleHighlight}
               showLoadMoreHint={showLoadMoreHint}
               hasMore={hasMore}

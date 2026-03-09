@@ -1,5 +1,6 @@
 import styled from 'styled-components'
 import { Button } from './Button'
+import { APP_ROUTES } from '../app/routes'
 
 interface TopNavProps {
   pathname: string
@@ -107,7 +108,7 @@ export function TopNav({
       onLockedNavigationAttempt?.()
       return
     }
-    if (nextPath === '/record' && !canRecord) {
+    if (nextPath === APP_ROUTES.record && !canRecord) {
       onLockedNavigationAttempt?.()
       return
     }
@@ -118,10 +119,10 @@ export function TopNav({
     <Nav>
       <Button
         variant="nav"
-        active={pathname.startsWith('/memories')}
-        onClick={() => onNavigate('/memories')}
-        aria-disabled={navigationLocked && !pathname.startsWith('/memories')}
-        style={{ opacity: navigationLocked && !pathname.startsWith('/memories') ? 0.62 : 1 }}
+        active={pathname.startsWith(APP_ROUTES.memories)}
+        onClick={() => onNavigate(APP_ROUTES.memories)}
+        aria-disabled={navigationLocked && !pathname.startsWith(APP_ROUTES.memories)}
+        style={{ opacity: navigationLocked && !pathname.startsWith(APP_ROUTES.memories) ? 0.62 : 1 }}
       >
         <NavItem>
           <BookIcon />
@@ -130,10 +131,10 @@ export function TopNav({
       </Button>
       <Button
         variant="nav"
-        active={pathname.startsWith('/record')}
-        onClick={() => onNavigate('/record')}
-        aria-disabled={navigationLocked && !pathname.startsWith('/record')}
-        style={{ opacity: !canRecord || (navigationLocked && !pathname.startsWith('/record')) ? 0.62 : 1 }}
+        active={pathname.startsWith(APP_ROUTES.record)}
+        onClick={() => onNavigate(APP_ROUTES.record)}
+        aria-disabled={navigationLocked && !pathname.startsWith(APP_ROUTES.record)}
+        style={{ opacity: !canRecord || (navigationLocked && !pathname.startsWith(APP_ROUTES.record)) ? 0.62 : 1 }}
       >
         <NavItem>
           <RecordIcon />
@@ -142,10 +143,10 @@ export function TopNav({
       </Button>
       <Button
         variant="nav"
-        active={pathname.startsWith('/settings')}
-        onClick={() => onNavigate('/settings')}
-        aria-disabled={navigationLocked && !pathname.startsWith('/settings')}
-        style={{ opacity: navigationLocked && !pathname.startsWith('/settings') ? 0.62 : 1 }}
+        active={pathname.startsWith(APP_ROUTES.settings)}
+        onClick={() => onNavigate(APP_ROUTES.settings)}
+        aria-disabled={navigationLocked && !pathname.startsWith(APP_ROUTES.settings)}
+        style={{ opacity: navigationLocked && !pathname.startsWith(APP_ROUTES.settings) ? 0.62 : 1 }}
       >
         <NavItem>
           <SettingsIcon />
