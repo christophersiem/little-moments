@@ -236,7 +236,7 @@ public class SupabaseGatewayService {
             .build(true)
             .toUriString();
 
-        callPost(uri, body, authorizationHeader, "resolution=ignore-duplicates,return=minimal");
+        callPost(uri, body, authorizationHeader, profileEnsurePreferHeader());
     }
 
     public ProfileResponse getOwnProfile(String authorizationHeader) {
@@ -741,6 +741,10 @@ public class SupabaseGatewayService {
             return value;
         }
         return fallback;
+    }
+
+    String profileEnsurePreferHeader() {
+        return "resolution=ignore-duplicates,return=minimal";
     }
 
     private void applyMemoryFilters(
