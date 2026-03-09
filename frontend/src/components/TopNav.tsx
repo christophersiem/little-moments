@@ -1,10 +1,12 @@
 import styled from 'styled-components'
-import { Button } from './Button'
+import type { BottomNavigationIcon, BottomNavigationItem } from '../app/navigation'
 import { APP_ROUTES } from '../app/routes'
+import { Button } from './Button'
 
 interface TopNavProps {
   pathname: string
   navigate: (nextPath: string) => void
+  items: readonly BottomNavigationItem[]
   canRecord?: boolean
   navigationLocked?: boolean
   onLockedNavigationAttempt?: () => void
@@ -96,9 +98,20 @@ function SettingsIcon() {
   )
 }
 
+function iconFor(icon: BottomNavigationIcon) {
+  if (icon === 'record') {
+    return <RecordIcon />
+  }
+  if (icon === 'settings') {
+    return <SettingsIcon />
+  }
+  return <BookIcon />
+}
+
 export function TopNav({
   pathname,
   navigate,
+  items,
   canRecord = false,
   navigationLocked = false,
   onLockedNavigationAttempt,
@@ -117,42 +130,28 @@ export function TopNav({
 
   return (
     <Nav>
-      <Button
-        variant="nav"
-        active={pathname.startsWith(APP_ROUTES.memories)}
-        onClick={() => onNavigate(APP_ROUTES.memories)}
-        aria-disabled={navigationLocked && !pathname.startsWith(APP_ROUTES.memories)}
-        style={{ opacity: navigationLocked && !pathname.startsWith(APP_ROUTES.memories) ? 0.62 : 1 }}
-      >
-        <NavItem>
-          <BookIcon />
-          <NavLabel>Memories</NavLabel>
-        </NavItem>
-      </Button>
-      <Button
-        variant="nav"
-        active={pathname.startsWith(APP_ROUTES.record)}
-        onClick={() => onNavigate(APP_ROUTES.record)}
-        aria-disabled={navigationLocked && !pathname.startsWith(APP_ROUTES.record)}
-        style={{ opacity: !canRecord || (navigationLocked && !pathname.startsWith(APP_ROUTES.record)) ? 0.62 : 1 }}
-      >
-        <NavItem>
-          <RecordIcon />
-          <NavLabel>Record</NavLabel>
-        </NavItem>
-      </Button>
-      <Button
-        variant="nav"
-        active={pathname.startsWith(APP_ROUTES.settings)}
-        onClick={() => onNavigate(APP_ROUTES.settings)}
-        aria-disabled={navigationLocked && !pathname.startsWith(APP_ROUTES.settings)}
-        style={{ opacity: navigationLocked && !pathname.startsWith(APP_ROUTES.settings) ? 0.62 : 1 }}
-      >
-        <NavItem>
-          <SettingsIcon />
-          <NavLabel>Settings</NavLabel>
-        </NavItem>
-      </Button>
+      {items.map((item) => {
+        const active = pathname.startsWith(item.route)
+        const disabledByLock = navigationLocked && !active
+        const isRecordRoute = item.route === APP_ROUTES.record
+        const opacity = !canRecord && isRecordRoute ? 0.62 : disabledByLock ? 0.62 : 1
+
+        return (
+          <Button
+            key={item.route}
+            variant="nav"
+            active={active}
+            onClick={() => onNavigate(item.route)}
+            aria-disabled={disabledByLock}
+            style={{ opacity }}
+          >
+            <NavItem>
+              {iconFor(item.icon)}
+              <NavLabel>{item.label}</NavLabel>
+            </NavItem>
+          </Button>
+        )
+      })}
     </Nav>
   )
 }

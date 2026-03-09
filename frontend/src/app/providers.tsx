@@ -3,11 +3,11 @@ import { ThemeProvider } from 'styled-components'
 import { GlobalStyle } from '../styles/GlobalStyle'
 import { theme } from '../styles/theme'
 
-interface ProvidersProps {
+interface AppProvidersProps {
   children: ReactNode
 }
 
-export function Providers({ children }: ProvidersProps) {
+export function AppProviders({ children }: AppProvidersProps) {
   return (
     <ThemeProvider theme={theme}>
       <GlobalStyle />
@@ -15,3 +15,5 @@ export function Providers({ children }: ProvidersProps) {
     </ThemeProvider>
   )
 }
+
+export const Providers = AppProviders

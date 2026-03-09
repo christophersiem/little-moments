@@ -1,7 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './app/App'
-import { Providers } from './app/Providers'
 import rippleLogoUrl from './assets/logo-ripple-1.svg'
 
 const rootElement = document.getElementById('root')
@@ -35,8 +34,6 @@ setFavicon(rippleLogoUrl)
 
 createRoot(rootElement).render(
   <StrictMode>
-    <Providers>
-      <App />
-    </Providers>
+    <App />
   </StrictMode>,
 )
