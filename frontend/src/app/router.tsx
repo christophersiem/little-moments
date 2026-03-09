@@ -261,7 +261,6 @@ export function AppRouter() {
       setFamilyReady(false)
       setFamilyError('')
       setCanRecord(false)
-      setCanRecord(false)
       setNeedsOnboarding(false)
       return
     }
