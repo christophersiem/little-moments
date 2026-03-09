@@ -242,9 +242,7 @@ public class MemoryService {
             memory.updateTranscriptAndSummary(nextTranscript, insights.summary());
 
             if (request.title() == null || request.title().isBlank()) {
-                if (memory.getTitle() == null || memory.getTitle().isBlank()) {
-                    memory.updateTitle(insights.title());
-                }
+                memory.updateTitle(insights.title());
             }
 
             if (request.tags() == null) {

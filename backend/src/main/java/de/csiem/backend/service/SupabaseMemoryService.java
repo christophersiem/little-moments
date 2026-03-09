@@ -224,10 +224,7 @@ public class SupabaseMemoryService {
             patch.put("summary", insights.summary());
 
             if (request.title() == null || request.title().isBlank()) {
-                String currentTitle = nullableText(current.get("title"));
-                if (currentTitle == null || currentTitle.isBlank()) {
-                    patch.put("title", insights.title());
-                }
+                patch.put("title", insights.title());
             }
 
             if (request.tags() == null) {

@@ -426,6 +426,70 @@ class MemoryControllerIntegrationTests {
     }
 
     @Test
+    void regeneratesTitleAndSummaryWhenOnlyTranscriptChanges() throws Exception {
+        stubTranscriptionService.setFailure(null);
+        stubTranscriptionService.setTranscript("She stacked blocks in silence.");
+
+        MockMultipartFile audioFile = new MockMultipartFile(
+            "audio",
+            "moment.webm",
+            "audio/webm",
+            "fake-audio".getBytes()
+        );
+
+        MvcResult createResult = mockMvc.perform(
+                multipart("/api/memories")
+                    .file(audioFile)
+                    .param("recordedAt", "2026-01-30T10:00:00Z")
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+            )
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        String id = extractId(createResult.getResponse().getContentAsString());
+
+        MvcResult initialDetailResult = mockMvc.perform(get("/api/memories/{id}", id))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        String initialPayload = initialDetailResult.getResponse().getContentAsString();
+        String initialTitle = extractStringField(initialPayload, "title");
+        String initialSummary = extractStringField(initialPayload, "summary");
+
+        mockMvc.perform(
+                patch("/api/memories/{id}", id)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "transcript": "He built a complete tower alone and asked for another challenge right away."
+                        }
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value(id))
+            .andExpect(jsonPath("$.title").isNotEmpty())
+            .andExpect(jsonPath("$.summary").isNotEmpty())
+            .andExpect(jsonPath("$.transcript").value("He built a complete tower alone and asked for another challenge right away."));
+
+        MvcResult updatedDetailResult = mockMvc.perform(get("/api/memories/{id}", id))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        String updatedPayload = updatedDetailResult.getResponse().getContentAsString();
+        String updatedTitle = extractStringField(updatedPayload, "title");
+        String updatedSummary = extractStringField(updatedPayload, "summary");
+
+        assertNotNull(initialTitle);
+        assertNotNull(initialSummary);
+        assertNotNull(updatedTitle);
+        assertNotNull(updatedSummary);
+        assertFalse(updatedTitle.isBlank());
+        assertFalse(updatedSummary.isBlank());
+        assertFalse(initialTitle.equals(updatedTitle));
+        assertFalse(initialSummary.equals(updatedSummary));
+    }
+
+    @Test
     void togglesHighlightAndFiltersListByHighlights() throws Exception {
         stubTranscriptionService.setFailure(null);
         MockMultipartFile audioFile = new MockMultipartFile(
@@ -590,5 +654,14 @@ class MemoryControllerIntegrationTests {
             ids.add(idMatcher.group(1));
         }
         return ids;
+    }
+
+    private String extractStringField(String json, String fieldName) {
+        Pattern pattern = Pattern.compile("\"" + fieldName + "\"\\s*:\\s*\"([^\"]*)\"");
+        Matcher matcher = pattern.matcher(json);
+        if (!matcher.find()) {
+            return null;
+        }
+        return matcher.group(1);
     }
 }
