@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { Button } from '../components/Button'
+import { BottomSheet } from '../components/BottomSheet'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { OverflowMenu, type OverflowMenuAction } from '../components/OverflowMenu'
 import { deleteMemory, updateMemory } from '../features/memories/api'
@@ -83,21 +84,42 @@ const MetaText = styled.p`
   font-size: ${({ theme }) => theme.typography.secondarySize};
 `
 
-const DateEditRow = styled.div`
+const DateSheetContent = styled.div`
   display: flex;
-  align-items: center;
-  gap: ${({ theme }) => theme.space.x2};
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.x3};
+  padding: ${({ theme }) => theme.space.x4};
 `
 
-const DateInput = styled.input`
-  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+const DateField = styled.label`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.x1};
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+`
+
+const DateTextInput = styled.input`
+  min-height: 48px;
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: ${({ theme }) => theme.radii.md};
-  background: ${({ theme }) => theme.colors.surfaceStrong};
+  background: ${({ theme }) => theme.colors.surface};
   color: ${({ theme }) => theme.colors.text};
   padding: 0 ${({ theme }) => theme.space.x3};
-  font-size: ${({ theme }) => theme.typography.secondarySize};
+  font-size: ${({ theme }) => theme.typography.bodySize};
+  font-family: inherit;
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
+    outline-offset: 2px;
+  }
+`
+
+const DateSheetFooter = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: ${({ theme }) => theme.space.x2};
+  padding: ${({ theme }) => theme.space.x3};
 `
 
 const EditIcon = styled.svg`
@@ -261,12 +283,22 @@ function toDateTimeLocalValue(isoValue: string): string {
   return `${year}-${month}-${day}T${hour}:${minute}`
 }
 
-function toIsoFromLocalDateTime(value: string): string | null {
-  const normalized = value.trim()
-  if (!normalized) {
+function splitDateTimeDraft(isoValue: string): { date: string; time: string } {
+  const local = toDateTimeLocalValue(isoValue)
+  if (!local.includes('T')) {
+    return { date: '', time: '' }
+  }
+  const [date, time] = local.split('T')
+  return { date, time }
+}
+
+function toIsoFromDateAndTime(dateValue: string, timeValue: string): string | null {
+  const date = dateValue.trim()
+  const time = timeValue.trim()
+  if (!date || !time) {
     return null
   }
-  const parsed = new Date(normalized)
+  const parsed = new Date(`${date}T${time}`)
   if (Number.isNaN(parsed.getTime())) {
     return null
   }
@@ -288,7 +320,9 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
   const [editingDate, setEditingDate] = useState(false)
-  const [dateDraft, setDateDraft] = useState('')
+  const [dateDraftDate, setDateDraftDate] = useState('')
+  const [dateDraftTime, setDateDraftTime] = useState('')
+  const dateInputRef = useRef<HTMLInputElement | null>(null)
 
   const [editingTranscript, setEditingTranscript] = useState(false)
   const [transcriptDraft, setTranscriptDraft] = useState('')
@@ -302,7 +336,9 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
     }
     setCurrentMemory(memory)
     setTitleDraft(memory.title || '')
-    setDateDraft(toDateTimeLocalValue(memory.recordedAt || memory.createdAt))
+    const split = splitDateTimeDraft(memory.recordedAt || memory.createdAt)
+    setDateDraftDate(split.date)
+    setDateDraftTime(split.time)
     setTranscriptDraft(memory.transcript || '')
     setTagsDraft(memory.tags)
     setSaveError('')
@@ -357,7 +393,7 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
   }
 
   const onSaveDate = async () => {
-    const isoValue = toIsoFromLocalDateTime(dateDraft)
+    const isoValue = toIsoFromDateAndTime(dateDraftDate, dateDraftTime)
     if (!isoValue) {
       setSaveError('Please select a valid date and time.')
       return
@@ -433,7 +469,11 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
             setEditingTitle(false)
             setEditingTranscript(false)
             setEditingTags(false)
-            setDateDraft(currentMemory ? toDateTimeLocalValue(currentMemory.recordedAt || currentMemory.createdAt) : '')
+            if (currentMemory) {
+              const split = splitDateTimeDraft(currentMemory.recordedAt || currentMemory.createdAt)
+              setDateDraftDate(split.date)
+              setDateDraftTime(split.time)
+            }
             setEditingDate(true)
           },
         },
@@ -533,35 +573,7 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
           )}
         </TitleRow>
 
-        {editingDate ? (
-          <DateEditRow>
-            <DateInput
-              type="datetime-local"
-              value={dateDraft}
-              onChange={(event) => setDateDraft(event.target.value)}
-              aria-label="Edit memory date"
-            />
-            <EditStateActions>
-              <EditStateIconButton $kind="save" type="button" aria-label="Save date" disabled={saving} onClick={() => void onSaveDate()}>
-                <SaveIcon />
-              </EditStateIconButton>
-              <EditStateIconButton
-                $kind="cancel"
-                type="button"
-                aria-label="Cancel date editing"
-                disabled={saving}
-                onClick={() => {
-                  setDateDraft(toDateTimeLocalValue(currentMemory.recordedAt || currentMemory.createdAt))
-                  setEditingDate(false)
-                }}
-              >
-                <CancelIcon />
-              </EditStateIconButton>
-            </EditStateActions>
-          </DateEditRow>
-        ) : (
-          <MetaText>{formatDateTime(currentMemory.recordedAt || currentMemory.createdAt)}</MetaText>
-        )}
+        <MetaText>{formatDateTime(currentMemory.recordedAt || currentMemory.createdAt)}</MetaText>
         {lastSavedAt && <MetaText>Last saved {formatDateTime(lastSavedAt)}</MetaText>}
 
         <TagRow>
@@ -673,6 +685,68 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
         }}
         onConfirm={() => void onConfirmDelete()}
       />
+      <BottomSheet
+        open={canManageMemory && editingDate}
+        title="Edit date and time"
+        onClose={() => {
+          if (saving) {
+            return
+          }
+          if (currentMemory) {
+            const split = splitDateTimeDraft(currentMemory.recordedAt || currentMemory.createdAt)
+            setDateDraftDate(split.date)
+            setDateDraftTime(split.time)
+          }
+          setEditingDate(false)
+        }}
+        initialFocusRef={dateInputRef}
+        footer={
+          <DateSheetFooter>
+            <Button
+              type="button"
+              onClick={() => {
+                if (saving) {
+                  return
+                }
+                if (currentMemory) {
+                  const split = splitDateTimeDraft(currentMemory.recordedAt || currentMemory.createdAt)
+                  setDateDraftDate(split.date)
+                  setDateDraftTime(split.time)
+                }
+                setEditingDate(false)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button variant="primary" type="button" disabled={saving} onClick={() => void onSaveDate()}>
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+          </DateSheetFooter>
+        }
+      >
+        <DateSheetContent>
+          <DateField>
+            Date
+            <DateTextInput
+              ref={dateInputRef}
+              type="date"
+              value={dateDraftDate}
+              onChange={(event) => setDateDraftDate(event.target.value)}
+              aria-label="Memory date"
+            />
+          </DateField>
+          <DateField>
+            Time
+            <DateTextInput
+              type="time"
+              value={dateDraftTime}
+              onChange={(event) => setDateDraftTime(event.target.value)}
+              aria-label="Memory time"
+              step={60}
+            />
+          </DateField>
+        </DateSheetContent>
+      </BottomSheet>
     </Section>
   )
 }
