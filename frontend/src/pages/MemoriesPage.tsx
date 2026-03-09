@@ -286,6 +286,7 @@ const ScrollSentinel = styled.div`
 `
 
 const PENDING_MEMORY_PREFIX = 'pending-memory-'
+const SHORT_TRANSCRIPT_ERROR = 'Recording too short. Please speak at least 8 words.'
 
 function getEventDate(item: MemoryListItem): string {
   return item.recordedAt || item.createdAt
@@ -343,6 +344,18 @@ function CheckGlyph() {
       <path d="M6 12.5l4 4 8-9" />
     </FilterIcon>
   )
+}
+
+function toReadableProcessingError(message: string | null | undefined): string {
+  const raw = (message ?? '').trim()
+  if (!raw) {
+    return 'Please try again.'
+  }
+  const normalized = raw.toLowerCase()
+  if (normalized.includes('transcription response was empty') || normalized.includes('too short')) {
+    return SHORT_TRANSCRIPT_ERROR
+  }
+  return raw
 }
 
 function ChevronGlyph() {
@@ -716,7 +729,7 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
         <StatusBanner
           tone="error"
           title="We couldn’t finish saving this moment."
-          detail={activeUpload.errorMessage || processingError || 'Please try again.'}
+          detail={toReadableProcessingError(activeUpload.errorMessage || processingError)}
           actionLabel="Try again"
           onAction={onRetryProcessing}
         />

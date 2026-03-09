@@ -27,7 +27,7 @@ interface RecordingPayload {
 const NOOP = () => undefined
 const MIN_RECORDING_SECONDS = 2
 const MIN_RECORDING_BYTES = 10000
-const SHORT_RECORDING_HINT = 'Recording too short. Please speak at least 5 words.'
+const SHORT_RECORDING_HINT = 'Recording too short. Please speak at least 8 words.'
 const SHORT_HINT_DISPLAY_MS = 5200
 
 function isLikelyTooShort(blob: Blob, elapsedSeconds: number): boolean {
@@ -100,7 +100,7 @@ const BodyText = styled.p`
 const HintBanner = styled.p`
   width: min(360px, calc(100dvw - 48px));
   max-width: 100%;
-  margin: ${({ theme }) => `${theme.space.x3} 0 0`};
+  margin: ${({ theme }) => `${theme.space.x5} 0 0`};
   padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3}`};
   border: 1px solid ${({ theme }) => theme.colors.danger};
   border-radius: ${({ theme }) => theme.radii.md};
