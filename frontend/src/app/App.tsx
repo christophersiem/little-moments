@@ -265,9 +265,7 @@ export default function App() {
     const persistedFamilyId = getActiveFamilyId()
     const persistedChildId = getActiveChildId()
     const persistedCanRecord = getCanRecord()
-    const nextFamilyId = familyId ?? persistedFamilyId
-    const nextChildId = childId ?? persistedChildId
-    const hasCachedContext = Boolean(nextFamilyId && nextChildId)
+    const hasCachedContext = Boolean(persistedFamilyId && persistedChildId)
     if (!familyId && persistedFamilyId) {
       setFamilyId(persistedFamilyId)
     }
@@ -307,6 +305,7 @@ export default function App() {
           setFamilyId(null)
           setChildId(null)
           setCanRecord(false)
+          clearActiveFamilyId()
           clearActiveChildId()
           clearCanRecord()
           setFamilyReady(true)
@@ -354,7 +353,7 @@ export default function App() {
     return () => {
       disposed = true
     }
-  }, [bootstrapTick, childId, familyId, sessionUserId])
+  }, [bootstrapTick, sessionUserId])
 
   useEffect(() => {
     if (!familyReady || familyError) {
