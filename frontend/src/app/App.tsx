@@ -21,7 +21,6 @@ import {
   setActiveFamilyId as persistActiveFamilyId,
   setPendingInviteToken,
 } from '../features/families/localState'
-import { ensureOwnProfileForSession } from '../features/profiles/api'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import { AccountPage } from '../pages/AccountPage'
 import { AcceptInvitePage } from '../pages/AcceptInvitePage'
@@ -239,14 +238,6 @@ export default function App() {
 
     const bootstrapFamilyContext = async () => {
       try {
-        try {
-          if (session?.user) {
-            await ensureOwnProfileForSession(session.user)
-          }
-        } catch {
-          // Keep onboarding robust if profile sync is temporarily unavailable.
-        }
-
         let acceptedFamilyId: string | null = null
         const pendingInviteToken = getPendingInviteToken()
         if (pendingInviteToken) {

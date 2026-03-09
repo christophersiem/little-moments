@@ -15,6 +15,32 @@ interface CachedMemoriesState {
 
 const memoriesCache = new Map<string, CachedMemoriesState>()
 
+export function updateMemoryHighlightInCache(memoryId: string, isHighlight: boolean): void {
+  for (const [queryKey, cached] of memoriesCache.entries()) {
+    let hasChanged = false
+    const nextItems = cached.items.map((item) => {
+      if (item.id !== memoryId || item.isHighlight === isHighlight) {
+        return item
+      }
+      hasChanged = true
+      return {
+        ...item,
+        isHighlight,
+      }
+    })
+
+    if (!hasChanged) {
+      continue
+    }
+
+    memoriesCache.set(queryKey, {
+      ...cached,
+      items: nextItems,
+      cachedAt: Date.now(),
+    })
+  }
+}
+
 interface PaginatedMemoriesQuery {
   familyId?: string
   month?: string
