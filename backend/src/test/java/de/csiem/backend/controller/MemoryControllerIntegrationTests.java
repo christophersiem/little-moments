@@ -111,6 +111,12 @@ class MemoryControllerIntegrationTests {
     }
 
     @Test
+    void returnsNotFoundForUnknownMemoryId() throws Exception {
+        mockMvc.perform(get("/api/memories/{id}", UUID.randomUUID()))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
     void returnsFailedStatusWhenTranscriptionThrows() throws Exception {
         stubTranscriptionService.setFailure(new IllegalStateException("Provider unavailable"));
 

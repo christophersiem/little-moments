@@ -186,7 +186,7 @@ const SuccessText = styled.p`
 `
 
 function displayName(member: FamilyMember): string {
-  return member.displayName?.trim() || 'Member'
+  return member.displayName?.trim() || 'Viewer'
 }
 
 export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange }: FamilyPageProps) {
@@ -261,10 +261,10 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
           return
         }
         if (isForbiddenError(error)) {
-          setMembersError('You are not authorized to view family members.')
+          setMembersError('You are not authorized to view family viewers.')
           return
         }
-        setMembersError(error instanceof Error ? error.message : 'Could not load members.')
+        setMembersError(error instanceof Error ? error.message : 'Could not load viewers.')
       })
       .finally(() => {
         if (!disposed) {
@@ -369,8 +369,8 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
     await runMemberAction(
       `remove:${member.userId}`,
       () => removeMember(familyId, member.userId),
-      'Member removed.',
-      'Could not remove member.',
+      'Viewer removed.',
+      'Could not remove viewer.',
     )
     setConfirmAction(null)
   }
@@ -434,9 +434,9 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
 
   const confirmDialogBody = confirmAction
     ? confirmAction.type === 'make-owner'
-      ? 'They will be able to manage members and invites, and record moments.'
+      ? 'They will be able to manage viewers and invites, and record moments.'
       : confirmAction.type === 'demote-owner'
-        ? 'They will remain in the family as a member.'
+        ? 'They will remain in the family as a viewer.'
       : 'They will lose access to memories in this family.'
     : ''
 
@@ -509,10 +509,10 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
         )}
 
         <Block>
-          <Subheading>Members</Subheading>
+          <Subheading>Viewers</Subheading>
           <Card>
-            {loadingMembers && <SmallText>Loading members...</SmallText>}
-            {!loadingMembers && members.length === 0 && <SmallText>No members found.</SmallText>}
+            {loadingMembers && <SmallText>Loading viewers...</SmallText>}
+            {!loadingMembers && members.length === 0 && <SmallText>No viewers found.</SmallText>}
             {!loadingMembers && members.length > 0 && <MemberList>{memberRows}</MemberList>}
             {membersError && <ErrorText>{membersError}</ErrorText>}
             {memberActionError && <ErrorText>{memberActionError}</ErrorText>}
@@ -532,7 +532,7 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
                     $selected={inviteRole === 'MEMBER'}
                     onClick={() => setInviteRole('MEMBER')}
                   >
-                    <RoleTitle>Member</RoleTitle>
+                    <RoleTitle>Viewer</RoleTitle>
                     <RoleDescription>Can view memories</RoleDescription>
                   </RoleOption>
                   <RoleOption
@@ -541,7 +541,7 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
                     onClick={() => setInviteRole('OWNER')}
                   >
                     <RoleTitle>Owner</RoleTitle>
-                    <RoleDescription>Full access, including invites and member management</RoleDescription>
+                    <RoleDescription>Full access, including invites and viewer management</RoleDescription>
                   </RoleOption>
                 </RoleSelector>
                 <InviteInput

@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { Button } from '../components/Button'
+import { BottomSheet } from '../components/BottomSheet'
 import { PageContainer } from '../components/PageContainer'
 import { StatusBanner } from '../components/StatusBanner'
 import { updateMemory } from '../features/memories/api'
-import { FilterChipBar } from '../features/memories/components/FilterChipBar'
 import { MemoryListItemCard } from '../features/memories/components/MemoryListItemCard'
-import { MonthPickerSheet } from '../features/memories/components/MonthPickerSheet'
-import { TagPickerSheet } from '../features/memories/components/TagPickerSheet'
 import { setActiveUploadStatusFromPolling, retryActiveMemoryUpload, useActiveMemoryUpload } from '../features/memories/hooks/uploadSessionStore'
 import { updateMemoryHighlightInCache, usePaginatedMemories } from '../features/memories/hooks/usePaginatedMemories'
 import { useProcessingMemory } from '../features/memories/hooks/useProcessingMemory'
@@ -35,7 +33,7 @@ const Section = styled.section`
   padding-top: ${({ theme }) => theme.space.x3};
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.space.x4};
+  gap: ${({ theme }) => theme.space.x3};
 `
 
 const PageShell = styled.div`
@@ -50,19 +48,74 @@ const StickyHeader = styled.div`
   padding: ${({ theme }) => `${theme.space.x1} 0 ${theme.space.x2}`};
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.space.x2};
+  gap: ${({ theme }) => theme.space.x1};
+  border-bottom: 1px solid color-mix(in srgb, ${({ theme }) => theme.colors.border} 42%, transparent);
 `
 
 const HeadingRow = styled.div`
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
 `
 
 const Heading = styled.h2`
   margin: 0;
-  font-size: ${({ theme }) => theme.typography.h1Size};
+  font-size: 1.5rem;
   color: ${({ theme }) => theme.colors.text};
+`
+
+const FilterButton = styled.button<{ $active: boolean }>`
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  min-width: ${({ theme }) => theme.layout.minTouchTarget};
+  border-radius: ${({ theme }) => theme.radii.pill};
+  border: 1px solid
+    ${({ theme, $active }) => ($active ? theme.colors.accentStrong : theme.colors.border)};
+  background: ${({ theme, $active }) => ($active ? theme.colors.surface : theme.colors.surfaceStrong)};
+  color: ${({ theme, $active }) => ($active ? theme.colors.accentStrong : theme.colors.textMuted)};
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  padding: 0 ${({ theme }) => theme.space.x2};
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
+    outline-offset: 2px;
+  }
+`
+
+const FilterIcon = styled.svg`
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+`
+
+const FilterSummary = styled.p`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+`
+
+const FilterBadge = styled.span`
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  min-width: 14px;
+  height: 14px;
+  border-radius: ${({ theme }) => theme.radii.pill};
+  background: ${({ theme }) => theme.colors.accentStrong};
+  color: ${({ theme }) => theme.colors.surfaceStrong};
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 14px;
+  text-align: center;
+  padding: 0 4px;
 `
 
 const Group = styled.div`
@@ -73,17 +126,17 @@ const Group = styled.div`
 
 const GroupTitle = styled.h3`
   margin: 0;
-  padding: ${({ theme }) => `${theme.space.x1} 0 ${theme.space.x2}`};
-  color: ${({ theme }) => theme.colors.text};
+  padding: ${({ theme }) => `${theme.space.x2} 0 ${theme.space.x1}`};
+  color: ${({ theme }) => theme.colors.textMuted};
   font-family: ${({ theme }) => theme.typography.headingFamily};
-  font-size: ${({ theme }) => theme.typography.h2Size};
-  font-weight: 500;
+  font-size: 1.05rem;
+  font-weight: 400;
 `
 
 const Groups = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.space.x5};
+  gap: ${({ theme }) => theme.space.x3};
 `
 
 const EmptyState = styled.div`
@@ -143,12 +196,97 @@ const RetryLoadMoreButton = styled.button`
   cursor: pointer;
 `
 
+const SheetSection = styled.section`
+  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x4}`};
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.x2};
+`
+
+const SheetHeading = styled.h3`
+  margin: 0;
+  font-size: calc(${({ theme }) => theme.typography.secondarySize} - 1px);
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-weight: 600;
+`
+
+const SheetRow = styled.button<{ $selected?: boolean }>`
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid
+    ${({ theme, $selected }) =>
+      $selected ? theme.colors.accentStrong : `color-mix(in srgb, ${theme.colors.border} 60%, transparent)`};
+  border-radius: ${({ theme }) => theme.radii.md};
+  background: ${({ theme, $selected }) => ($selected ? theme.colors.surface : theme.colors.surfaceStrong)};
+  color: ${({ theme, $selected }) => ($selected ? theme.colors.accentStrong : theme.colors.text)};
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: ${({ theme }) => `0 ${theme.space.x3}`};
+  cursor: pointer;
+  font-size: ${({ theme }) => theme.typography.bodySize};
+`
+
+const SheetTags = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.space.x2};
+`
+
+const SheetTag = styled.button<{ $selected: boolean }>`
+  min-height: 32px;
+  border-radius: ${({ theme }) => theme.radii.pill};
+  border: 1px solid
+    ${({ theme, $selected }) =>
+      $selected ? theme.colors.accentStrong : `color-mix(in srgb, ${theme.colors.border} 70%, transparent)`};
+  background: ${({ theme, $selected }) => ($selected ? theme.colors.surface : theme.colors.surfaceStrong)};
+  color: ${({ theme, $selected }) => ($selected ? theme.colors.accentStrong : theme.colors.textMuted)};
+  padding: 0 ${({ theme }) => theme.space.x2};
+  font-size: calc(${({ theme }) => theme.typography.secondarySize} - 1px);
+  cursor: pointer;
+`
+
+const SheetFooter = styled.div`
+  display: flex;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.space.x2};
+  padding: ${({ theme }) => theme.space.x3};
+`
+
+const SheetSelectorRow = styled.button`
+  width: 100%;
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  border: 1px solid color-mix(in srgb, ${({ theme }) => theme.colors.border} 62%, transparent);
+  border-radius: ${({ theme }) => theme.radii.md};
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  color: ${({ theme }) => theme.colors.text};
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: ${({ theme }) => `0 ${theme.space.x3}`};
+  cursor: pointer;
+`
+
+const SelectorLabel = styled.span`
+  color: ${({ theme }) => theme.colors.text};
+  font-size: ${({ theme }) => theme.typography.bodySize};
+`
+
+const SelectorValue = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.x1};
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+`
+
 const ScrollSentinel = styled.div`
   width: 100%;
   height: 1px;
 `
 
 const PENDING_MEMORY_PREFIX = 'pending-memory-'
+const SHORT_TRANSCRIPT_ERROR = 'Recording too short. Please speak at least 8 words.'
 
 function getEventDate(item: MemoryListItem): string {
   return item.recordedAt || item.createdAt
@@ -192,12 +330,51 @@ function groupByMonth(items: MemoryListItem[]): MonthGroup[] {
   return groups
 }
 
+function FilterGlyph() {
+  return (
+    <FilterIcon viewBox="0 0 24 24" aria-hidden>
+      <path d="M4 6h16l-6.2 6.8v5.4L10.2 20v-7.2L4 6Z" />
+    </FilterIcon>
+  )
+}
+
+function CheckGlyph() {
+  return (
+    <FilterIcon viewBox="0 0 24 24" aria-hidden>
+      <path d="M6 12.5l4 4 8-9" />
+    </FilterIcon>
+  )
+}
+
+function toReadableProcessingError(message: string | null | undefined): string {
+  const raw = (message ?? '').trim()
+  if (!raw) {
+    return 'Please try again.'
+  }
+  const normalized = raw.toLowerCase()
+  if (normalized.includes('transcription response was empty') || normalized.includes('too short')) {
+    return SHORT_TRANSCRIPT_ERROR
+  }
+  return raw
+}
+
+function ChevronGlyph() {
+  return (
+    <FilterIcon viewBox="0 0 24 24" aria-hidden>
+      <path d="M9 6l6 6-6 6" />
+    </FilterIcon>
+  )
+}
+
 export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false)
   const [monthPickerOpen, setMonthPickerOpen] = useState(false)
-  const [tagPickerOpen, setTagPickerOpen] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState('all')
   const [selectedTags, setSelectedTags] = useState<MemoryTag[]>([])
   const [highlightsOnly, setHighlightsOnly] = useState(false)
+  const [draftMonth, setDraftMonth] = useState('all')
+  const [draftTags, setDraftTags] = useState<MemoryTag[]>([])
+  const [draftHighlightsOnly, setDraftHighlightsOnly] = useState(false)
   const [highlightOverrides, setHighlightOverrides] = useState<Record<string, boolean>>({})
   const [highlightPendingById, setHighlightPendingById] = useState<Record<string, boolean>>({})
   const [highlightError, setHighlightError] = useState('')
@@ -280,6 +457,13 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
     return monthOptions.find((option) => option.key === selectedMonth)?.label || selectedMonth
   }, [monthOptions, selectedMonth])
 
+  const draftMonthLabel = useMemo(() => {
+    if (draftMonth === 'all') {
+      return 'All months'
+    }
+    return monthOptions.find((option) => option.key === draftMonth)?.label || draftMonth
+  }, [draftMonth, monthOptions])
+
   const timelineItems = useMemo(
     () => (highlightsOnly ? effectiveItems.filter((item) => item.isHighlight) : effectiveItems),
     [effectiveItems, highlightsOnly],
@@ -288,20 +472,56 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
   const groups = useMemo(() => groupByMonth(timelineItems), [timelineItems])
 
   const hasActiveFilters = selectedMonth !== 'all' || selectedTags.length > 0 || highlightsOnly
-  const tagsChipLabel = useMemo(() => {
-    if (selectedTags.length === 0) {
-      return 'All tags'
-    }
-    if (selectedTags.length === 1) {
-      return selectedTags[0]
-    }
-    return `${selectedTags[0]} +${selectedTags.length - 1}`
-  }, [selectedTags])
+  const activeFilterCount = (selectedMonth !== 'all' ? 1 : 0) + (selectedTags.length > 0 ? 1 : 0) + (highlightsOnly ? 1 : 0)
+  const filterSummary = useMemo(() => {
+    const monthPart = selectedMonth === 'all' ? 'All months' : selectedMonthLabel
+    const tagsPart =
+      selectedTags.length === 0
+        ? 'No tags'
+        : selectedTags.length === 1
+          ? selectedTags[0]
+          : `${selectedTags[0]} +${selectedTags.length - 1}`
+    const highlightPart = highlightsOnly ? 'Highlights only' : null
+    return [monthPart, tagsPart, highlightPart].filter(Boolean).join(' · ')
+  }, [highlightsOnly, selectedMonth, selectedMonthLabel, selectedTags])
+
+  const openFilters = () => {
+    setDraftMonth(selectedMonth)
+    setDraftTags(selectedTags)
+    setDraftHighlightsOnly(highlightsOnly)
+    setFilterSheetOpen(true)
+  }
+
+  const applyFilters = () => {
+    setSelectedMonth(draftMonth)
+    setSelectedTags(draftTags)
+    setHighlightsOnly(draftHighlightsOnly)
+    setFilterSheetOpen(false)
+  }
+
+  const openMonthPicker = () => {
+    setFilterSheetOpen(false)
+    setMonthPickerOpen(true)
+  }
+
+  const closeMonthPickerToFilters = () => {
+    setMonthPickerOpen(false)
+    setFilterSheetOpen(true)
+  }
+
+  const selectDraftMonth = (nextMonth: string) => {
+    setDraftMonth(nextMonth)
+    closeMonthPickerToFilters()
+  }
 
   const clearFilters = () => {
-    setSelectedMonth('all')
-    setSelectedTags([])
-    setHighlightsOnly(false)
+    setDraftMonth('all')
+    setDraftTags([])
+    setDraftHighlightsOnly(false)
+  }
+
+  const toggleDraftTag = (tag: MemoryTag) => {
+    setDraftTags((current) => (current.includes(tag) ? current.filter((value) => value !== tag) : [...current, tag]))
   }
 
   useEffect(() => {
@@ -509,7 +729,7 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
         <StatusBanner
           tone="error"
           title="We couldn’t finish saving this moment."
-          detail={activeUpload.errorMessage || processingError || 'Please try again.'}
+          detail={toReadableProcessingError(activeUpload.errorMessage || processingError)}
           actionLabel="Try again"
           onAction={onRetryProcessing}
         />
@@ -523,17 +743,12 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
     <StickyHeader>
       <HeadingRow>
         <Heading>Memories</Heading>
+        <FilterButton type="button" $active={hasActiveFilters} onClick={openFilters} aria-label="Open filters">
+          <FilterGlyph />
+          {activeFilterCount > 0 ? <FilterBadge>{activeFilterCount}</FilterBadge> : null}
+        </FilterButton>
       </HeadingRow>
-      <FilterChipBar
-        monthLabel={selectedMonthLabel}
-        tagsLabel={tagsChipLabel}
-        highlightsActive={highlightsOnly}
-        hasActiveFilters={hasActiveFilters}
-        onOpenMonth={() => setMonthPickerOpen(true)}
-        onOpenTags={() => setTagPickerOpen(true)}
-        onToggleHighlights={() => setHighlightsOnly((current) => !current)}
-        onClear={clearFilters}
-      />
+      <FilterSummary>{filterSummary}</FilterSummary>
     </StickyHeader>
   )
 
@@ -551,20 +766,6 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
             <LoadingSkeleton />
             <LoadingSkeleton />
           </Section>
-          <MonthPickerSheet
-            open={monthPickerOpen}
-            monthOptions={monthOptions}
-            selectedMonth={selectedMonth}
-            onSelect={setSelectedMonth}
-            onClose={() => setMonthPickerOpen(false)}
-          />
-          <TagPickerSheet
-            open={tagPickerOpen}
-            availableTags={MEMORY_TAG_OPTIONS}
-            selectedTags={selectedTags}
-            onDone={setSelectedTags}
-            onClose={() => setTagPickerOpen(false)}
-          />
         </PageShell>
       </PageContainer>
     )
@@ -582,20 +783,6 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
               Try again
             </Button>
           </Section>
-          <MonthPickerSheet
-            open={monthPickerOpen}
-            monthOptions={monthOptions}
-            selectedMonth={selectedMonth}
-            onSelect={setSelectedMonth}
-            onClose={() => setMonthPickerOpen(false)}
-          />
-          <TagPickerSheet
-            open={tagPickerOpen}
-            availableTags={MEMORY_TAG_OPTIONS}
-            selectedTags={selectedTags}
-            onDone={setSelectedTags}
-            onClose={() => setTagPickerOpen(false)}
-          />
         </PageShell>
       </PageContainer>
     )
@@ -614,7 +801,7 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
               {highlightsOnly ? (
                 <>
                   <EmptyTitle>No highlights yet</EmptyTitle>
-                  <EmptyText>Mark meaningful memories with the heart icon to find them here later.</EmptyText>
+                  <EmptyText>Mark meaningful memories with the bookmark icon to find them here later.</EmptyText>
                 </>
               ) : (
                 <EmptyText>No moments match these filters.</EmptyText>
@@ -673,20 +860,91 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
             </>
           )}
         </Section>
-        <MonthPickerSheet
+        <BottomSheet
+          open={filterSheetOpen}
+          title="Filters"
+          onClose={() => setFilterSheetOpen(false)}
+          footer={
+            <SheetFooter>
+              <Button type="button" onClick={clearFilters}>
+                Clear
+              </Button>
+              <Button variant="primary" type="button" onClick={applyFilters}>
+                Apply
+              </Button>
+            </SheetFooter>
+          }
+        >
+          <SheetSection>
+            <SheetHeading>Month</SheetHeading>
+            <SheetSelectorRow type="button" onClick={openMonthPicker} aria-label="Open month picker">
+              <SelectorLabel>Selected month</SelectorLabel>
+              <SelectorValue>
+                {draftMonthLabel}
+                <ChevronGlyph />
+              </SelectorValue>
+            </SheetSelectorRow>
+          </SheetSection>
+
+          <SheetSection>
+            <SheetHeading>Tags</SheetHeading>
+            <SheetTags>
+              {MEMORY_TAG_OPTIONS.map((tag) => (
+                <SheetTag
+                  key={tag}
+                  type="button"
+                  $selected={draftTags.includes(tag)}
+                  onClick={() => toggleDraftTag(tag)}
+                  aria-pressed={draftTags.includes(tag)}
+                >
+                  {tag}
+                </SheetTag>
+              ))}
+            </SheetTags>
+          </SheetSection>
+
+          <SheetSection>
+            <SheetHeading>Highlights</SheetHeading>
+            <SheetRow
+              type="button"
+              $selected={draftHighlightsOnly}
+              onClick={() => setDraftHighlightsOnly((current) => !current)}
+              aria-pressed={draftHighlightsOnly}
+            >
+              Show highlights only
+              {draftHighlightsOnly ? <CheckGlyph /> : null}
+            </SheetRow>
+          </SheetSection>
+        </BottomSheet>
+        <BottomSheet
           open={monthPickerOpen}
-          monthOptions={monthOptions}
-          selectedMonth={selectedMonth}
-          onSelect={setSelectedMonth}
-          onClose={() => setMonthPickerOpen(false)}
-        />
-        <TagPickerSheet
-          open={tagPickerOpen}
-          availableTags={MEMORY_TAG_OPTIONS}
-          selectedTags={selectedTags}
-          onDone={setSelectedTags}
-          onClose={() => setTagPickerOpen(false)}
-        />
+          title="Month"
+          onClose={closeMonthPickerToFilters}
+        >
+          <SheetSection>
+            <SheetRow
+              type="button"
+              $selected={draftMonth === 'all'}
+              onClick={() => selectDraftMonth('all')}
+              aria-pressed={draftMonth === 'all'}
+            >
+              All months
+              {draftMonth === 'all' ? <CheckGlyph /> : null}
+            </SheetRow>
+            {monthOptions.map((option) => (
+              <SheetRow
+                key={option.key}
+                type="button"
+                $selected={draftMonth === option.key}
+                onClick={() => selectDraftMonth(option.key)}
+                aria-pressed={draftMonth === option.key}
+              >
+                {option.label}
+                {draftMonth === option.key ? <CheckGlyph /> : null}
+              </SheetRow>
+            ))}
+          </SheetSection>
+        </BottomSheet>
       </PageShell>
     </PageContainer>
   )

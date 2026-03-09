@@ -19,10 +19,6 @@ const Nav = styled.nav`
   background: ${({ theme }) => theme.colors.surfaceStrong};
 `
 
-const NavTwoColumns = styled(Nav)`
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-`
-
 const NavItem = styled.span`
   display: flex;
   flex-direction: column;
@@ -102,14 +98,16 @@ function SettingsIcon() {
 export function TopNav({
   pathname,
   navigate,
-  canRecord = true,
+  canRecord = false,
   navigationLocked = false,
   onLockedNavigationAttempt,
 }: TopNavProps) {
-  const NavContainer = canRecord ? Nav : NavTwoColumns
-
   const onNavigate = (nextPath: string) => {
     if (navigationLocked && pathname !== nextPath) {
+      onLockedNavigationAttempt?.()
+      return
+    }
+    if (nextPath === '/record' && !canRecord) {
       onLockedNavigationAttempt?.()
       return
     }
@@ -117,7 +115,7 @@ export function TopNav({
   }
 
   return (
-    <NavContainer>
+    <Nav>
       <Button
         variant="nav"
         active={pathname.startsWith('/memories')}
@@ -130,20 +128,18 @@ export function TopNav({
           <NavLabel>Memories</NavLabel>
         </NavItem>
       </Button>
-      {canRecord && (
-        <Button
-          variant="nav"
-          active={pathname.startsWith('/record')}
-          onClick={() => onNavigate('/record')}
-          aria-disabled={navigationLocked && !pathname.startsWith('/record')}
-          style={{ opacity: navigationLocked && !pathname.startsWith('/record') ? 0.62 : 1 }}
-        >
-          <NavItem>
-            <RecordIcon />
-            <NavLabel>Record</NavLabel>
-          </NavItem>
-        </Button>
-      )}
+      <Button
+        variant="nav"
+        active={pathname.startsWith('/record')}
+        onClick={() => onNavigate('/record')}
+        aria-disabled={navigationLocked && !pathname.startsWith('/record')}
+        style={{ opacity: !canRecord || (navigationLocked && !pathname.startsWith('/record')) ? 0.62 : 1 }}
+      >
+        <NavItem>
+          <RecordIcon />
+          <NavLabel>Record</NavLabel>
+        </NavItem>
+      </Button>
       <Button
         variant="nav"
         active={pathname.startsWith('/settings')}
@@ -156,6 +152,6 @@ export function TopNav({
           <NavLabel>Settings</NavLabel>
         </NavItem>
       </Button>
-    </NavContainer>
+    </Nav>
   )
 }

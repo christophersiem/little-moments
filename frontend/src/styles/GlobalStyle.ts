@@ -16,6 +16,11 @@ export const GlobalStyle = createGlobalStyle`
     overflow-x: hidden;
   }
 
+  html,
+  body {
+    scrollbar-gutter: stable both-edges;
+  }
+
   body {
     margin: 0;
     font-family: ${({ theme }) => theme.typography.bodyFamily};

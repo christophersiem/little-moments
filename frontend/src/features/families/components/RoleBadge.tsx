@@ -20,6 +20,6 @@ const Badge = styled.span<{ $role: FamilyMemberRole }>`
 `
 
 export function RoleBadge({ role }: RoleBadgeProps) {
-  return <Badge $role={role}>{role === 'OWNER' ? 'Owner' : 'Member'}</Badge>
+  return <Badge $role={role}>{role === 'OWNER' ? 'Owner' : 'Viewer'}</Badge>
 }
 

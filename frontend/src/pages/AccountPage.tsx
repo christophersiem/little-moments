@@ -145,7 +145,7 @@ export function AccountPage({ navigate, userEmail = '' }: AccountPageProps) {
           return
         }
 
-        const nextDisplayName = profile?.displayName ?? 'Member'
+        const nextDisplayName = profile?.displayName ?? 'Viewer'
         const nextEmail = userEmail || accountPageCache?.email || ''
         accountPageCache = {
           displayName: nextDisplayName,

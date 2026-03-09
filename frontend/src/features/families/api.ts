@@ -3,7 +3,7 @@ import { backendRequestJson, backendRequestVoid } from '../../lib/backendApi'
 /*
  * Security notes:
  * - The frontend never simulates authorization rules.
- * - Role/member writes run through backend RPC wrappers.
+ * - Role/viewer writes run through backend RPC wrappers.
  * - Supabase RLS remains the source of truth for data visibility.
  */
 
@@ -106,7 +106,7 @@ export async function listFamilyMembers(familyId: string): Promise<FamilyMember[
 
   return (rows ?? []).map((row) => ({
     userId: String(row.userId),
-    displayName: typeof row.displayName === 'string' && row.displayName.trim() ? row.displayName : 'Member',
+    displayName: typeof row.displayName === 'string' && row.displayName.trim() ? row.displayName : 'Viewer',
     role: mapRole(String(row.role)),
     joinedAt: String(row.joinedAt),
   }))

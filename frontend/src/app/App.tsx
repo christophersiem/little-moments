@@ -56,7 +56,7 @@ const Header = styled.header`
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: ${({ theme }) => theme.space.x2};
+  gap: ${({ theme }) => theme.space.x1};
   padding-top: ${({ theme }) => theme.space.x1};
 `
 
@@ -69,10 +69,10 @@ const Brand = styled.div`
 
 const Title = styled.h1`
   margin: 0;
-  font-size: 1.95rem;
+  font-size: 1.72rem;
   color: currentColor;
   font-family: ${({ theme }) => theme.typography.headingFamily};
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: 0.02em;
 `
 
