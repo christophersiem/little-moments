@@ -332,16 +332,24 @@ public class SupabaseGatewayService {
         SupabaseUser user = getCurrentUser(authorizationHeader);
         String uri = UriComponentsBuilder
             .fromPath("/rest/v1/profiles")
-            .queryParam("user_id", "eq." + user.id())
+            .queryParam("on_conflict", "user_id")
+            .queryParam("select", "user_id,display_name")
             .build(true)
             .toUriString();
 
-        callPatch(
+        JsonNode rows = callPost(
             uri,
-            Map.of("display_name", displayName),
+            Map.of(
+                "user_id", user.id(),
+                "display_name", displayName
+            ),
             authorizationHeader,
-            "return=minimal"
+            "resolution=merge-duplicates,return=representation"
         );
+
+        if (!rows.isArray() || rows.isEmpty()) {
+            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Could not update profile");
+        }
     }
 
     public JsonNode createProcessingMemory(String authorizationHeader, String childId, Instant recordedAt) {
