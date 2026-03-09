@@ -253,6 +253,33 @@ const SheetFooter = styled.div`
   padding: ${({ theme }) => theme.space.x3};
 `
 
+const SheetSelectorRow = styled.button`
+  width: 100%;
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  border: 1px solid color-mix(in srgb, ${({ theme }) => theme.colors.border} 62%, transparent);
+  border-radius: ${({ theme }) => theme.radii.md};
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  color: ${({ theme }) => theme.colors.text};
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: ${({ theme }) => `0 ${theme.space.x3}`};
+  cursor: pointer;
+`
+
+const SelectorLabel = styled.span`
+  color: ${({ theme }) => theme.colors.text};
+  font-size: ${({ theme }) => theme.typography.bodySize};
+`
+
+const SelectorValue = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.x1};
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+`
+
 const ScrollSentinel = styled.div`
   width: 100%;
   height: 1px;
@@ -318,8 +345,17 @@ function CheckGlyph() {
   )
 }
 
+function ChevronGlyph() {
+  return (
+    <FilterIcon viewBox="0 0 24 24" aria-hidden>
+      <path d="M9 6l6 6-6 6" />
+    </FilterIcon>
+  )
+}
+
 export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
   const [filterSheetOpen, setFilterSheetOpen] = useState(false)
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState('all')
   const [selectedTags, setSelectedTags] = useState<MemoryTag[]>([])
   const [highlightsOnly, setHighlightsOnly] = useState(false)
@@ -408,6 +444,13 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
     return monthOptions.find((option) => option.key === selectedMonth)?.label || selectedMonth
   }, [monthOptions, selectedMonth])
 
+  const draftMonthLabel = useMemo(() => {
+    if (draftMonth === 'all') {
+      return 'All months'
+    }
+    return monthOptions.find((option) => option.key === draftMonth)?.label || draftMonth
+  }, [draftMonth, monthOptions])
+
   const timelineItems = useMemo(
     () => (highlightsOnly ? effectiveItems.filter((item) => item.isHighlight) : effectiveItems),
     [effectiveItems, highlightsOnly],
@@ -441,6 +484,21 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
     setSelectedTags(draftTags)
     setHighlightsOnly(draftHighlightsOnly)
     setFilterSheetOpen(false)
+  }
+
+  const openMonthPicker = () => {
+    setFilterSheetOpen(false)
+    setMonthPickerOpen(true)
+  }
+
+  const closeMonthPickerToFilters = () => {
+    setMonthPickerOpen(false)
+    setFilterSheetOpen(true)
+  }
+
+  const selectDraftMonth = (nextMonth: string) => {
+    setDraftMonth(nextMonth)
+    closeMonthPickerToFilters()
   }
 
   const clearFilters = () => {
@@ -806,27 +864,13 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
         >
           <SheetSection>
             <SheetHeading>Month</SheetHeading>
-            <SheetRow
-              type="button"
-              $selected={draftMonth === 'all'}
-              onClick={() => setDraftMonth('all')}
-              aria-pressed={draftMonth === 'all'}
-            >
-              All months
-              {draftMonth === 'all' ? <CheckGlyph /> : null}
-            </SheetRow>
-            {monthOptions.map((option) => (
-              <SheetRow
-                key={option.key}
-                type="button"
-                $selected={draftMonth === option.key}
-                onClick={() => setDraftMonth(option.key)}
-                aria-pressed={draftMonth === option.key}
-              >
-                {option.label}
-                {draftMonth === option.key ? <CheckGlyph /> : null}
-              </SheetRow>
-            ))}
+            <SheetSelectorRow type="button" onClick={openMonthPicker} aria-label="Open month picker">
+              <SelectorLabel>Selected month</SelectorLabel>
+              <SelectorValue>
+                {draftMonthLabel}
+                <ChevronGlyph />
+              </SelectorValue>
+            </SheetSelectorRow>
           </SheetSection>
 
           <SheetSection>
@@ -857,6 +901,35 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
               Show highlights only
               {draftHighlightsOnly ? <CheckGlyph /> : null}
             </SheetRow>
+          </SheetSection>
+        </BottomSheet>
+        <BottomSheet
+          open={monthPickerOpen}
+          title="Month"
+          onClose={closeMonthPickerToFilters}
+        >
+          <SheetSection>
+            <SheetRow
+              type="button"
+              $selected={draftMonth === 'all'}
+              onClick={() => selectDraftMonth('all')}
+              aria-pressed={draftMonth === 'all'}
+            >
+              All months
+              {draftMonth === 'all' ? <CheckGlyph /> : null}
+            </SheetRow>
+            {monthOptions.map((option) => (
+              <SheetRow
+                key={option.key}
+                type="button"
+                $selected={draftMonth === option.key}
+                onClick={() => selectDraftMonth(option.key)}
+                aria-pressed={draftMonth === option.key}
+              >
+                {option.label}
+                {draftMonth === option.key ? <CheckGlyph /> : null}
+              </SheetRow>
+            ))}
           </SheetSection>
         </BottomSheet>
       </PageShell>
