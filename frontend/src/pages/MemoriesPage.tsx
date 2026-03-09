@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
+import { APP_ROUTES, toMemoryDetailPath } from '../app/routes'
 import { Button } from '../components/Button'
 import { BottomSheet } from '../components/BottomSheet'
 import { PageContainer } from '../components/PageContainer'
 import { StatusBanner } from '../components/StatusBanner'
 import { updateMemory } from '../features/memories/api'
 import { MemoryListItemCard } from '../features/memories/components/MemoryListItemCard'
+import {
+  PROCESSING_BANNER_DETAIL,
+  PROCESSING_BANNER_TITLE,
+  SHORT_TRANSCRIPT_MESSAGE,
+} from '../features/memories/constants'
 import { setActiveUploadStatusFromPolling, retryActiveMemoryUpload, useActiveMemoryUpload } from '../features/memories/hooks/uploadSessionStore'
 import { updateMemoryHighlightInCache, usePaginatedMemories } from '../features/memories/hooks/usePaginatedMemories'
 import { useProcessingMemory } from '../features/memories/hooks/useProcessingMemory'
@@ -286,7 +292,6 @@ const ScrollSentinel = styled.div`
 `
 
 const PENDING_MEMORY_PREFIX = 'pending-memory-'
-const SHORT_TRANSCRIPT_ERROR = 'Recording too short. Please speak at least 8 words.'
 
 function getEventDate(item: MemoryListItem): string {
   return item.recordedAt || item.createdAt
@@ -353,7 +358,7 @@ function toReadableProcessingError(message: string | null | undefined): string {
   }
   const normalized = raw.toLowerCase()
   if (normalized.includes('transcription response was empty') || normalized.includes('too short')) {
-    return SHORT_TRANSCRIPT_ERROR
+    return SHORT_TRANSCRIPT_MESSAGE
   }
   return raw
 }
@@ -609,7 +614,7 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
       return
     }
 
-    window.history.replaceState({}, '', '/memories')
+    window.history.replaceState({}, '', APP_ROUTES.memories)
   }, [activeUpload])
 
   useEffect(() => {
@@ -698,8 +703,8 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
     if (activeUpload.status === 'uploading') {
       return (
         <StatusBanner
-          title="Saving your moment… It will appear here shortly."
-          detail="You can keep scrolling."
+          title={PROCESSING_BANNER_TITLE}
+          detail={PROCESSING_BANNER_DETAIL}
         />
       )
     }
@@ -718,8 +723,8 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
 
       return (
         <StatusBanner
-          title="Saving your moment… It will appear here shortly."
-          detail={isProcessingPolling ? 'You can keep scrolling.' : undefined}
+          title={PROCESSING_BANNER_TITLE}
+          detail={isProcessingPolling ? PROCESSING_BANNER_DETAIL : undefined}
         />
       )
     }
@@ -806,7 +811,7 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
               ) : (
                 <EmptyText>No moments match these filters.</EmptyText>
               )}
-              <Button variant="primary" onClick={() => navigate('/record')}>
+              <Button variant="primary" onClick={() => navigate(APP_ROUTES.record)}>
                 Record moment
               </Button>
             </EmptyState>
@@ -825,7 +830,7 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
                           if (id.startsWith(PENDING_MEMORY_PREFIX)) {
                             return
                           }
-                          navigate(`/memories/${id}`)
+                          navigate(toMemoryDetailPath(id))
                         }}
                         onToggleHighlight={onToggleHighlight}
                         highlightBusy={

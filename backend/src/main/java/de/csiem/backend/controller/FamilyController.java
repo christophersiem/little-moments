@@ -9,6 +9,7 @@ import de.csiem.backend.dto.FamilyNameRequest;
 import de.csiem.backend.dto.FamilySummaryResponse;
 import de.csiem.backend.dto.SetMemberRoleRequest;
 import de.csiem.backend.dto.TokenResponse;
+import de.csiem.backend.service.FamilyRoles;
 import de.csiem.backend.service.SupabaseGatewayService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
@@ -88,8 +89,8 @@ public class FamilyController {
         if (!StringUtils.hasText(request.email())) {
             throw new ResponseStatusException(BAD_REQUEST, "Email is required");
         }
-        String role = StringUtils.hasText(request.role()) ? request.role().trim().toUpperCase() : "MEMBER";
-        if (!"OWNER".equals(role) && !"MEMBER".equals(role)) {
+        String role = FamilyRoles.normalizeOrDefaultMember(request.role());
+        if (!FamilyRoles.isSupported(role)) {
             throw new ResponseStatusException(BAD_REQUEST, "Role must be OWNER or MEMBER");
         }
         return new TokenResponse(
@@ -118,7 +119,7 @@ public class FamilyController {
         if (!StringUtils.hasText(request.role())) {
             throw new ResponseStatusException(BAD_REQUEST, "Role is required");
         }
-        supabaseGatewayService.setMemberRole(authorizationHeader, familyId, userId, request.role().trim().toUpperCase());
+        supabaseGatewayService.setMemberRole(authorizationHeader, familyId, userId, FamilyRoles.normalize(request.role()));
         return ResponseEntity.noContent().build();
     }
 

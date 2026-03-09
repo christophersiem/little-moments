@@ -172,14 +172,6 @@ export function setActiveUploadStatusFromPolling(status: MemoryStatus, errorMess
   }
 }
 
-export function clearActiveUploadSession(): void {
-  activeSession = null
-  activeBlob = null
-  activeRecordedAt = ''
-  activeChildId = ''
-  emit()
-}
-
 export function useActiveMemoryUpload(): ActiveUploadSession | null {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }

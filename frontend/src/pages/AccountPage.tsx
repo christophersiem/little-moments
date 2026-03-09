@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import styled from 'styled-components'
+import { APP_ROUTES } from '../app/routes'
 import { Button } from '../components/Button'
+import { FAMILY_MEMBER_FALLBACK_NAME } from '../features/families/roles'
 import { getOwnProfile, updateOwnDisplayName } from '../features/profiles/api'
 import { supabase } from '../lib/supabase'
 import { isUnauthorizedError } from '../lib/supabaseErrors'
@@ -145,7 +147,7 @@ export function AccountPage({ navigate, userEmail = '' }: AccountPageProps) {
           return
         }
 
-        const nextDisplayName = profile?.displayName ?? 'Viewer'
+        const nextDisplayName = profile?.displayName ?? FAMILY_MEMBER_FALLBACK_NAME
         const nextEmail = userEmail || accountPageCache?.email || ''
         accountPageCache = {
           displayName: nextDisplayName,
@@ -159,7 +161,7 @@ export function AccountPage({ navigate, userEmail = '' }: AccountPageProps) {
         }
         if (isUnauthorizedError(error)) {
           await supabase.auth.signOut()
-          navigate('/record')
+          navigate(APP_ROUTES.record)
           return
         }
         setLoadError(error instanceof Error ? error.message : 'Could not load account details.')
@@ -198,7 +200,7 @@ export function AccountPage({ navigate, userEmail = '' }: AccountPageProps) {
     } catch (error) {
       if (isUnauthorizedError(error)) {
         await supabase?.auth.signOut()
-        navigate('/record')
+        navigate(APP_ROUTES.record)
         return
       }
       setNameError(error instanceof Error ? error.message : 'Could not update display name.')
@@ -351,7 +353,7 @@ export function AccountPage({ navigate, userEmail = '' }: AccountPageProps) {
         </Form>
       </Card>
 
-      <Button onClick={() => navigate('/settings')}>Back to Settings</Button>
+      <Button onClick={() => navigate(APP_ROUTES.settings)}>Back to Settings</Button>
     </Section>
   )
 }

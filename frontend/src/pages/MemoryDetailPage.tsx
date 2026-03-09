@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
+import { APP_ROUTES } from '../app/routes'
 import { Button } from '../components/Button'
 import { BottomSheet } from '../components/BottomSheet'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -372,7 +373,7 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
       if (isUnauthorizedError(saveFailure)) {
         setSaveError('Your session expired. Please sign in again.')
         void supabase?.auth.signOut()
-        navigate('/record')
+        navigate(APP_ROUTES.record)
       } else if (isForbiddenError(saveFailure)) {
         setSaveError('You are not authorized to update this memory.')
       } else {
@@ -433,12 +434,12 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
     try {
       await deleteMemory(currentMemory.id)
       removeMemoryFromCache(currentMemory.id)
-      navigate('/memories')
+      navigate(APP_ROUTES.memories)
     } catch (failure) {
       if (isUnauthorizedError(failure)) {
         setDeleteError('Your session expired. Please sign in again.')
         void supabase?.auth.signOut()
-        navigate('/record')
+        navigate(APP_ROUTES.record)
       } else if (isForbiddenError(failure)) {
         setDeleteError('You are not authorized to delete this memory.')
       } else {
@@ -527,7 +528,7 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
           <Button variant="primary" onClick={reload}>
             Try again
           </Button>
-          <Button onClick={() => navigate('/memories')}>Back to memories</Button>
+          <Button onClick={() => navigate(APP_ROUTES.memories)}>Back to memories</Button>
         </ActionRow>
       </Section>
     )
@@ -537,7 +538,7 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
     <Section>
       <Header>
         <TopBar>
-          <BackButton type="button" onClick={() => navigate('/memories')} aria-label="Back to memories">
+          <BackButton type="button" onClick={() => navigate(APP_ROUTES.memories)} aria-label="Back to memories">
             ← Back
           </BackButton>
           {canManageMemory && (

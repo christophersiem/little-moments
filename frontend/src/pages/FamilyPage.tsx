@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import styled from 'styled-components'
+import { APP_ROUTES } from '../app/routes'
 import { Button } from '../components/Button'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import type { OverflowMenuAction } from '../components/OverflowMenu'
@@ -13,6 +14,7 @@ import {
   type FamilyMember,
   type FamilySummary,
 } from '../features/families/api'
+import { FAMILY_MEMBER_FALLBACK_NAME, FAMILY_ROLE_MEMBER, FAMILY_ROLE_OWNER } from '../features/families/roles'
 import { supabase } from '../lib/supabase'
 import { isForbiddenError, isUnauthorizedError } from '../lib/supabaseErrors'
 
@@ -186,7 +188,7 @@ const SuccessText = styled.p`
 `
 
 function displayName(member: FamilyMember): string {
-  return member.displayName?.trim() || 'Viewer'
+  return member.displayName?.trim() || FAMILY_MEMBER_FALLBACK_NAME
 }
 
 export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange }: FamilyPageProps) {
@@ -198,7 +200,7 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
   const [memberActionBusyKey, setMemberActionBusyKey] = useState<string | null>(null)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
   const [email, setEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState<FamilyMemberRole>('MEMBER')
+  const [inviteRole, setInviteRole] = useState<FamilyMemberRole>(FAMILY_ROLE_MEMBER)
   const [inviteError, setInviteError] = useState('')
   const [inviteMessage, setInviteMessage] = useState('')
   const [inviteLink, setInviteLink] = useState('')
@@ -216,7 +218,7 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
         return
       }
       if (error || !data.user) {
-        navigate('/record')
+        navigate(APP_ROUTES.record)
         return
       }
       setCurrentUserId(data.user.id)
@@ -257,7 +259,7 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
         if (isUnauthorizedError(error)) {
           setMembersError('Your session expired. Please sign in again.')
           void supabase?.auth.signOut()
-          navigate('/record')
+          navigate(APP_ROUTES.record)
           return
         }
         if (isForbiddenError(error)) {
@@ -281,7 +283,7 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
     if (!currentUserId) {
       return false
     }
-    return members.some((member) => member.userId === currentUserId && member.role === 'OWNER')
+    return members.some((member) => member.userId === currentUserId && member.role === FAMILY_ROLE_OWNER)
   }, [currentUserId, members])
 
   const toMemberActionError = (error: unknown, fallback: string): string => {
@@ -329,7 +331,7 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
     } catch (error) {
       if (isUnauthorizedError(error)) {
         void supabase?.auth.signOut()
-        navigate('/record')
+        navigate(APP_ROUTES.record)
         return
       }
       setMemberActionError(toMemberActionError(error, fallbackErrorMessage))
@@ -347,7 +349,7 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
     if (type === 'make-owner') {
       await runMemberAction(
         `make-owner:${member.userId}`,
-        () => setMemberRole(familyId, member.userId, 'OWNER'),
+        () => setMemberRole(familyId, member.userId, FAMILY_ROLE_OWNER),
         'Owner updated.',
         'Could not update role.',
       )
@@ -358,7 +360,7 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
     if (type === 'demote-owner') {
       await runMemberAction(
         `demote-owner:${member.userId}`,
-        () => setMemberRole(familyId, member.userId, 'MEMBER'),
+        () => setMemberRole(familyId, member.userId, FAMILY_ROLE_MEMBER),
         'Owner access removed.',
         'Could not update role.',
       )
@@ -393,7 +395,7 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
 
     try {
       const token = await createInvitation(familyId, email, inviteRole)
-      const link = `${window.location.origin}/invite/accept?token=${encodeURIComponent(token)}`
+      const link = `${window.location.origin}${APP_ROUTES.inviteAccept}?token=${encodeURIComponent(token)}`
       setInviteLink(link)
       setInviteMessage('Invite link created.')
       setEmail('')
@@ -401,7 +403,7 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
       if (isUnauthorizedError(error)) {
         setInviteError('Your session expired. Please sign in again.')
         void supabase?.auth.signOut()
-        navigate('/record')
+        navigate(APP_ROUTES.record)
       } else if (isForbiddenError(error)) {
         setInviteError('You are not authorized to create invites for this family.')
       } else {
@@ -444,7 +446,7 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
     const isCurrentUser = member.userId === currentUserId
     const menuActions: OverflowMenuAction[] =
       isCurrentUserOwner && !isCurrentUser
-        ? member.role === 'OWNER'
+        ? member.role === FAMILY_ROLE_OWNER
           ? [
               {
                 id: `demote-owner:${member.userId}`,
@@ -529,16 +531,16 @@ export function FamilyPage({ familyId, families, navigate, onActiveFamilyChange 
                 <RoleSelector aria-label="Invite role">
                   <RoleOption
                     type="button"
-                    $selected={inviteRole === 'MEMBER'}
-                    onClick={() => setInviteRole('MEMBER')}
+                    $selected={inviteRole === FAMILY_ROLE_MEMBER}
+                    onClick={() => setInviteRole(FAMILY_ROLE_MEMBER)}
                   >
                     <RoleTitle>Viewer</RoleTitle>
                     <RoleDescription>Can view memories</RoleDescription>
                   </RoleOption>
                   <RoleOption
                     type="button"
-                    $selected={inviteRole === 'OWNER'}
-                    onClick={() => setInviteRole('OWNER')}
+                    $selected={inviteRole === FAMILY_ROLE_OWNER}
+                    onClick={() => setInviteRole(FAMILY_ROLE_OWNER)}
                   >
                     <RoleTitle>Owner</RoleTitle>
                     <RoleDescription>Full access, including invites and viewer management</RoleDescription>

@@ -53,8 +53,8 @@ public class SupabaseGatewayService {
     public String getFirstChildIdForFamily(String authorizationHeader, String familyId) {
         String uri = UriComponentsBuilder
             .fromPath("/rest/v1/children")
-            .queryParam("select", "id")
-            .queryParam("family_id", "eq." + familyId)
+            .queryParam("select", SupabaseFields.ID)
+            .queryParam(SupabaseFields.FAMILY_ID, "eq." + familyId)
             .queryParam("order", "created_at.asc")
             .queryParam("limit", 1)
             .build(true)
@@ -64,7 +64,7 @@ public class SupabaseGatewayService {
         if (!response.isArray() || response.isEmpty()) {
             return null;
         }
-        return asText(response.get(0).get("id"));
+        return asText(response.get(0).get(SupabaseFields.ID));
     }
 
     public String ensureDefaultChildForFamily(String authorizationHeader, String familyId) {
@@ -83,7 +83,7 @@ public class SupabaseGatewayService {
         String membersUri = UriComponentsBuilder
             .fromPath("/rest/v1/family_members")
             .queryParam("select", "user_id,role,joined_at")
-            .queryParam("family_id", "eq." + familyId)
+            .queryParam(SupabaseFields.FAMILY_ID, "eq." + familyId)
             .queryParam("order", "joined_at.asc")
             .build(true)
             .toUriString();
@@ -95,7 +95,7 @@ public class SupabaseGatewayService {
 
         List<String> userIds = new ArrayList<>();
         for (JsonNode row : members) {
-            String userId = asText(row.get("user_id"));
+            String userId = asText(row.get(SupabaseFields.USER_ID));
             if (!userId.isBlank()) {
                 userIds.add(userId);
             }
@@ -105,9 +105,9 @@ public class SupabaseGatewayService {
         List<FamilyMemberResponse> response = new ArrayList<>();
 
         for (JsonNode row : members) {
-            String userId = asText(row.get("user_id"));
-            String role = asText(row.get("role"));
-            String joinedAt = asText(row.get("joined_at"));
+            String userId = asText(row.get(SupabaseFields.USER_ID));
+            String role = asText(row.get(SupabaseFields.ROLE));
+            String joinedAt = asText(row.get(SupabaseFields.JOINED_AT));
             String displayName = displayNamesByUserId.getOrDefault(userId, "Member");
 
             response.add(new FamilyMemberResponse(userId, displayName, role, joinedAt));
@@ -122,7 +122,7 @@ public class SupabaseGatewayService {
         String membershipUri = UriComponentsBuilder
             .fromPath("/rest/v1/family_members")
             .queryParam("select", "family_id,role,joined_at")
-            .queryParam("user_id", "eq." + user.id())
+            .queryParam(SupabaseFields.USER_ID, "eq." + user.id())
             .queryParam("order", "joined_at.asc")
             .build(true)
             .toUriString();
@@ -134,7 +134,7 @@ public class SupabaseGatewayService {
 
         List<String> familyIds = new ArrayList<>();
         for (JsonNode row : membershipRows) {
-            String familyId = asText(row.get("family_id"));
+            String familyId = asText(row.get(SupabaseFields.FAMILY_ID));
             if (!familyId.isBlank()) {
                 familyIds.add(familyId);
             }
@@ -154,7 +154,7 @@ public class SupabaseGatewayService {
         Map<String, String> familyNamesById = new HashMap<>();
         if (familyRows.isArray()) {
             for (JsonNode row : familyRows) {
-                String familyId = asText(row.get("id"));
+                String familyId = asText(row.get(SupabaseFields.ID));
                 if (!familyId.isBlank()) {
                     familyNamesById.put(familyId, firstNonBlank(asText(row.get("name")), "Family"));
                 }
@@ -163,7 +163,7 @@ public class SupabaseGatewayService {
 
         List<FamilySummaryResponse> result = new ArrayList<>();
         for (JsonNode row : membershipRows) {
-            String familyId = asText(row.get("family_id"));
+            String familyId = asText(row.get(SupabaseFields.FAMILY_ID));
             if (familyId.isBlank()) {
                 continue;
             }
@@ -171,8 +171,8 @@ public class SupabaseGatewayService {
                 new FamilySummaryResponse(
                     familyId,
                     familyNamesById.getOrDefault(familyId, "Family"),
-                    asText(row.get("role")),
-                    asText(row.get("joined_at"))
+                    asText(row.get(SupabaseFields.ROLE)),
+                    asText(row.get(SupabaseFields.JOINED_AT))
                 )
             );
         }
@@ -244,7 +244,7 @@ public class SupabaseGatewayService {
         String uri = UriComponentsBuilder
             .fromPath("/rest/v1/profiles")
             .queryParam("select", "user_id,display_name")
-            .queryParam("user_id", "eq." + user.id())
+            .queryParam(SupabaseFields.USER_ID, "eq." + user.id())
             .queryParam("limit", 1)
             .build(true)
             .toUriString();
@@ -256,8 +256,8 @@ public class SupabaseGatewayService {
 
         JsonNode row = result.get(0);
         return new ProfileResponse(
-            asText(row.get("user_id")),
-            firstNonBlank(asText(row.get("display_name")), "Member")
+            asText(row.get(SupabaseFields.USER_ID)),
+            firstNonBlank(asText(row.get(SupabaseFields.DISPLAY_NAME)), "Member")
         );
     }
 
@@ -270,8 +270,8 @@ public class SupabaseGatewayService {
         SupabaseUser user = getCurrentUser(authorizationHeader);
         String memoryUri = UriComponentsBuilder
             .fromPath("/rest/v1/memories")
-            .queryParam("select", "child_id")
-            .queryParam("id", "eq." + memoryId)
+            .queryParam("select", SupabaseFields.CHILD_ID)
+            .queryParam(SupabaseFields.ID, "eq." + memoryId)
             .queryParam("limit", 1)
             .build(true)
             .toUriString();
@@ -281,7 +281,7 @@ public class SupabaseGatewayService {
             throw new ResponseStatusException(NOT_FOUND, "Memory not found");
         }
 
-        String childId = asText(memoryRows.get(0).get("child_id"));
+        String childId = asText(memoryRows.get(0).get(SupabaseFields.CHILD_ID));
         if (!StringUtils.hasText(childId)) {
             throw new ResponseStatusException(FORBIDDEN, "Only owners can edit or delete memories.");
         }
@@ -292,8 +292,8 @@ public class SupabaseGatewayService {
     private void assertOwnerForChild(String authorizationHeader, String userId, String childId, String errorMessage) {
         String childUri = UriComponentsBuilder
             .fromPath("/rest/v1/children")
-            .queryParam("select", "family_id")
-            .queryParam("id", "eq." + childId)
+            .queryParam("select", SupabaseFields.FAMILY_ID)
+            .queryParam(SupabaseFields.ID, "eq." + childId)
             .queryParam("limit", 1)
             .build(true)
             .toUriString();
@@ -303,16 +303,16 @@ public class SupabaseGatewayService {
             throw new ResponseStatusException(NOT_FOUND, "Child not found");
         }
 
-        String familyId = asText(childRows.get(0).get("family_id"));
+        String familyId = asText(childRows.get(0).get(SupabaseFields.FAMILY_ID));
         if (!StringUtils.hasText(familyId)) {
             throw new ResponseStatusException(FORBIDDEN, errorMessage);
         }
 
         String membershipUri = UriComponentsBuilder
             .fromPath("/rest/v1/family_members")
-            .queryParam("select", "role")
-            .queryParam("family_id", "eq." + familyId)
-            .queryParam("user_id", "eq." + userId)
+            .queryParam("select", SupabaseFields.ROLE)
+            .queryParam(SupabaseFields.FAMILY_ID, "eq." + familyId)
+            .queryParam(SupabaseFields.USER_ID, "eq." + userId)
             .queryParam("limit", 1)
             .build(true)
             .toUriString();
@@ -322,8 +322,8 @@ public class SupabaseGatewayService {
             throw new ResponseStatusException(FORBIDDEN, errorMessage);
         }
 
-        String role = asText(membershipRows.get(0).get("role"));
-        if (!"OWNER".equalsIgnoreCase(role)) {
+        String role = asText(membershipRows.get(0).get(SupabaseFields.ROLE));
+        if (!FamilyRoles.isOwner(role)) {
             throw new ResponseStatusException(FORBIDDEN, errorMessage);
         }
     }
@@ -364,10 +364,10 @@ public class SupabaseGatewayService {
             callPost(
                 uri,
                 Map.of(
-                    "child_id", childId,
-                    "created_by", user.id(),
-                    "recorded_at", recordedAt.toString(),
-                    "status", "PROCESSING"
+                    SupabaseFields.CHILD_ID, childId,
+                    SupabaseFields.CREATED_BY, user.id(),
+                    SupabaseFields.RECORDED_AT, recordedAt.toString(),
+                    SupabaseFields.STATUS, SupabaseStatuses.PROCESSING
                 ),
                 authorizationHeader,
                 "return=representation"
@@ -397,14 +397,14 @@ public class SupabaseGatewayService {
             callPost(
                 uri,
                 Map.of(
-                    "child_id", childId,
-                    "created_by", user.id(),
-                    "recorded_at", recordedAt.toString(),
-                    "status", "READY",
-                    "transcript", transcript,
-                    "title", title,
-                    "summary", summary,
-                    "tags", tags
+                    SupabaseFields.CHILD_ID, childId,
+                    SupabaseFields.CREATED_BY, user.id(),
+                    SupabaseFields.RECORDED_AT, recordedAt.toString(),
+                    SupabaseFields.STATUS, SupabaseStatuses.READY,
+                    SupabaseFields.TRANSCRIPT, transcript,
+                    SupabaseFields.TITLE, title,
+                    SupabaseFields.SUMMARY, summary,
+                    SupabaseFields.TAGS, tags
                 ),
                 authorizationHeader,
                 "return=representation"
@@ -418,7 +418,7 @@ public class SupabaseGatewayService {
         String uri = UriComponentsBuilder
             .fromPath("/rest/v1/memories")
             .queryParam("select", memorySelect())
-            .queryParam("id", "eq." + memoryId)
+            .queryParam(SupabaseFields.ID, "eq." + memoryId)
             .build(true)
             .toUriString();
 
@@ -433,7 +433,7 @@ public class SupabaseGatewayService {
         String uri = UriComponentsBuilder
             .fromPath("/rest/v1/memories")
             .queryParam("select", memorySelect())
-            .queryParam("id", "eq." + memoryId)
+            .queryParam(SupabaseFields.ID, "eq." + memoryId)
             .queryParam("limit", 1)
             .build(true)
             .toUriString();
@@ -484,7 +484,7 @@ public class SupabaseGatewayService {
     ) {
         UriComponentsBuilder builder = UriComponentsBuilder
             .fromPath("/rest/v1/memories")
-            .queryParam("select", "id");
+            .queryParam("select", SupabaseFields.ID);
 
         applyMemoryFilters(
             builder,
@@ -505,8 +505,8 @@ public class SupabaseGatewayService {
     public void deleteMemoryById(String authorizationHeader, String memoryId) {
         String uri = UriComponentsBuilder
             .fromPath("/rest/v1/memories")
-            .queryParam("id", "eq." + memoryId)
-            .queryParam("select", "id")
+            .queryParam(SupabaseFields.ID, "eq." + memoryId)
+            .queryParam("select", SupabaseFields.ID)
             .build(true)
             .toUriString();
 
@@ -525,7 +525,7 @@ public class SupabaseGatewayService {
         String uri = UriComponentsBuilder
             .fromPath("/rest/v1/profiles")
             .queryParam("select", "user_id,display_name")
-            .queryParam("user_id", inFilter)
+            .queryParam(SupabaseFields.USER_ID, inFilter)
             .build(true)
             .toUriString();
 
@@ -536,8 +536,8 @@ public class SupabaseGatewayService {
 
         Map<String, String> result = new HashMap<>();
         for (JsonNode row : rows) {
-            String userId = asText(row.get("user_id"));
-            String displayName = firstNonBlank(asText(row.get("display_name")), "Member");
+            String userId = asText(row.get(SupabaseFields.USER_ID));
+            String displayName = firstNonBlank(asText(row.get(SupabaseFields.DISPLAY_NAME)), "Member");
             if (!userId.isBlank()) {
                 result.put(userId, displayName);
             }
@@ -759,33 +759,33 @@ public class SupabaseGatewayService {
         if (StringUtils.hasText(familyId)) {
             List<String> childIds = listChildIdsForFamily(authorizationHeader, familyId);
             if (childIds.isEmpty()) {
-                builder.queryParam("id", "eq.00000000-0000-0000-0000-000000000000");
+                builder.queryParam(SupabaseFields.ID, "eq.00000000-0000-0000-0000-000000000000");
                 return;
             }
-            builder.queryParam("child_id", "in.(" + String.join(",", childIds) + ")");
+            builder.queryParam(SupabaseFields.CHILD_ID, "in.(" + String.join(",", childIds) + ")");
         }
         if (StringUtils.hasText(fromRecordedAtIso)) {
-            builder.queryParam("recorded_at", "gte." + fromRecordedAtIso);
+            builder.queryParam(SupabaseFields.RECORDED_AT, "gte." + fromRecordedAtIso);
         }
         if (StringUtils.hasText(toRecordedAtIso)) {
-            builder.queryParam("recorded_at", "lt." + toRecordedAtIso);
+            builder.queryParam(SupabaseFields.RECORDED_AT, "lt." + toRecordedAtIso);
         }
         if (tags != null && !tags.isEmpty()) {
             String tagFilter = buildTagOverlapFilter(tags);
             if (StringUtils.hasText(tagFilter)) {
-                builder.queryParam("tags", tagFilter);
+                builder.queryParam(SupabaseFields.TAGS, tagFilter);
             }
         }
         if (highlightsOnly) {
-            builder.queryParam("is_highlight", "eq.true");
+            builder.queryParam(SupabaseFields.IS_HIGHLIGHT, "eq.true");
         }
     }
 
     private List<String> listChildIdsForFamily(String authorizationHeader, String familyId) {
         String uri = UriComponentsBuilder
             .fromPath("/rest/v1/children")
-            .queryParam("select", "id")
-            .queryParam("family_id", "eq." + familyId)
+            .queryParam("select", SupabaseFields.ID)
+            .queryParam(SupabaseFields.FAMILY_ID, "eq." + familyId)
             .build(true)
             .toUriString();
 
@@ -796,7 +796,7 @@ public class SupabaseGatewayService {
 
         List<String> childIds = new ArrayList<>();
         for (JsonNode row : rows) {
-            String childId = asText(row.get("id"));
+            String childId = asText(row.get(SupabaseFields.ID));
             if (!childId.isBlank()) {
                 childIds.add(childId);
             }
@@ -837,7 +837,19 @@ public class SupabaseGatewayService {
     }
 
     private String memorySelect() {
-        return "id,created_at,recorded_at,status,is_highlight,title,summary,transcript,error_message,tags";
+        return String.join(
+            ",",
+            SupabaseFields.ID,
+            SupabaseFields.CREATED_AT,
+            SupabaseFields.RECORDED_AT,
+            SupabaseFields.STATUS,
+            SupabaseFields.IS_HIGHLIGHT,
+            SupabaseFields.TITLE,
+            SupabaseFields.SUMMARY,
+            SupabaseFields.TRANSCRIPT,
+            SupabaseFields.ERROR_MESSAGE,
+            SupabaseFields.TAGS
+        );
     }
 
     private record SupabaseUser(String id, String email) {
