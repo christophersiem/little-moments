@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { listMemories } from '../api'
-import type { MemoryListItem, MemoryTag } from '../types'
+import type { Memory, MemoryListItem, MemoryTag } from '../types'
 import { appendMemoriesPage, type PaginationState } from './paginationState'
 
 const DEFAULT_PAGE_SIZE = 5
@@ -15,6 +15,17 @@ interface CachedMemoriesState {
 
 const memoriesCache = new Map<string, CachedMemoriesState>()
 
+function toListSnippet(transcript: string | null): string {
+  if (!transcript) {
+    return ''
+  }
+  const normalized = transcript.trim().replace(/\s+/g, ' ')
+  if (normalized.length <= 180) {
+    return normalized
+  }
+  return `${normalized.slice(0, 177).trimEnd()}...`
+}
+
 export function updateMemoryHighlightInCache(memoryId: string, isHighlight: boolean): void {
   for (const [queryKey, cached] of memoriesCache.entries()) {
     let hasChanged = false
@@ -26,6 +37,38 @@ export function updateMemoryHighlightInCache(memoryId: string, isHighlight: bool
       return {
         ...item,
         isHighlight,
+      }
+    })
+
+    if (!hasChanged) {
+      continue
+    }
+
+    memoriesCache.set(queryKey, {
+      ...cached,
+      items: nextItems,
+      cachedAt: Date.now(),
+    })
+  }
+}
+
+export function updateMemoryInCache(memory: Memory): void {
+  for (const [queryKey, cached] of memoriesCache.entries()) {
+    let hasChanged = false
+    const nextItems = cached.items.map((item) => {
+      if (item.id !== memory.id) {
+        return item
+      }
+
+      hasChanged = true
+      return {
+        ...item,
+        title: memory.title,
+        transcriptSnippet: toListSnippet(memory.transcript),
+        tags: memory.tags,
+        isHighlight: memory.isHighlight,
+        recordedAt: memory.recordedAt,
+        status: memory.status,
       }
     })
 
