@@ -237,14 +237,25 @@ export default function App() {
       setFamilyError('')
       setCanRecord(false)
       setNeedsOnboarding(false)
-      clearActiveFamilyId()
-      clearActiveChildId()
-      clearCanRecord()
       return
     }
 
     let disposed = false
-    const hasCachedContext = Boolean(familyId && childId)
+    const persistedFamilyId = getActiveFamilyId()
+    const persistedChildId = getActiveChildId()
+    const persistedCanRecord = getCanRecord()
+    const nextFamilyId = familyId ?? persistedFamilyId
+    const nextChildId = childId ?? persistedChildId
+    const hasCachedContext = Boolean(nextFamilyId && nextChildId)
+    if (!familyId && persistedFamilyId) {
+      setFamilyId(persistedFamilyId)
+    }
+    if (!childId && persistedChildId) {
+      setChildId(persistedChildId)
+    }
+    if (persistedCanRecord !== null) {
+      setCanRecord(persistedCanRecord)
+    }
     setFamilyReady(hasCachedContext)
     setFamilyError('')
 
@@ -322,7 +333,7 @@ export default function App() {
     return () => {
       disposed = true
     }
-  }, [bootstrapTick, sessionUserId])
+  }, [bootstrapTick, childId, familyId, sessionUserId])
 
   useEffect(() => {
     if (!familyReady || familyError) {
