@@ -35,78 +35,100 @@ function isLikelyTooShort(blob: Blob, elapsedSeconds: number): boolean {
   return elapsedSeconds < MIN_RECORDING_SECONDS || blob.size < MIN_RECORDING_BYTES
 }
 
-const Stage = styled.section`
+const RecordSurface = styled.section`
+  position: relative;
   width: 100%;
   min-height: 100%;
   display: flex;
-  flex-direction: column;
-  background: ${({ theme }) => theme.colors.background};
-`
-
-const CenterStage = styled(Stage)`
-  justify-content: center;
-`
-
-const Hero = styled.div`
-  margin-top: clamp(56px, 14vh, 120px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: ${({ theme }) => theme.space.x4};
-`
-
-const CenterHero = styled.div`
-  width: 100%;
-  display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding-inline: ${({ theme }) => theme.space.x3};
-  padding-bottom: calc(${({ theme }) => theme.layout.bottomNavHeight} + ${({ theme }) => theme.space.x2});
+  background:
+    radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.56), rgba(255, 255, 255, 0) 52%),
+    linear-gradient(180deg, #f5efe3, #f1e9dc 52%, #efe7da 100%);
+  border-radius: ${({ theme }) => theme.radii.lg};
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 18% 24%, rgba(154, 130, 102, 0.05), transparent 36%),
+      radial-gradient(circle at 84% 72%, rgba(158, 132, 103, 0.045), transparent 42%),
+      radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.15), transparent 62%);
+    pointer-events: none;
+  }
 `
 
-const RecordAnchor = styled.div`
+const Content = styled.div`
   position: relative;
+  z-index: 1;
   width: 100%;
-  display: inline-flex;
+  max-width: 440px;
+  min-height: 100%;
+  padding: clamp(44px, 8.2vh, 86px) ${({ theme }) => theme.space.x3} clamp(46px, 8vh, 92px);
+  display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: clamp(26px, 4.8vh, 44px);
 `
 
-const RecordingMeta = styled.div`
-  position: absolute;
-  top: calc(100% + ${({ theme }) => theme.space.x4});
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(320px, calc(100dvw - 48px));
-  max-width: 100%;
+const Intro = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: ${({ theme }) => theme.space.x2};
 `
 
-const Timer = styled.div`
-  font-size: ${({ theme }) => theme.typography.timerSize};
-  letter-spacing: 0.08em;
-  color: ${({ theme }) => theme.colors.text};
+const BrandTitle = styled.h1`
+  margin: 0;
+  font-family: ${({ theme }) => theme.typography.headingFamily};
+  font-size: clamp(3.2rem, 10.4vw, 4.9rem);
+  font-weight: 500;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  color: color-mix(in srgb, ${({ theme }) => theme.colors.text} 95%, #2f241a);
 `
 
-const BodyText = styled.p`
-  max-width: 280px;
+const Subtitle = styled.p`
+  font-size: clamp(1.14rem, 3.9vw, 1.52rem);
+  line-height: 1.25;
+  color: color-mix(in srgb, ${({ theme }) => theme.colors.textMuted} 80%, ${({ theme }) => theme.colors.text});
+`
+
+const RecorderStack = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(24px, 4vh, 38px);
+`
+
+const Timer = styled.p`
+  margin: 0;
+  font-size: clamp(3.3rem, 11.6vw, 5.2rem);
+  line-height: 0.92;
+  letter-spacing: 0.045em;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, ${({ theme }) => theme.colors.text} 96%, #2b2018);
+`
+
+const SupportText = styled.p`
+  margin-top: -2px;
+  max-width: 320px;
   color: ${({ theme }) => theme.colors.textMuted};
-  font-size: ${({ theme }) => theme.typography.bodySize};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
 `
 
 const HintBanner = styled.p`
   width: min(360px, calc(100dvw - 48px));
   max-width: 100%;
-  margin: ${({ theme }) => `${theme.space.x5} 0 0`};
+  margin-top: ${({ theme }) => theme.space.x1};
   padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3}`};
-  border: 1px solid ${({ theme }) => theme.colors.danger};
+  border: 1px solid color-mix(in srgb, ${({ theme }) => theme.colors.danger} 70%, ${({ theme }) => theme.colors.border});
   border-radius: ${({ theme }) => theme.radii.md};
-  background: ${({ theme }) => theme.colors.surfaceStrong};
+  background: color-mix(in srgb, ${({ theme }) => theme.colors.surfaceStrong} 90%, #fff);
   color: ${({ theme }) => theme.colors.danger};
   font-size: ${({ theme }) => theme.typography.bodySize};
   line-height: ${({ theme }) => theme.typography.bodyLineHeight};
@@ -184,8 +206,7 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
     typeof window === 'undefined' ? 390 : window.innerWidth,
   )
 
-  const largeButtonDiameter = viewportWidth < 390 ? 168 : 188
-  const stoppedButtonDiameter = viewportWidth < 390 ? 88 : 96
+  const buttonDiameter = viewportWidth < 390 ? 196 : 224
 
   const cleanupStream = () => {
     if (streamRef.current) {
@@ -360,98 +381,72 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
     )
   }
 
-  if (phase === 'recording') {
-    return (
-      <CenterStage>
-        <CenterHero>
-          <RecordAnchor>
-            <RecordButton
-              status="recording"
-              elapsedSec={elapsedSeconds}
-              maxDurationSec={60}
-              onStart={NOOP}
-              onStop={stopRecording}
-              diameter={largeButtonDiameter}
-            />
-            <RecordingMeta>
-              <Timer>{formatDuration(elapsedSeconds)}</Timer>
-              <BodyText>Speak naturally. We will structure this moment for you.</BodyText>
-            </RecordingMeta>
-          </RecordAnchor>
-        </CenterHero>
-      </CenterStage>
-    )
-  }
-
-  if (phase === 'stopped') {
-    return (
-      <>
-        <Stage>
-          <Hero>
-            <RecordButton
-              status="stopped"
-              elapsedSec={elapsedSeconds}
-              maxDurationSec={60}
-              onStart={NOOP}
-              onStop={NOOP}
-              diameter={stoppedButtonDiameter}
-            />
-            <BodyText>Your recording is ready to save.</BodyText>
-          </Hero>
-        </Stage>
-
-        {stopDecisionState !== 'hidden' && (
-          <ModalOverlay role="presentation">
-            <ModalSheet role="dialog" aria-modal="true" aria-label="Save or discard recording">
-              <SheetHandle aria-hidden />
-              {stopDecisionState === 'choice' ? (
-                <>
-                  <h2>Save this recording?</h2>
-                  <BodyText>Save now, or discard this moment.</BodyText>
-                  <PrivacyText>Audio is transcribed to text and not stored as audio.</PrivacyText>
-                  <SheetActions>
-                    <Button variant="primary" fullWidth autoFocus onClick={() => onStopDecision('save-selected')}>
-                      Save recording
-                    </Button>
-                    <Button fullWidth onClick={() => onStopDecision('discard-selected')}>
-                      Discard recording
-                    </Button>
-                  </SheetActions>
-                </>
-              ) : (
-                <>
-                  <h2>Discard this recording?</h2>
-                  <BodyText>This action cannot be undone.</BodyText>
-                  <SheetActions>
-                    <Button variant="danger" fullWidth autoFocus onClick={() => onStopDecision('discard-confirmed')}>
-                      Yes, discard recording
-                    </Button>
-                    <Button fullWidth onClick={() => onStopDecision('discard-canceled')}>
-                      Keep recording
-                    </Button>
-                  </SheetActions>
-                </>
-              )}
-            </ModalSheet>
-          </ModalOverlay>
-        )}
-      </>
-    )
-  }
+  const displayStatus = phase === 'recording' ? 'recording' : phase === 'stopped' ? 'stopped' : 'idle'
+  const timerValue = phase === 'idle' ? 0 : elapsedSeconds
 
   return (
-    <CenterStage>
-      <CenterHero>
-        <RecordButton
-          status="idle"
-          elapsedSec={0}
-          maxDurationSec={60}
-          onStart={() => void startRecording()}
-          onStop={NOOP}
-          diameter={largeButtonDiameter}
-        />
-        {errorMessage && <HintBanner role="status">{errorMessage}</HintBanner>}
-      </CenterHero>
-    </CenterStage>
+    <>
+      <RecordSurface>
+        <Content>
+          <Intro>
+            <BrandTitle>Little Moments</BrandTitle>
+            <Subtitle>Capture a small moment</Subtitle>
+          </Intro>
+
+          <RecorderStack>
+            <RecordButton
+              status={displayStatus}
+              elapsedSec={timerValue}
+              maxDurationSec={60}
+              onStart={phase === 'idle' ? () => void startRecording() : NOOP}
+              onStop={phase === 'recording' ? stopRecording : NOOP}
+              diameter={buttonDiameter}
+            />
+
+            <Timer>{formatDuration(timerValue)}</Timer>
+            {phase === 'recording' ? <SupportText>Listening gently in the background.</SupportText> : null}
+            {phase === 'stopped' ? <SupportText>Your recording is ready to save.</SupportText> : null}
+            {phase === 'idle' ? <SupportText>A quiet place for memories.</SupportText> : null}
+            {phase === 'idle' && errorMessage ? <HintBanner role="status">{errorMessage}</HintBanner> : null}
+          </RecorderStack>
+        </Content>
+      </RecordSurface>
+
+      {phase === 'stopped' && stopDecisionState !== 'hidden' && (
+        <ModalOverlay role="presentation">
+          <ModalSheet role="dialog" aria-modal="true" aria-label="Save or discard recording">
+            <SheetHandle aria-hidden />
+            {stopDecisionState === 'choice' ? (
+              <>
+                <h2>Save this recording?</h2>
+                <SupportText>Save now, or discard this moment.</SupportText>
+                <PrivacyText>Audio is transcribed to text and not stored as audio.</PrivacyText>
+                <SheetActions>
+                  <Button variant="primary" fullWidth autoFocus onClick={() => onStopDecision('save-selected')}>
+                    Save recording
+                  </Button>
+                  <Button fullWidth onClick={() => onStopDecision('discard-selected')}>
+                    Discard recording
+                  </Button>
+                </SheetActions>
+              </>
+            ) : (
+              <>
+                <h2>Discard this recording?</h2>
+                <SupportText>This action cannot be undone.</SupportText>
+                <SheetActions>
+                  <Button variant="danger" fullWidth autoFocus onClick={() => onStopDecision('discard-confirmed')}>
+                    Yes, discard recording
+                  </Button>
+                  <Button fullWidth onClick={() => onStopDecision('discard-canceled')}>
+                    Keep recording
+                  </Button>
+                </SheetActions>
+              </>
+            )}
+          </ModalSheet>
+        </ModalOverlay>
+      )}
+    </>
   )
 }

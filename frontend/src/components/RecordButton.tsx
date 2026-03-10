@@ -21,91 +21,54 @@ type VisualState = 'idle' | 'recording' | 'stopped'
 
 const RECORDING_TAP_DEBOUNCE_MS = 300
 
-const idleButtonBreath = keyframes`
+const idleBreath = keyframes`
   0% {
     transform: scale(1);
-    animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
   }
-  30% {
-    transform: scale(1.045);
-    animation-timing-function: linear;
-  }
-  40% {
-    transform: scale(1.045);
-    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  70% {
-    transform: scale(1);
-    animation-timing-function: linear;
+  42% {
+    transform: scale(1.018);
   }
   100% {
     transform: scale(1);
   }
 `
 
-const idleHaloBreath = keyframes`
+const idleGlow = keyframes`
   0% {
-    opacity: 0.26;
-    box-shadow:
-      0 0 0 7px color-mix(in srgb, var(--lm-accent) 10%, transparent),
-      0 10px 18px rgba(var(--lm-shadow-rgb), 0.11);
-    animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
-  }
-  30% {
-    opacity: 0.58;
-    box-shadow:
-      0 0 0 17px color-mix(in srgb, var(--lm-accent) 18%, transparent),
-      0 12px 22px rgba(var(--lm-shadow-rgb), 0.17);
-    animation-timing-function: linear;
-  }
-  40% {
-    opacity: 0.58;
-    box-shadow:
-      0 0 0 17px color-mix(in srgb, var(--lm-accent) 18%, transparent),
-      0 12px 22px rgba(var(--lm-shadow-rgb), 0.17);
-    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  70% {
-    opacity: 0.26;
-    box-shadow:
-      0 0 0 7px color-mix(in srgb, var(--lm-accent) 10%, transparent),
-      0 10px 18px rgba(var(--lm-shadow-rgb), 0.11);
-    animation-timing-function: linear;
-  }
-  100% {
-    opacity: 0.26;
-    box-shadow:
-      0 0 0 7px color-mix(in srgb, var(--lm-accent) 10%, transparent),
-      0 10px 18px rgba(var(--lm-shadow-rgb), 0.11);
-  }
-`
-
-const recordingHaloPulse = keyframes`
-  0%, 100% {
-    opacity: 0.34;
+    opacity: 0.5;
   }
   50% {
+    opacity: 0.68;
+  }
+  100% {
     opacity: 0.5;
   }
 `
 
+const recordingPulse = keyframes`
+  0%, 100% {
+    opacity: 0.78;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.92;
+    transform: scale(1.012);
+  }
+`
+
 const Root = styled.div`
-  --lm-accent: ${({ theme }) => theme.colors.accent};
-  --lm-accent-strong: ${({ theme }) => theme.colors.accentStrong};
-  --lm-accent-contrast: ${({ theme }) => theme.colors.onAccent};
-  --lm-bg: ${({ theme }) => theme.colors.background};
-  --lm-surface: ${({ theme }) => theme.colors.surfaceStrong};
-  --lm-border: ${({ theme }) => theme.colors.border};
-  --lm-text: ${({ theme }) => theme.colors.text};
-  --lm-muted: ${({ theme }) => theme.colors.textMuted};
-  --lm-shadow-rgb: var(--lm-shadow);
+  --record-shell: color-mix(in srgb, ${({ theme }) => theme.colors.surfaceStrong} 88%, #fff);
+  --record-shell-edge: color-mix(in srgb, ${({ theme }) => theme.colors.border} 84%, ${({ theme }) => theme.colors.background});
+  --record-inner: color-mix(in srgb, ${({ theme }) => theme.colors.surface} 92%, #fff);
+  --record-accent: ${({ theme }) => theme.colors.accentStrong};
+  --record-icon: color-mix(in srgb, ${({ theme }) => theme.colors.accentStrong} 82%, ${({ theme }) => theme.colors.text});
 
   width: 100%;
   max-width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  color: var(--lm-text);
+  color: ${({ theme }) => theme.colors.text};
   text-align: center;
 `
 
@@ -127,18 +90,12 @@ const TapTarget = styled.button<{ $hitSize: number; $disabled: boolean }>`
   transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
 
   &:active:not(:disabled) {
-    transform: scale(0.96);
+    transform: scale(0.982);
   }
 
   &:focus-visible {
-    outline: 3px solid color-mix(in srgb, var(--lm-accent) 40%, transparent);
+    outline: 2px solid color-mix(in srgb, var(--record-accent) 65%, transparent);
     outline-offset: 5px;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    &:hover:not(:disabled) {
-      transform: translateY(-1px);
-    }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -157,8 +114,7 @@ const Visual = styled.span<{ $diameter: number; $state: VisualState }>`
   ${({ $state }) =>
     $state === 'idle' &&
     css`
-      transform-origin: center;
-      animation: ${idleButtonBreath} 8s infinite;
+      animation: ${idleBreath} 6.5s ease-in-out infinite;
       will-change: transform;
     `}
 
@@ -168,97 +124,113 @@ const Visual = styled.span<{ $diameter: number; $state: VisualState }>`
   }
 `
 
-const Halo = styled.span<{ $state: VisualState }>`
+const AmbientGlow = styled.span<{ $state: VisualState }>`
   position: absolute;
-  inset: -12px;
+  inset: -24px;
   border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--lm-accent) 30%, transparent);
   pointer-events: none;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.82) 0%,
+    rgba(249, 241, 228, 0.44) 42%,
+    rgba(244, 236, 223, 0) 76%
+  );
+  opacity: ${({ $state }) => ($state === 'recording' ? 0.72 : 0.56)};
 
   ${({ $state }) =>
     $state === 'idle' &&
     css`
-      transform-origin: center;
-      animation: ${idleHaloBreath} 8s infinite;
+      animation: ${idleGlow} 6.5s ease-in-out infinite;
     `}
-
-  ${({ $state }) =>
-    $state === 'recording' &&
-    css`
-      box-shadow:
-        0 0 0 10px color-mix(in srgb, var(--lm-accent) 12%, transparent),
-        0 10px 18px rgba(var(--lm-shadow-rgb), 0.16);
-      animation: ${recordingHaloPulse} 1.8s ease-in-out infinite;
-    `}
-
-  ${({ $state }) =>
-    $state === 'stopped' &&
-    css`
-      opacity: 0.14;
-      box-shadow: 0 8px 14px rgba(var(--lm-shadow-rgb), 0.1);
-    `}
-
-  transition: opacity 260ms ease, box-shadow 260ms ease;
-
-  @media (hover: hover) and (pointer: fine) {
-    ${TapTarget}:hover:not(:disabled) & {
-      box-shadow:
-        0 0 0 12px color-mix(in srgb, var(--lm-accent) 14%, transparent),
-        0 14px 22px rgba(var(--lm-shadow-rgb), 0.18);
-    }
-  }
 
   @media (prefers-reduced-motion: reduce) {
     animation: none;
   }
 `
 
-const SoftOuterRing = styled.span<{ $state: VisualState }>`
+const OuterRing = styled.span<{ $state: VisualState }>`
   position: absolute;
-  inset: -3px;
+  inset: -9px;
   border-radius: 50%;
-  border: 2px solid
-    ${({ $state }) =>
-      $state === 'recording'
-        ? 'color-mix(in srgb, var(--lm-accent-strong) 75%, transparent)'
-        : $state === 'stopped'
-          ? 'color-mix(in srgb, var(--lm-border) 78%, var(--lm-accent))'
-          : 'color-mix(in srgb, var(--lm-accent) 52%, transparent)'};
+  border: 1px solid color-mix(in srgb, var(--record-shell-edge) 88%, #fff);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 18px 28px rgba(var(--lm-shadow), 0.1);
   pointer-events: none;
+
+  ${({ $state }) =>
+    $state === 'recording' &&
+    css`
+      border-color: color-mix(in srgb, var(--record-accent) 35%, var(--record-shell-edge));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.9),
+        0 20px 30px rgba(var(--lm-shadow), 0.14),
+        0 0 0 8px color-mix(in srgb, var(--record-accent) 11%, transparent);
+      animation: ${recordingPulse} 1.6s ease-in-out infinite;
+    `}
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
 `
 
-const Core = styled.span<{ $state: VisualState; $disabled: boolean }>`
-  position: relative;
+const OuterPlate = styled.span<{ $state: VisualState }>`
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  border: 1px solid
-    ${({ $state }) =>
-      $state === 'recording'
-        ? 'color-mix(in srgb, var(--lm-accent-strong) 78%, var(--lm-accent))'
-        : $state === 'stopped'
-          ? 'color-mix(in srgb, var(--lm-border) 80%, var(--lm-accent))'
-          : 'color-mix(in srgb, var(--lm-accent) 66%, transparent)'};
-  background: ${({ $state }) =>
-    $state === 'recording'
-      ? 'color-mix(in srgb, var(--lm-accent-strong) 78%, var(--lm-accent))'
-      : $state === 'stopped'
-        ? 'color-mix(in srgb, var(--lm-surface) 94%, var(--lm-border))'
-        : 'var(--lm-accent)'};
-  box-shadow: 0 10px 18px rgba(var(--lm-shadow-rgb), ${({ $disabled }) => ($disabled ? 0.1 : 0.16)});
+  border: 1px solid color-mix(in srgb, var(--record-shell-edge) 88%, #fff);
+  background: linear-gradient(180deg, var(--record-shell), color-mix(in srgb, var(--record-shell) 88%, ${({ theme }) => theme.colors.background}));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    inset 0 -10px 18px rgba(154, 127, 98, 0.12),
+    0 14px 24px rgba(var(--lm-shadow), 0.12);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+
+  ${({ $state }) =>
+    $state === 'stopped' &&
+    css`
+      opacity: 0.9;
+    `}
 `
 
-const LogoMark = styled(RippleLogo)<{ $size: number; $state: VisualState }>`
+const InnerPlate = styled.span<{ $state: VisualState }>`
+  position: relative;
+  width: calc(100% - 30px);
+  height: calc(100% - 30px);
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--record-shell-edge) 72%, #fff);
+  background: ${({ $state }) =>
+    $state === 'recording'
+      ? 'linear-gradient(180deg, color-mix(in srgb, #fff 84%, #f6e9d8), color-mix(in srgb, #f2e3cc 62%, #f7eee2))'
+      : 'linear-gradient(180deg, var(--record-inner), color-mix(in srgb, var(--record-inner) 84%, #f3e7d8))'};
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -6px 12px rgba(173, 145, 112, 0.11),
+    0 8px 14px rgba(var(--lm-shadow), 0.08);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+`
+
+const Accent = styled.svg<{ $state: VisualState }>`
+  position: absolute;
+  top: 18%;
+  left: 56%;
+  width: 76px;
+  height: 38px;
+  transform: translateX(-50%);
+  color: color-mix(in srgb, ${({ theme }) => theme.colors.textMuted} 70%, ${({ theme }) => theme.colors.accentStrong});
+  opacity: ${({ $state }) => ($state === 'recording' ? 0.72 : 0.56)};
+  pointer-events: none;
+`
+
+const LogoMark = styled(RippleLogo)<{ $size: number }>`
   width: ${({ $size }) => `${$size}px`};
   height: ${({ $size }) => `${$size}px`};
-  display: block;
-  color: var(--lm-bg);
-  opacity: ${({ $state }) => ($state === 'recording' ? 1 : 0.98)};
-  transition: color 220ms ease, opacity 220ms ease;
+  color: var(--record-icon);
+  transform: translateY(4px);
 `
 
 const SpinnerRow = styled.div`
@@ -266,7 +238,7 @@ const SpinnerRow = styled.div`
   display: inline-flex;
   align-items: center;
   gap: ${({ theme }) => theme.space.x2};
-  color: var(--lm-muted);
+  color: ${({ theme }) => theme.colors.textMuted};
   font-size: ${({ theme }) => theme.typography.secondarySize};
 `
 
@@ -274,8 +246,8 @@ const Spinner = styled.span`
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  border: 2px solid color-mix(in srgb, var(--lm-muted) 22%, transparent);
-  border-top-color: var(--lm-accent-strong);
+  border: 2px solid color-mix(in srgb, ${({ theme }) => theme.colors.textMuted} 24%, transparent);
+  border-top-color: ${({ theme }) => theme.colors.accentStrong};
   animation: spin 900ms linear infinite;
 
   @keyframes spin {
@@ -290,12 +262,12 @@ const Spinner = styled.span`
 
 const Title = styled.p`
   margin-top: 16px;
-  color: var(--lm-text);
+  color: ${({ theme }) => theme.colors.text};
 `
 
 const Helper = styled.p`
   margin-top: 8px;
-  color: var(--lm-muted);
+  color: ${({ theme }) => theme.colors.textMuted};
   max-width: 280px;
 `
 
@@ -321,7 +293,7 @@ export function RecordButton({
   const isStopped = status === 'stopped' || status === 'disabled' || status === 'processing'
   const disabled = isStopped || isProcessing
   const visualState: VisualState = isRecording ? 'recording' : isStopped ? 'stopped' : 'idle'
-  const logoSize = Math.round(Math.max(diameter * 0.34, 24))
+  const logoSize = Math.round(Math.max(diameter * 0.24, 24))
 
   const onActivate = () => {
     if (status === 'idle') {
@@ -343,7 +315,7 @@ export function RecordButton({
     <Root>
       <TapTarget
         type="button"
-        $hitSize={Math.max(diameter + 12, 72)}
+        $hitSize={Math.max(diameter + 26, 72)}
         $disabled={disabled}
         disabled={disabled}
         aria-label={isRecording ? ariaLabelRecording : ariaLabelIdle}
@@ -351,15 +323,39 @@ export function RecordButton({
         onClick={onActivate}
       >
         <Visual $diameter={diameter} $state={visualState}>
-          <Halo $state={visualState} />
-          <SoftOuterRing $state={visualState} />
-          <Core $state={visualState} $disabled={disabled}>
-            <LogoMark
-              $size={logoSize}
-              $state={visualState}
-              animate={isRecording ? 'recording' : visualState === 'stopped' ? 'stopped' : 'idle'}
-            />
-          </Core>
+          <AmbientGlow $state={visualState} />
+          <OuterRing $state={visualState} />
+          <OuterPlate $state={visualState}>
+            <InnerPlate $state={visualState}>
+              <Accent viewBox="0 0 76 38" fill="none" aria-hidden $state={visualState}>
+                <path
+                  d="M4 19C16 10 34 8.5 50 14"
+                  stroke="currentColor"
+                  strokeWidth="1.35"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M51 14C58 17.5 63 23.5 64 31"
+                  stroke="currentColor"
+                  strokeWidth="1.35"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M20 14.8C25 16 28.5 18.8 31 22.6"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </Accent>
+              <LogoMark
+                $size={logoSize}
+                animate={isRecording ? 'recording' : visualState === 'stopped' ? 'stopped' : 'idle'}
+              />
+            </InnerPlate>
+          </OuterPlate>
         </Visual>
       </TapTarget>
 

@@ -3,6 +3,7 @@ import styled from 'styled-components'
 import { RippleLogo } from '../components/RippleLogo'
 import { TopNav } from '../components/TopNav'
 import { BOTTOM_NAVIGATION_ITEMS } from './navigation'
+import { APP_ROUTES } from './routes'
 
 interface AppShellProps {
   children: ReactNode
@@ -17,16 +18,16 @@ interface AppShellProps {
   childId?: string | null
 }
 
-const Shell = styled.div`
+const Shell = styled.div<{ $isRecordRoute: boolean }>`
   width: 100%;
   max-width: ${({ theme }) => theme.layout.maxWidth};
   margin: 0 auto;
   min-height: 100vh;
-  padding: ${({ theme }) =>
-    `${theme.space.x3} ${theme.space.x3} calc(${theme.layout.bottomNavHeight} + ${theme.space.x4} + env(safe-area-inset-bottom, 0px))`};
+  padding: ${({ theme, $isRecordRoute }) =>
+    `${$isRecordRoute ? '0' : theme.space.x3} ${theme.space.x3} calc(${theme.layout.bottomNavHeight} + ${theme.space.x4} + env(safe-area-inset-bottom, 0px))`};
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.space.x3};
+  gap: ${({ theme, $isRecordRoute }) => ($isRecordRoute ? '0' : theme.space.x3)};
   overflow-x: hidden;
 `
 
@@ -118,15 +119,19 @@ export function AppShell({
   familyId,
   childId,
 }: AppShellProps) {
+  const isRecordRoute = pathname?.startsWith(APP_ROUTES.record) ?? false
+
   return (
-    <Shell data-family-id={familyId ?? undefined} data-child-id={childId ?? undefined}>
-      <Header>
-        <Brand>
-          <BrandLogo animate="stopped" />
-          <Title>Little Moments</Title>
-        </Brand>
-        <Divider />
-      </Header>
+    <Shell data-family-id={familyId ?? undefined} data-child-id={childId ?? undefined} $isRecordRoute={isRecordRoute}>
+      {!isRecordRoute && (
+        <Header>
+          <Brand>
+            <BrandLogo animate="stopped" />
+            <Title>Little Moments</Title>
+          </Brand>
+          <Divider />
+        </Header>
+      )}
       <Content>{children}</Content>
       {showNavigationHint && <NavigationHint>Please stop the recording first.</NavigationHint>}
       {showNavigation && pathname && navigate && (
