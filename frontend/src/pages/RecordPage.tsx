@@ -40,6 +40,7 @@ const Stage = styled.section`
   min-height: 100%;
   display: flex;
   flex-direction: column;
+  background: ${({ theme }) => theme.colors.background};
 `
 
 const CenterStage = styled(Stage)`
@@ -183,8 +184,8 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
     typeof window === 'undefined' ? 390 : window.innerWidth,
   )
 
-  const largeButtonDiameter = viewportWidth < 390 ? 168 : 188
-  const stoppedButtonDiameter = viewportWidth < 390 ? 88 : 96
+  const largeButtonDiameter = viewportWidth < 390 ? 176 : 196
+  const stoppedButtonDiameter = viewportWidth < 390 ? 90 : 98
 
   const cleanupStream = () => {
     if (streamRef.current) {

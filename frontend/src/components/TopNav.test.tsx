@@ -40,7 +40,10 @@ describe('TopNav', () => {
       />,
     )
 
-    await user.click(screen.getByRole('button', { name: /memories/i }))
+    const memoriesButton = screen.getByRole('button', { name: /memories/i })
+    expect(memoriesButton).toHaveAttribute('aria-disabled', 'true')
+
+    await user.click(memoriesButton)
 
     expect(onLockedNavigationAttempt).toHaveBeenCalledTimes(1)
     expect(navigate).not.toHaveBeenCalled()
@@ -61,7 +64,10 @@ describe('TopNav', () => {
       />,
     )
 
-    await user.click(screen.getByRole('button', { name: /record/i }))
+    const recordButton = screen.getByRole('button', { name: /record/i })
+    expect(recordButton).toHaveAttribute('aria-disabled', 'true')
+
+    await user.click(recordButton)
 
     expect(onLockedNavigationAttempt).toHaveBeenCalledTimes(1)
     expect(navigate).not.toHaveBeenCalled()

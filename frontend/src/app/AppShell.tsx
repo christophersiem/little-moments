@@ -27,7 +27,7 @@ const Shell = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.space.x3};
-  overflow-x: hidden;
+  overflow-x: clip;
 `
 
 const Header = styled.header`
