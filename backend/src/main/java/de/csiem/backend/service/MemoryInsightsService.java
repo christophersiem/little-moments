@@ -7,7 +7,6 @@ import org.springframework.web.client.RestClient;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -16,7 +15,7 @@ import java.util.regex.Pattern;
 public class MemoryInsightsService {
 
     private static final int MAX_TITLE_LENGTH = 72;
-    private static final int MAX_TITLE_WORDS = 10;
+    private static final int MAX_TITLE_WORDS = 6;
     private static final int MAX_SUMMARY_WORDS = 22;
     private static final Pattern QUOTED_TEXT_PATTERN = Pattern.compile("\"([^\"]+)\"");
     private static final Pattern JSON_TITLE_PATTERN = Pattern.compile("\"title\"\\s*:\\s*\"((?:\\\\.|[^\\\"])*)\"", Pattern.CASE_INSENSITIVE);
@@ -26,10 +25,11 @@ public class MemoryInsightsService {
 
     // Title/Summary generation rules for Reduced MVP:
     // - title: specific, timeline-friendly, max 10 words, avoid generic filler terms
-    // - summary: exactly one warm sentence, max 22 words, adds meaning beyond title
+    // - summary: exactly one factual sentence, max 22 words
     // - both: strict JSON contract with deterministic post-processing and retry guards
     private static final String METADATA_SYSTEM_PROMPT =
-        "You write concise, warm, timeline-friendly titles and summaries for parents' short memories. Output JSON only.";
+        "You generate concise, factual, timeline-friendly titles and summaries from transcripts. " +
+            "Be strictly grounded in the transcript and never add interpretation.";
     private static final String METADATA_USER_PROMPT_TEMPLATE = """
         TRANSCRIPT:
         <<<
@@ -40,25 +40,28 @@ public class MemoryInsightsService {
         Return valid JSON ONLY with keys "title" and "summary".
 
         RULES:
-        - Title: 3-7 words preferred, max 10 words. Make it specific and scannable.
+        - Grounding:
+          - Use only information explicitly present in the transcript.
+          - Do NOT add emotion, intent, developmental meaning, or context not directly stated.
+          - Keep uncertainty words if present (e.g., maybe, perhaps, not sure, vielleicht).
+        - Title: 2-6 words, max 6 words. Make it specific and scannable.
           - Describe the concrete moment (what happened).
           - Avoid generic words like "moment", "memory", "today".
-          - Avoid clinical language.
-        - Summary: exactly 1 sentence, max 22 words, warm and reflective.
-          - Include what happened + why it mattered emotionally/developmentally, based strictly on the transcript.
-          - Avoid repeating the transcript verbatim.
-          - No advice, diagnosis, or speculation.
+          - The title value must be plain text only: no surrounding quotes, no backslashes, no JSON snippets.
+        - Summary: exactly 1 sentence, max 22 words, factual and literal.
+          - Stay neutral for low-information / test / noisy transcripts.
+          - No advice, diagnosis, speculation, or embellishment.
 
         EXAMPLES:
         Input transcript:
-        "At breakfast, he asked for more apples and said the full sentence without prompting... he clapped for himself."
+        "At breakfast, he asked for more apples and said the full sentence without prompting."
         Output:
-        {"title":"First full sentence at breakfast","summary":"He asked for more apples in a full sentence and clapped proudly - an exciting little step in his language."}
+        {"title":"Asked for more apples","summary":"He asked for more apples in a full sentence at breakfast."}
 
         Input transcript:
-        "She put on her shoes by herself for the first time and smiled."
+        "Test eins, zwei, drei."
         Output:
-        {"title":"Put on shoes by herself","summary":"She managed her shoes on her own for the first time, and her proud smile made the whole moment feel big."}
+        {"title":"Testaufnahme","summary":"Short test recording: \\"Test eins, zwei, drei\\""}
 
         Now produce the JSON for the provided transcript.
         """;
@@ -73,11 +76,19 @@ public class MemoryInsightsService {
         "meaningful", "proud", "happy", "lovely", "wonderful", "moment", "memory", "today",
         "ein", "eine", "der", "die", "das", "besonderer", "besondere", "schoener", "suesser"
     );
-    private static final Map<String, String> CLINICAL_WORD_REPLACEMENTS = Map.of(
-        "independently", "on their own",
-        "facilitated", "helped",
-        "atmosphere", "mood",
-        "demonstrated", "showed"
+    private static final Set<String> LOW_INFORMATION_MARKERS = Set.of(
+        "test", "testing", "mic", "microphone", "check", "eins", "zwei", "drei", "one", "two", "three"
+    );
+    private static final Set<String> NOISE_MARKERS = Set.of(
+        "um", "uh", "hmm", "mm", "ah", "eh", "mhm", "er", "erm"
+    );
+    private static final Set<String> COUNTING_WORDS = Set.of(
+        "eins", "zwei", "drei", "vier", "fuenf", "fünf", "sechs", "sieben", "acht", "neun", "zehn",
+        "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"
+    );
+    private static final Set<String> UNCERTAINTY_MARKERS = Set.of(
+        "maybe", "perhaps", "probably", "possibly", "not sure", "unsure", "i think", "might",
+        "vielleicht", "eventuell", "wohl", "scheinbar", "nicht sicher", "ich glaube", "koennte", "könnte"
     );
 
     private static final Set<String> STOP_WORDS_EN = Set.of(
@@ -93,7 +104,7 @@ public class MemoryInsightsService {
         "noch", "oder", "sie", "sind", "so", "und", "uns", "unser", "war", "waren", "wie", "wir", "zu", "zum", "zur"
     );
     private static final Set<String> LANGUAGE_MARKERS_DE = Set.of(
-        "der", "die", "das", "und", "nicht", "ein", "eine", "wir", "heute", "gestern", "woche", "kind"
+        "der", "die", "das", "und", "nicht", "ein", "eine", "wir", "heute", "gestern", "woche", "kind", "eins", "zwei", "drei"
     );
     private static final Set<String> LANGUAGE_MARKERS_EN = Set.of(
         "the", "and", "not", "a", "an", "we", "today", "yesterday", "week", "child"
@@ -108,8 +119,9 @@ public class MemoryInsightsService {
 
     public MemoryInsights generate(String transcript) {
         String normalized = normalize(transcript);
+        DetectedLanguage language = detectLanguage(normalized);
         if (normalized.isBlank()) {
-            return new MemoryInsights("Untitled Memory", "");
+            return new MemoryInsights(defaultTitle(language), emptyTranscriptSummary(language));
         }
 
         MemoryInsights aiInsights = generateWithAi(normalized);
@@ -117,7 +129,7 @@ public class MemoryInsightsService {
             return aiInsights;
         }
 
-        return generateFallback(normalized);
+        return generateFallback(normalized, language);
     }
 
     private MemoryInsights generateWithAi(String transcript) {
@@ -126,6 +138,9 @@ public class MemoryInsightsService {
             return null;
         }
         DetectedLanguage transcriptLanguage = detectLanguage(transcript);
+        if (isLowInformationTranscript(transcript, transcriptLanguage)) {
+            return null;
+        }
 
         String apiKey = firstNonBlank(insights.getOpenaiApiKey(), appProperties.getTranscription().getOpenaiApiKey());
         if (apiKey == null || apiKey.isBlank()) {
@@ -187,7 +202,7 @@ public class MemoryInsightsService {
             .headers(headers -> headers.setBearerAuth(apiKey))
             .body(new ChatCompletionsRequest(
                 model,
-                0.2,
+                0.0,
                 new ResponseFormat("json_object"),
                 List.of(
                     new ChatMessage("system", METADATA_SYSTEM_PROMPT),
@@ -225,6 +240,12 @@ public class MemoryInsightsService {
         if (title.isBlank() || summary.isBlank()) {
             return ProcessedInsights.invalid(false);
         }
+        if (!isGroundedSummary(summary, transcript, transcriptLanguage)) {
+            return ProcessedInsights.invalid(false);
+        }
+        if (containsUncertaintyMarker(transcript) && !containsUncertaintyMarker(summary)) {
+            return ProcessedInsights.invalid(false);
+        }
         if (!matchesLanguage(title, transcriptLanguage) || !matchesLanguage(summary, transcriptLanguage)) {
             return ProcessedInsights.invalid(false);
         }
@@ -243,18 +264,18 @@ public class MemoryInsightsService {
 
     private String unescapeJsonString(String value) {
         return value
-            .replace("\\\\n", "\n")
-            .replace("\\\\r", "\r")
-            .replace("\\\\t", "\t")
-            .replace("\\\\\"", "\"")
-            .replace("\\\\\\\\", "\\");
+            .replace("\\n", "\n")
+            .replace("\\r", "\r")
+            .replace("\\t", "\t")
+            .replace("\\\"", "\"")
+            .replace("\\\\", "\\");
     }
 
-    private MemoryInsights generateFallback(String transcript) {
-        DetectedLanguage language = detectLanguage(transcript);
+    private MemoryInsights generateFallback(String transcript, DetectedLanguage language) {
         List<String> words = tokenize(transcript);
+        boolean lowInformation = isLowInformationTranscript(transcript, language);
         String title = buildFallbackTitle(transcript, words, language);
-        String summary = buildFallbackSummary(title, language);
+        String summary = buildFallbackSummary(transcript, language, lowInformation);
         return new MemoryInsights(title, summary);
     }
 
@@ -332,23 +353,44 @@ public class MemoryInsightsService {
         return normalized;
     }
 
-    private String buildFallbackSummary(String title, DetectedLanguage language) {
-        if (language == DetectedLanguage.GERMAN) {
-            if (title == null || title.isBlank()) {
-                return "Ein besonderer Moment wurde festgehalten.";
+    private String buildFallbackSummary(String transcript, DetectedLanguage language, boolean lowInformation) {
+        if (lowInformation) {
+            String excerpt = normalize(keepFirstSentence(transcript)).replaceAll("[.!?]+$", "");
+            if (excerpt.isBlank()) {
+                return emptyTranscriptSummary(language);
             }
-            return "Ein besonderer Moment zu " + lowerFirst(title) + " wurde festgehalten.";
+            boolean looksLikeTest = tokenize(excerpt).stream().anyMatch(
+                word -> word.equals("test") || word.equals("testing") || word.equals("check")
+            );
+            if (language == DetectedLanguage.GERMAN) {
+                return (looksLikeTest ? "Kurze Testaufnahme: \"" : "Kurze Aufnahme: \"") + excerpt + "\"";
+            }
+            return (looksLikeTest ? "Short test recording: \"" : "Short recording: \"") + excerpt + "\"";
         }
-        if (title == null || title.isBlank()) {
-            return "A meaningful moment was captured and saved.";
+
+        String literal = keepFirstSentence(transcript);
+        if (literal.isBlank()) {
+            return emptyTranscriptSummary(language);
         }
-        return "A meaningful moment about " + lowerFirst(title) + " was captured and saved.";
+        String withPrefix = (language == DetectedLanguage.GERMAN ? "Im Transkript: " : "Transcript says: ") + literal;
+        literal = limitSummaryWordCount(withPrefix, MAX_SUMMARY_WORDS);
+        if (!literal.endsWith(".") && !literal.endsWith("!") && !literal.endsWith("?")) {
+            literal = literal + ".";
+        }
+        return literal;
     }
 
     private String sanitizeTitle(String value, String transcript) {
         String title = normalize(value)
-            .replaceAll("[\\n\\r\\t]+", " ")
-            .replaceAll("^[\"'`]+|[\"'`.,!?;:]+$", "");
+            .replaceAll("[\\n\\r\\t]+", " ");
+
+        title = extractNestedTitleIfPresent(title);
+        title = title
+            .replace("\\\"", "\"")
+            .replace("\\'", "'")
+            .replaceAll("\\\\+$", "")
+            .trim();
+        title = stripSurroundingQuotes(title);
         if (title.isBlank()) {
             return "";
         }
@@ -365,13 +407,42 @@ public class MemoryInsightsService {
         return title;
     }
 
+    private String extractNestedTitleIfPresent(String value) {
+        String normalized = normalize(value);
+        if (!normalized.startsWith("{") || !normalized.endsWith("}")) {
+            return normalized;
+        }
+        String nestedTitle = extractJsonValue(normalized, JSON_TITLE_PATTERN);
+        if (nestedTitle.isBlank()) {
+            return normalized;
+        }
+        return normalize(nestedTitle);
+    }
+
+    private String stripSurroundingQuotes(String value) {
+        String normalized = normalize(value);
+        while (normalized.length() >= 2) {
+            char first = normalized.charAt(0);
+            char last = normalized.charAt(normalized.length() - 1);
+            boolean wrapped = (first == '"' && last == '"')
+                || (first == '\'' && last == '\'')
+                || (first == '`' && last == '`');
+            if (!wrapped) {
+                break;
+            }
+            normalized = normalize(normalized.substring(1, normalized.length() - 1));
+        }
+        return normalized
+            .replaceAll("^[\"'`]+", "")
+            .replaceAll("[\"'`]+$", "");
+    }
+
     private String sanitizeSummary(String value, String transcript, String title) {
         String summary = normalize(value)
             .replace('\n', ' ')
             .replace('\r', ' ');
         summary = LEADING_LIST_PATTERN.matcher(summary).replaceFirst("");
         summary = keepFirstSentence(summary);
-        summary = softenClinicalLanguage(summary);
         summary = limitSummaryWordCount(summary, MAX_SUMMARY_WORDS);
         if (summary.isBlank()) {
             return "";
@@ -381,10 +452,7 @@ public class MemoryInsightsService {
             summary = summary + ".";
         }
 
-        if (equalsIgnoringPunctuation(summary, transcript) || equalsIgnoringPunctuation(summary, title)) {
-            return "";
-        }
-        if (summaryRepeatsTitle(summary, title)) {
+        if (equalsIgnoringPunctuation(summary, title) || summaryRepeatsTitle(summary, title)) {
             return "";
         }
 
@@ -424,17 +492,6 @@ public class MemoryInsightsService {
             return normalize(matcher.group(1));
         }
         return normalized;
-    }
-
-    private String softenClinicalLanguage(String value) {
-        String softened = value;
-        for (Map.Entry<String, String> entry : CLINICAL_WORD_REPLACEMENTS.entrySet()) {
-            softened = softened.replaceAll(
-                "(?i)\\b" + Pattern.quote(entry.getKey()) + "\\b",
-                entry.getValue()
-            );
-        }
-        return normalize(softened);
     }
 
     private String limitSummaryWordCount(String summary, int maxWords) {
@@ -520,13 +577,6 @@ public class MemoryInsightsService {
         return String.join(" ", words);
     }
 
-    private String lowerFirst(String value) {
-        if (value == null || value.isBlank()) {
-            return "memory";
-        }
-        return value.substring(0, 1).toLowerCase(Locale.ROOT) + value.substring(1);
-    }
-
     private String capitalize(String value) {
         if (value == null || value.isBlank()) {
             return "";
@@ -550,6 +600,91 @@ public class MemoryInsightsService {
             return "Unbenannter Moment";
         }
         return "Untitled Memory";
+    }
+
+    private String emptyTranscriptSummary(DetectedLanguage language) {
+        if (language == DetectedLanguage.GERMAN) {
+            return "Keine klare gesprochene Erinnerung im Transkript.";
+        }
+        return "No clear spoken memory in the transcript.";
+    }
+
+    private boolean isLowInformationTranscript(String transcript, DetectedLanguage language) {
+        List<String> words = tokenize(transcript);
+        if (words.isEmpty()) {
+            return true;
+        }
+        if (words.size() <= 3) {
+            return true;
+        }
+
+        int markerHits = 0;
+        int noiseHits = 0;
+        int numericOrCountingHits = 0;
+        for (String word : words) {
+            if (LOW_INFORMATION_MARKERS.contains(word)) {
+                markerHits++;
+            }
+            if (NOISE_MARKERS.contains(word)) {
+                noiseHits++;
+            }
+            if (word.matches("\\d+") || COUNTING_WORDS.contains(word)) {
+                numericOrCountingHits++;
+            }
+        }
+
+        if (markerHits >= 1 && words.size() <= 8) {
+            return true;
+        }
+        if (noiseHits >= Math.max(2, words.size() - 1)) {
+            return true;
+        }
+        if (numericOrCountingHits == words.size()) {
+            return true;
+        }
+
+        Set<String> stopWords = language == DetectedLanguage.GERMAN ? STOP_WORDS_DE : STOP_WORDS_EN;
+        int informativeWords = 0;
+        for (String word : words) {
+            if (!stopWords.contains(word) && !NOISE_MARKERS.contains(word) && !word.matches("\\d+")) {
+                informativeWords++;
+            }
+        }
+        return informativeWords <= 2;
+    }
+
+    private boolean isGroundedSummary(String summary, String transcript, DetectedLanguage language) {
+        List<String> transcriptWords = tokenize(transcript);
+        if (transcriptWords.isEmpty()) {
+            return false;
+        }
+        Set<String> transcriptWordSet = Set.copyOf(transcriptWords);
+        Set<String> stopWords = language == DetectedLanguage.GERMAN ? STOP_WORDS_DE : STOP_WORDS_EN;
+
+        int unsupportedContentWords = 0;
+        for (String word : tokenize(summary)) {
+            if (word.length() <= 2 || stopWords.contains(word) || word.matches("\\d+")) {
+                continue;
+            }
+            if (!transcriptWordSet.contains(word)) {
+                unsupportedContentWords++;
+            }
+        }
+
+        return unsupportedContentWords == 0;
+    }
+
+    private boolean containsUncertaintyMarker(String text) {
+        String normalized = normalize(text).toLowerCase(Locale.ROOT);
+        if (normalized.isBlank()) {
+            return false;
+        }
+        for (String marker : UNCERTAINTY_MARKERS) {
+            if (normalized.contains(marker)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean matchesLanguage(String text, DetectedLanguage expected) {
