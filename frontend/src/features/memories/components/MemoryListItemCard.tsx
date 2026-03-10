@@ -18,7 +18,7 @@ const CardShell = styled.div`
 const RowButton = styled.button<{ $revealed: boolean }>`
   width: 100%;
   border: none;
-  padding: ${({ theme }) => `${theme.space.x2} 0`};
+  padding: ${({ theme }) => `${theme.space.x1} 0`};
   background: transparent;
   text-align: left;
   cursor: pointer;
@@ -44,12 +44,12 @@ const RowButton = styled.button<{ $revealed: boolean }>`
 
 const MarkerColumn = styled.div`
   position: relative;
-  min-height: 104px;
+  min-height: 92px;
 `
 
 const MarkerDot = styled.span`
   position: absolute;
-  top: 16px;
+  top: 14px;
   left: 1px;
   width: 8px;
   height: 8px;
@@ -61,7 +61,7 @@ const MarkerDot = styled.span`
 
 const MarkerLine = styled.span<{ $hidden: boolean }>`
   position: absolute;
-  top: 29px;
+  top: 27px;
   left: 4.5px;
   width: 1.5px;
   bottom: 0;
@@ -71,12 +71,12 @@ const MarkerLine = styled.span<{ $hidden: boolean }>`
 `
 
 const Content = styled.div`
-  min-height: 104px;
-  padding: ${({ theme }) => `${theme.space.x2} 0 ${theme.space.x3}`};
+  min-height: 92px;
+  padding: ${({ theme }) => `${theme.space.x1} 0 ${theme.space.x2}`};
   padding-right: ${({ theme }) => theme.space.x1};
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.space.x2};
+  gap: ${({ theme }) => theme.space.x1};
   border-bottom: 1px solid ${({ theme }) => theme.colors.border};
   border-bottom-color: color-mix(in srgb, ${({ theme }) => theme.colors.border} 32%, transparent);
 `
@@ -85,7 +85,7 @@ const Head = styled.div`
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: ${({ theme }) => theme.space.x2};
+  gap: ${({ theme }) => theme.space.x1};
 `
 
 const Meta = styled.div`
@@ -105,8 +105,8 @@ const DateText = styled.span`
 const Title = styled.div`
   font-family: ${({ theme }) => theme.typography.headingFamily};
   color: ${({ theme }) => theme.colors.text};
-  font-size: 1.22rem;
-  line-height: 1.25;
+  font-size: 1.14rem;
+  line-height: 1.22;
   font-weight: 600;
 `
 
@@ -117,12 +117,12 @@ const Tags = styled.div`
 `
 
 const TagChip = styled.span`
-  padding: 1px ${({ theme }) => theme.space.x2};
+  padding: 0 ${({ theme }) => theme.space.x1};
   border-radius: ${({ theme }) => theme.radii.pill};
   background: ${({ theme }) => theme.colors.surface};
   color: ${({ theme }) => theme.colors.textMuted};
   border: 1px solid color-mix(in srgb, ${({ theme }) => theme.colors.border} 52%, transparent);
-  font-size: calc(${({ theme }) => theme.typography.secondarySize} - 2px);
+  font-size: calc(${({ theme }) => theme.typography.secondarySize} - 3px);
   line-height: 1.2;
   opacity: 0.9;
 `

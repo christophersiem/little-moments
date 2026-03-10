@@ -2,6 +2,7 @@ import { useRef, type KeyboardEvent, type ReactNode } from 'react'
 import styled from 'styled-components'
 import { useAppearance, type AppearanceMode } from '../app/appearance'
 import { APP_ROUTES } from '../app/routes'
+import { PageContainer } from '../components/PageContainer'
 
 interface SettingsPageProps {
   navigate: (nextPath: string) => void
@@ -17,8 +18,18 @@ const Section = styled.section`
   padding-top: ${({ theme }) => theme.space.x3};
 `
 
+const HeaderBlock = styled.div`
+  padding: ${({ theme }) => `${theme.space.x1} 0 ${theme.space.x3}`};
+`
+
+const HeadingRow = styled.div`
+  display: flex;
+  align-items: center;
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+`
+
 const Heading = styled.h2`
-  margin: 0 0 ${({ theme }) => theme.space.x4};
+  margin: 0;
   font-size: 1.5rem;
   color: ${({ theme }) => theme.colors.text};
 `
@@ -300,9 +311,14 @@ export function SettingsPage({ navigate, onLogout }: SettingsPageProps) {
   }
 
   return (
-    <Section>
-      <Heading>Settings</Heading>
-      <List>
+    <PageContainer>
+      <Section>
+        <HeaderBlock>
+          <HeadingRow>
+            <Heading>Settings</Heading>
+          </HeadingRow>
+        </HeaderBlock>
+        <List>
         <StaticItem>
           <StaticItemRow>
             <ItemIcon>
@@ -366,20 +382,21 @@ export function SettingsPage({ navigate, onLogout }: SettingsPageProps) {
           </ItemText>
           <Chevron>›</Chevron>
         </Item>
-      </List>
+        </List>
 
-      <LogoutSection>
-        <LogoutItem type="button" $interactive onClick={onLogout}>
-          <LogoutIcon>
-            <LogoutArrowIcon />
-          </LogoutIcon>
-          <ItemText>
-            <LogoutTitle>Logout</LogoutTitle>
-            <ItemSubtitle>Sign out of your account</ItemSubtitle>
-          </ItemText>
-          <Chevron>›</Chevron>
-        </LogoutItem>
-      </LogoutSection>
-    </Section>
+        <LogoutSection>
+          <LogoutItem type="button" $interactive onClick={onLogout}>
+            <LogoutIcon>
+              <LogoutArrowIcon />
+            </LogoutIcon>
+            <ItemText>
+              <LogoutTitle>Logout</LogoutTitle>
+              <ItemSubtitle>Sign out of your account</ItemSubtitle>
+            </ItemText>
+            <Chevron>›</Chevron>
+          </LogoutItem>
+        </LogoutSection>
+      </Section>
+    </PageContainer>
   )
 }

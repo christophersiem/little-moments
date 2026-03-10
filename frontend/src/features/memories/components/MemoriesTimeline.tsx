@@ -19,13 +19,13 @@ interface MemoriesTimelineProps {
 
 const Group = styled.section`
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
-  column-gap: ${({ theme }) => theme.space.x3};
+  grid-template-columns: 68px minmax(0, 1fr);
+  column-gap: ${({ theme }) => theme.space.x2};
   align-items: start;
   scroll-margin-top: ${({ theme }) => `calc(${theme.space.x6} + ${theme.space.x5})`};
 
   @media (max-width: 389px) {
-    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-columns: 60px minmax(0, 1fr);
     column-gap: ${({ theme }) => theme.space.x2};
   }
 `
@@ -60,7 +60,7 @@ const GroupTitle = styled.h3<{ $active: boolean }>`
 const Groups = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.space.x3};
+  gap: ${({ theme }) => theme.space.x2};
 `
 
 const FooterArea = styled.div`
