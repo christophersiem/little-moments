@@ -6,38 +6,32 @@ import de.csiem.backend.config.AppProperties;
 import de.csiem.backend.dto.FamilyMemberResponse;
 import de.csiem.backend.dto.FamilySummaryResponse;
 import de.csiem.backend.dto.ProfileResponse;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.util.ArrayList;
 import java.time.Instant;
-import java.net.URI;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.springframework.http.HttpStatus.BAD_REQUEST;
-import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
-import static org.springframework.http.HttpStatus.NOT_FOUND;
-import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
 @Service
 public class SupabaseGatewayService {
 
     private final AppProperties appProperties;
-    private final ObjectMapper objectMapper;
+    private final SupabaseHttpClient supabaseHttpClient;
+    private final SupabaseMemoryGateway supabaseMemoryGateway;
 
     public SupabaseGatewayService(AppProperties appProperties) {
         this.appProperties = appProperties;
-        this.objectMapper = new ObjectMapper();
+        ObjectMapper objectMapper = new ObjectMapper();
+        this.supabaseHttpClient = new SupabaseHttpClient(appProperties, objectMapper);
+        this.supabaseMemoryGateway = new SupabaseMemoryGateway(supabaseHttpClient);
     }
 
     public boolean isConfigured() {
@@ -47,7 +41,7 @@ public class SupabaseGatewayService {
 
     public String createFamilyWithOwner(String authorizationHeader, String name) {
         JsonNode result = callRpc("rpc_create_family_with_owner", Map.of("name", name), authorizationHeader);
-        return asText(result);
+        return SupabaseJson.asText(result);
     }
 
     public String getFirstChildIdForFamily(String authorizationHeader, String familyId) {
@@ -60,11 +54,11 @@ public class SupabaseGatewayService {
             .build(true)
             .toUriString();
 
-        JsonNode response = callGet(uri, authorizationHeader);
+        JsonNode response = supabaseHttpClient.get(uri, authorizationHeader, SupabaseHttpClient.REQUEST_FAILED_MESSAGE);
         if (!response.isArray() || response.isEmpty()) {
             return null;
         }
-        return asText(response.get(0).get(SupabaseFields.ID));
+        return SupabaseJson.asText(response.get(0).get(SupabaseFields.ID));
     }
 
     public String ensureDefaultChildForFamily(String authorizationHeader, String familyId) {
@@ -76,7 +70,7 @@ public class SupabaseGatewayService {
             ),
             authorizationHeader
         );
-        return asText(result);
+        return SupabaseJson.asText(result);
     }
 
     public List<FamilyMemberResponse> listFamilyMembers(String authorizationHeader, String familyId) {
@@ -88,14 +82,14 @@ public class SupabaseGatewayService {
             .build(true)
             .toUriString();
 
-        JsonNode members = callGet(membersUri, authorizationHeader);
+        JsonNode members = supabaseHttpClient.get(membersUri, authorizationHeader, SupabaseHttpClient.REQUEST_FAILED_MESSAGE);
         if (!members.isArray()) {
             return List.of();
         }
 
         List<String> userIds = new ArrayList<>();
         for (JsonNode row : members) {
-            String userId = asText(row.get(SupabaseFields.USER_ID));
+            String userId = SupabaseJson.asText(row.get(SupabaseFields.USER_ID));
             if (!userId.isBlank()) {
                 userIds.add(userId);
             }
@@ -105,9 +99,9 @@ public class SupabaseGatewayService {
         List<FamilyMemberResponse> response = new ArrayList<>();
 
         for (JsonNode row : members) {
-            String userId = asText(row.get(SupabaseFields.USER_ID));
-            String role = asText(row.get(SupabaseFields.ROLE));
-            String joinedAt = asText(row.get(SupabaseFields.JOINED_AT));
+            String userId = SupabaseJson.asText(row.get(SupabaseFields.USER_ID));
+            String role = SupabaseJson.asText(row.get(SupabaseFields.ROLE));
+            String joinedAt = SupabaseJson.asText(row.get(SupabaseFields.JOINED_AT));
             String displayName = displayNamesByUserId.getOrDefault(userId, "Member");
 
             response.add(new FamilyMemberResponse(userId, displayName, role, joinedAt));
@@ -117,7 +111,7 @@ public class SupabaseGatewayService {
     }
 
     public List<FamilySummaryResponse> listMyFamilies(String authorizationHeader) {
-        SupabaseUser user = getCurrentUser(authorizationHeader);
+        SupabaseHttpClient.SupabaseUser user = supabaseHttpClient.getCurrentUser(authorizationHeader);
 
         String membershipUri = UriComponentsBuilder
             .fromPath("/rest/v1/family_members")
@@ -127,14 +121,18 @@ public class SupabaseGatewayService {
             .build(true)
             .toUriString();
 
-        JsonNode membershipRows = callGet(membershipUri, authorizationHeader);
+        JsonNode membershipRows = supabaseHttpClient.get(
+            membershipUri,
+            authorizationHeader,
+            SupabaseHttpClient.REQUEST_FAILED_MESSAGE
+        );
         if (!membershipRows.isArray() || membershipRows.isEmpty()) {
             return List.of();
         }
 
         List<String> familyIds = new ArrayList<>();
         for (JsonNode row : membershipRows) {
-            String familyId = asText(row.get(SupabaseFields.FAMILY_ID));
+            String familyId = SupabaseJson.asText(row.get(SupabaseFields.FAMILY_ID));
             if (!familyId.isBlank()) {
                 familyIds.add(familyId);
             }
@@ -150,20 +148,24 @@ public class SupabaseGatewayService {
             .build(true)
             .toUriString();
 
-        JsonNode familyRows = callGet(familiesUri, authorizationHeader);
+        JsonNode familyRows = supabaseHttpClient.get(
+            familiesUri,
+            authorizationHeader,
+            SupabaseHttpClient.REQUEST_FAILED_MESSAGE
+        );
         Map<String, String> familyNamesById = new HashMap<>();
         if (familyRows.isArray()) {
             for (JsonNode row : familyRows) {
-                String familyId = asText(row.get(SupabaseFields.ID));
+                String familyId = SupabaseJson.asText(row.get(SupabaseFields.ID));
                 if (!familyId.isBlank()) {
-                    familyNamesById.put(familyId, firstNonBlank(asText(row.get("name")), "Family"));
+                    familyNamesById.put(familyId, SupabaseJson.firstNonBlank(SupabaseJson.asText(row.get("name")), "Family"));
                 }
             }
         }
 
         List<FamilySummaryResponse> result = new ArrayList<>();
         for (JsonNode row : membershipRows) {
-            String familyId = asText(row.get(SupabaseFields.FAMILY_ID));
+            String familyId = SupabaseJson.asText(row.get(SupabaseFields.FAMILY_ID));
             if (familyId.isBlank()) {
                 continue;
             }
@@ -171,8 +173,8 @@ public class SupabaseGatewayService {
                 new FamilySummaryResponse(
                     familyId,
                     familyNamesById.getOrDefault(familyId, "Family"),
-                    asText(row.get(SupabaseFields.ROLE)),
-                    asText(row.get(SupabaseFields.JOINED_AT))
+                    SupabaseJson.asText(row.get(SupabaseFields.ROLE)),
+                    SupabaseJson.asText(row.get(SupabaseFields.JOINED_AT))
                 )
             );
         }
@@ -189,7 +191,7 @@ public class SupabaseGatewayService {
             ),
             authorizationHeader
         );
-        return asText(result);
+        return SupabaseJson.asText(result);
     }
 
     public String acceptInvitation(String authorizationHeader, String token) {
@@ -198,7 +200,7 @@ public class SupabaseGatewayService {
             Map.of("p_token", token),
             authorizationHeader
         );
-        return asText(result);
+        return SupabaseJson.asText(result);
     }
 
     public void setMemberRole(String authorizationHeader, String familyId, String userId, String role) {
@@ -225,7 +227,7 @@ public class SupabaseGatewayService {
     }
 
     public void ensureOwnProfile(String authorizationHeader, String displayName) {
-        SupabaseUser user = getCurrentUser(authorizationHeader);
+        SupabaseHttpClient.SupabaseUser user = supabaseHttpClient.getCurrentUser(authorizationHeader);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("user_id", user.id());
         body.put("display_name", displayName);
@@ -236,11 +238,17 @@ public class SupabaseGatewayService {
             .build(true)
             .toUriString();
 
-        callPost(uri, body, authorizationHeader, profileEnsurePreferHeader());
+        supabaseHttpClient.post(
+            uri,
+            body,
+            authorizationHeader,
+            profileEnsurePreferHeader(),
+            SupabaseHttpClient.REQUEST_FAILED_MESSAGE
+        );
     }
 
     public ProfileResponse getOwnProfile(String authorizationHeader) {
-        SupabaseUser user = getCurrentUser(authorizationHeader);
+        SupabaseHttpClient.SupabaseUser user = supabaseHttpClient.getCurrentUser(authorizationHeader);
         String uri = UriComponentsBuilder
             .fromPath("/rest/v1/profiles")
             .queryParam("select", "user_id,display_name")
@@ -249,87 +257,20 @@ public class SupabaseGatewayService {
             .build(true)
             .toUriString();
 
-        JsonNode result = callGet(uri, authorizationHeader);
+        JsonNode result = supabaseHttpClient.get(uri, authorizationHeader, SupabaseHttpClient.REQUEST_FAILED_MESSAGE);
         if (!result.isArray() || result.isEmpty()) {
             return new ProfileResponse(user.id(), "Member");
         }
 
         JsonNode row = result.get(0);
         return new ProfileResponse(
-            asText(row.get(SupabaseFields.USER_ID)),
-            firstNonBlank(asText(row.get(SupabaseFields.DISPLAY_NAME)), "Member")
+            SupabaseJson.asText(row.get(SupabaseFields.USER_ID)),
+            SupabaseJson.firstNonBlank(SupabaseJson.asText(row.get(SupabaseFields.DISPLAY_NAME)), "Member")
         );
     }
 
-    public void assertOwnerCanCreateMemory(String authorizationHeader, String childId) {
-        SupabaseUser user = getCurrentUser(authorizationHeader);
-        assertOwnerForChild(authorizationHeader, user.id(), childId, "Only owners can record memories.");
-    }
-
-    public void assertOwnerCanManageMemory(String authorizationHeader, String memoryId) {
-        SupabaseUser user = getCurrentUser(authorizationHeader);
-        String memoryUri = UriComponentsBuilder
-            .fromPath("/rest/v1/memories")
-            .queryParam("select", SupabaseFields.CHILD_ID)
-            .queryParam(SupabaseFields.ID, "eq." + memoryId)
-            .queryParam("limit", 1)
-            .build(true)
-            .toUriString();
-
-        JsonNode memoryRows = callGet(memoryUri, authorizationHeader);
-        if (!memoryRows.isArray() || memoryRows.isEmpty()) {
-            throw new ResponseStatusException(NOT_FOUND, "Memory not found");
-        }
-
-        String childId = asText(memoryRows.get(0).get(SupabaseFields.CHILD_ID));
-        if (!StringUtils.hasText(childId)) {
-            throw new ResponseStatusException(FORBIDDEN, "Only owners can edit or delete memories.");
-        }
-
-        assertOwnerForChild(authorizationHeader, user.id(), childId, "Only owners can edit or delete memories.");
-    }
-
-    private void assertOwnerForChild(String authorizationHeader, String userId, String childId, String errorMessage) {
-        String childUri = UriComponentsBuilder
-            .fromPath("/rest/v1/children")
-            .queryParam("select", SupabaseFields.FAMILY_ID)
-            .queryParam(SupabaseFields.ID, "eq." + childId)
-            .queryParam("limit", 1)
-            .build(true)
-            .toUriString();
-
-        JsonNode childRows = callGet(childUri, authorizationHeader);
-        if (!childRows.isArray() || childRows.isEmpty()) {
-            throw new ResponseStatusException(NOT_FOUND, "Child not found");
-        }
-
-        String familyId = asText(childRows.get(0).get(SupabaseFields.FAMILY_ID));
-        if (!StringUtils.hasText(familyId)) {
-            throw new ResponseStatusException(FORBIDDEN, errorMessage);
-        }
-
-        String membershipUri = UriComponentsBuilder
-            .fromPath("/rest/v1/family_members")
-            .queryParam("select", SupabaseFields.ROLE)
-            .queryParam(SupabaseFields.FAMILY_ID, "eq." + familyId)
-            .queryParam(SupabaseFields.USER_ID, "eq." + userId)
-            .queryParam("limit", 1)
-            .build(true)
-            .toUriString();
-
-        JsonNode membershipRows = callGet(membershipUri, authorizationHeader);
-        if (!membershipRows.isArray() || membershipRows.isEmpty()) {
-            throw new ResponseStatusException(FORBIDDEN, errorMessage);
-        }
-
-        String role = asText(membershipRows.get(0).get(SupabaseFields.ROLE));
-        if (!FamilyRoles.isOwner(role)) {
-            throw new ResponseStatusException(FORBIDDEN, errorMessage);
-        }
-    }
-
     public void updateOwnProfile(String authorizationHeader, String displayName) {
-        SupabaseUser user = getCurrentUser(authorizationHeader);
+        SupabaseHttpClient.SupabaseUser user = supabaseHttpClient.getCurrentUser(authorizationHeader);
         String uri = UriComponentsBuilder
             .fromPath("/rest/v1/profiles")
             .queryParam("on_conflict", "user_id")
@@ -337,14 +278,15 @@ public class SupabaseGatewayService {
             .build(true)
             .toUriString();
 
-        JsonNode rows = callPost(
+        JsonNode rows = supabaseHttpClient.post(
             uri,
             Map.of(
                 "user_id", user.id(),
                 "display_name", displayName
             ),
             authorizationHeader,
-            "resolution=merge-duplicates,return=representation"
+            "resolution=merge-duplicates,return=representation",
+            SupabaseHttpClient.REQUEST_FAILED_MESSAGE
         );
 
         if (!rows.isArray() || rows.isEmpty()) {
@@ -352,29 +294,16 @@ public class SupabaseGatewayService {
         }
     }
 
-    public JsonNode createProcessingMemory(String authorizationHeader, String childId, Instant recordedAt) {
-        SupabaseUser user = getCurrentUser(authorizationHeader);
-        String uri = UriComponentsBuilder
-            .fromPath("/rest/v1/memories")
-            .queryParam("select", memorySelect())
-            .build(true)
-            .toUriString();
+    public void assertOwnerCanCreateMemory(String authorizationHeader, String childId) {
+        supabaseMemoryGateway.assertOwnerCanCreateMemory(authorizationHeader, childId);
+    }
 
-        return firstRow(
-            callPost(
-                uri,
-                Map.of(
-                    SupabaseFields.CHILD_ID, childId,
-                    SupabaseFields.CREATED_BY, user.id(),
-                    SupabaseFields.RECORDED_AT, recordedAt.toString(),
-                    SupabaseFields.STATUS, SupabaseStatuses.PROCESSING
-                ),
-                authorizationHeader,
-                "return=representation"
-            ),
-            NOT_FOUND,
-            "Could not create memory"
-        );
+    public void assertOwnerCanManageMemory(String authorizationHeader, String memoryId) {
+        supabaseMemoryGateway.assertOwnerCanManageMemory(authorizationHeader, memoryId);
+    }
+
+    public JsonNode createProcessingMemory(String authorizationHeader, String childId, Instant recordedAt) {
+        return supabaseMemoryGateway.createProcessingMemory(authorizationHeader, childId, recordedAt);
     }
 
     public JsonNode insertReadyMemory(
@@ -386,63 +315,23 @@ public class SupabaseGatewayService {
         String summary,
         List<String> tags
     ) {
-        SupabaseUser user = getCurrentUser(authorizationHeader);
-        String uri = UriComponentsBuilder
-            .fromPath("/rest/v1/memories")
-            .queryParam("select", memorySelect())
-            .build(true)
-            .toUriString();
-
-        return firstRow(
-            callPost(
-                uri,
-                Map.of(
-                    SupabaseFields.CHILD_ID, childId,
-                    SupabaseFields.CREATED_BY, user.id(),
-                    SupabaseFields.RECORDED_AT, recordedAt.toString(),
-                    SupabaseFields.STATUS, SupabaseStatuses.READY,
-                    SupabaseFields.TRANSCRIPT, transcript,
-                    SupabaseFields.TITLE, title,
-                    SupabaseFields.SUMMARY, summary,
-                    SupabaseFields.TAGS, tags
-                ),
-                authorizationHeader,
-                "return=representation"
-            ),
-            NOT_FOUND,
-            "Could not create split memory"
+        return supabaseMemoryGateway.insertReadyMemory(
+            authorizationHeader,
+            childId,
+            recordedAt,
+            transcript,
+            title,
+            summary,
+            tags
         );
     }
 
     public JsonNode updateMemoryById(String authorizationHeader, String memoryId, Map<String, ?> updates) {
-        String uri = UriComponentsBuilder
-            .fromPath("/rest/v1/memories")
-            .queryParam("select", memorySelect())
-            .queryParam(SupabaseFields.ID, "eq." + memoryId)
-            .build(true)
-            .toUriString();
-
-        return firstRow(
-            callPatchForJson(uri, updates, authorizationHeader, "return=representation"),
-            NOT_FOUND,
-            "Memory not found"
-        );
+        return supabaseMemoryGateway.updateMemoryById(authorizationHeader, memoryId, updates);
     }
 
     public JsonNode getMemoryById(String authorizationHeader, String memoryId) {
-        String uri = UriComponentsBuilder
-            .fromPath("/rest/v1/memories")
-            .queryParam("select", memorySelect())
-            .queryParam(SupabaseFields.ID, "eq." + memoryId)
-            .queryParam("limit", 1)
-            .build(true)
-            .toUriString();
-
-        return firstRow(
-            callGet(uri, authorizationHeader),
-            NOT_FOUND,
-            "Memory not found"
-        );
+        return supabaseMemoryGateway.getMemoryById(authorizationHeader, memoryId);
     }
 
     public JsonNode listMemories(
@@ -455,23 +344,16 @@ public class SupabaseGatewayService {
         List<String> tags,
         boolean highlightsOnly
     ) {
-        UriComponentsBuilder builder = UriComponentsBuilder
-            .fromPath("/rest/v1/memories")
-            .queryParam("select", memorySelect())
-            .queryParam("order", "recorded_at.desc,created_at.desc")
-            .queryParam("offset", offset)
-            .queryParam("limit", limit);
-
-        applyMemoryFilters(
-            builder,
+        return supabaseMemoryGateway.listMemories(
             authorizationHeader,
+            offset,
+            limit,
             familyId,
             fromRecordedAtIso,
             toRecordedAtIso,
             tags,
             highlightsOnly
         );
-        return callGet(builder.build().encode().toUri(), authorizationHeader);
     }
 
     public long countMemories(
@@ -482,12 +364,7 @@ public class SupabaseGatewayService {
         List<String> tags,
         boolean highlightsOnly
     ) {
-        UriComponentsBuilder builder = UriComponentsBuilder
-            .fromPath("/rest/v1/memories")
-            .queryParam("select", SupabaseFields.ID);
-
-        applyMemoryFilters(
-            builder,
+        return supabaseMemoryGateway.countMemories(
             authorizationHeader,
             familyId,
             fromRecordedAtIso,
@@ -495,25 +372,22 @@ public class SupabaseGatewayService {
             tags,
             highlightsOnly
         );
-        JsonNode rows = callGet(builder.build().encode().toUri(), authorizationHeader);
-        if (!rows.isArray()) {
-            return 0L;
-        }
-        return rows.size();
     }
 
     public void deleteMemoryById(String authorizationHeader, String memoryId) {
-        String uri = UriComponentsBuilder
-            .fromPath("/rest/v1/memories")
-            .queryParam(SupabaseFields.ID, "eq." + memoryId)
-            .queryParam("select", SupabaseFields.ID)
-            .build(true)
-            .toUriString();
+        supabaseMemoryGateway.deleteMemoryById(authorizationHeader, memoryId);
+    }
 
-        JsonNode deleted = callDelete(uri, authorizationHeader, "return=representation");
-        if (!deleted.isArray() || deleted.isEmpty()) {
-            throw new ResponseStatusException(NOT_FOUND, "Memory not found");
-        }
+    String profileEnsurePreferHeader() {
+        return "resolution=ignore-duplicates,return=minimal";
+    }
+
+    String buildTagOverlapFilter(List<String> values) {
+        return supabaseMemoryGateway.buildTagOverlapFilter(values);
+    }
+
+    String toPostgresTextArrayLiteral(List<String> values) {
+        return supabaseMemoryGateway.toPostgresTextArrayLiteral(values);
     }
 
     private Map<String, String> fetchDisplayNames(String authorizationHeader, List<String> userIds) {
@@ -529,15 +403,15 @@ public class SupabaseGatewayService {
             .build(true)
             .toUriString();
 
-        JsonNode rows = callGet(uri, authorizationHeader);
+        JsonNode rows = supabaseHttpClient.get(uri, authorizationHeader, SupabaseHttpClient.REQUEST_FAILED_MESSAGE);
         if (!rows.isArray()) {
             return Map.of();
         }
 
         Map<String, String> result = new HashMap<>();
         for (JsonNode row : rows) {
-            String userId = asText(row.get(SupabaseFields.USER_ID));
-            String displayName = firstNonBlank(asText(row.get(SupabaseFields.DISPLAY_NAME)), "Member");
+            String userId = SupabaseJson.asText(row.get(SupabaseFields.USER_ID));
+            String displayName = SupabaseJson.firstNonBlank(SupabaseJson.asText(row.get(SupabaseFields.DISPLAY_NAME)), "Member");
             if (!userId.isBlank()) {
                 result.put(userId, displayName);
             }
@@ -547,311 +421,6 @@ public class SupabaseGatewayService {
 
     private JsonNode callRpc(String rpcName, Map<String, ?> payload, String authorizationHeader) {
         String uri = "/rest/v1/rpc/" + rpcName;
-        return callPost(uri, payload, authorizationHeader, null);
-    }
-
-    private JsonNode callGet(String uri, String authorizationHeader) {
-        try {
-            String body = restClient().get()
-                .uri(uri)
-                .headers(headers -> applySupabaseHeaders(headers, authorizationHeader, null))
-                .retrieve()
-                .body(String.class);
-
-            if (!StringUtils.hasText(body)) {
-                return objectMapper.nullNode();
-            }
-            return objectMapper.readTree(body);
-        } catch (RestClientResponseException ex) {
-            throw mapException(ex, "Supabase request failed");
-        } catch (Exception ex) {
-            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Supabase request failed");
-        }
-    }
-
-    private JsonNode callGet(URI uri, String authorizationHeader) {
-        try {
-            String body = restClient().get()
-                .uri(uri)
-                .headers(headers -> applySupabaseHeaders(headers, authorizationHeader, null))
-                .retrieve()
-                .body(String.class);
-
-            if (!StringUtils.hasText(body)) {
-                return objectMapper.nullNode();
-            }
-            return objectMapper.readTree(body);
-        } catch (RestClientResponseException ex) {
-            throw mapException(ex, "Supabase request failed");
-        } catch (Exception ex) {
-            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Supabase request failed");
-        }
-    }
-
-    private JsonNode callPost(String uri, Object payload, String authorizationHeader, String preferHeader) {
-        try {
-            String body = restClient().post()
-                .uri(uri)
-                .headers(headers -> applySupabaseHeaders(headers, authorizationHeader, preferHeader))
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(payload)
-                .retrieve()
-                .body(String.class);
-
-            if (!StringUtils.hasText(body)) {
-                return objectMapper.nullNode();
-            }
-            return objectMapper.readTree(body);
-        } catch (RestClientResponseException ex) {
-            throw mapException(ex, "Supabase request failed");
-        } catch (Exception ex) {
-            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Supabase request failed");
-        }
-    }
-
-    private JsonNode callPatchForJson(String uri, Object payload, String authorizationHeader, String preferHeader) {
-        try {
-            String body = restClient().patch()
-                .uri(uri)
-                .headers(headers -> applySupabaseHeaders(headers, authorizationHeader, preferHeader))
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(payload)
-                .retrieve()
-                .body(String.class);
-
-            if (!StringUtils.hasText(body)) {
-                return objectMapper.nullNode();
-            }
-            return objectMapper.readTree(body);
-        } catch (RestClientResponseException ex) {
-            throw mapException(ex, "Supabase request failed");
-        } catch (Exception ex) {
-            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Supabase request failed");
-        }
-    }
-
-    private void callPatch(String uri, Object payload, String authorizationHeader, String preferHeader) {
-        try {
-            restClient().patch()
-                .uri(uri)
-                .headers(headers -> applySupabaseHeaders(headers, authorizationHeader, preferHeader))
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(payload)
-                .retrieve()
-                .toBodilessEntity();
-        } catch (RestClientResponseException ex) {
-            throw mapException(ex, "Supabase request failed");
-        } catch (Exception ex) {
-            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Supabase request failed");
-        }
-    }
-
-    private JsonNode callDelete(String uri, String authorizationHeader, String preferHeader) {
-        try {
-            String body = restClient().delete()
-                .uri(uri)
-                .headers(headers -> applySupabaseHeaders(headers, authorizationHeader, preferHeader))
-                .retrieve()
-                .body(String.class);
-
-            if (!StringUtils.hasText(body)) {
-                return objectMapper.nullNode();
-            }
-            return objectMapper.readTree(body);
-        } catch (RestClientResponseException ex) {
-            throw mapException(ex, "Supabase request failed");
-        } catch (Exception ex) {
-            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Supabase request failed");
-        }
-    }
-
-    private void applySupabaseHeaders(HttpHeaders headers, String authorizationHeader, String preferHeader) {
-        AppProperties.Supabase supabase = appProperties.getSupabase();
-        if (!StringUtils.hasText(supabase.getAnonKey())) {
-            throw new ResponseStatusException(BAD_REQUEST, "SUPABASE_ANON_KEY is not configured");
-        }
-        if (!StringUtils.hasText(authorizationHeader) || !authorizationHeader.startsWith("Bearer ")) {
-            throw new ResponseStatusException(UNAUTHORIZED, "Missing or invalid Authorization header");
-        }
-
-        headers.set("apikey", supabase.getAnonKey());
-        headers.set(HttpHeaders.AUTHORIZATION, authorizationHeader);
-        if (StringUtils.hasText(preferHeader)) {
-            headers.set("Prefer", preferHeader);
-        }
-    }
-
-    private SupabaseUser getCurrentUser(String authorizationHeader) {
-        try {
-            String body = restClient().get()
-                .uri("/auth/v1/user")
-                .headers(headers -> applySupabaseHeaders(headers, authorizationHeader, null))
-                .retrieve()
-                .body(String.class);
-
-            JsonNode user = objectMapper.readTree(body);
-            return new SupabaseUser(
-                asText(user.get("id")),
-                asText(user.get("email"))
-            );
-        } catch (RestClientResponseException ex) {
-            throw mapException(ex, "Could not resolve authenticated user");
-        } catch (Exception ex) {
-            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Could not resolve authenticated user");
-        }
-    }
-
-    private ResponseStatusException mapException(RestClientResponseException exception, String fallbackMessage) {
-        String message = fallbackMessage;
-        String responseBody = exception.getResponseBodyAsString();
-        if (StringUtils.hasText(responseBody)) {
-            try {
-                JsonNode json = objectMapper.readTree(responseBody);
-                if (json.hasNonNull("message")) {
-                    message = json.get("message").asText(message);
-                } else if (json.hasNonNull("error_description")) {
-                    message = json.get("error_description").asText(message);
-                } else if (json.hasNonNull("error")) {
-                    message = json.get("error").asText(message);
-                }
-            } catch (Exception ignored) {
-                message = responseBody;
-            }
-        }
-        return new ResponseStatusException(exception.getStatusCode(), message);
-    }
-
-    private RestClient restClient() {
-        String baseUrl = appProperties.getSupabase().getUrl();
-        if (!StringUtils.hasText(baseUrl)) {
-            throw new ResponseStatusException(BAD_REQUEST, "SUPABASE_URL is not configured");
-        }
-        return RestClient.builder().baseUrl(baseUrl).build();
-    }
-
-    private String asText(JsonNode node) {
-        if (node == null || node.isNull()) {
-            return "";
-        }
-        return node.asText("");
-    }
-
-    private String firstNonBlank(String value, String fallback) {
-        if (StringUtils.hasText(value)) {
-            return value;
-        }
-        return fallback;
-    }
-
-    String profileEnsurePreferHeader() {
-        return "resolution=ignore-duplicates,return=minimal";
-    }
-
-    private void applyMemoryFilters(
-        UriComponentsBuilder builder,
-        String authorizationHeader,
-        String familyId,
-        String fromRecordedAtIso,
-        String toRecordedAtIso,
-        List<String> tags,
-        boolean highlightsOnly
-    ) {
-        if (StringUtils.hasText(familyId)) {
-            List<String> childIds = listChildIdsForFamily(authorizationHeader, familyId);
-            if (childIds.isEmpty()) {
-                builder.queryParam(SupabaseFields.ID, "eq.00000000-0000-0000-0000-000000000000");
-                return;
-            }
-            builder.queryParam(SupabaseFields.CHILD_ID, "in.(" + String.join(",", childIds) + ")");
-        }
-        if (StringUtils.hasText(fromRecordedAtIso)) {
-            builder.queryParam(SupabaseFields.RECORDED_AT, "gte." + fromRecordedAtIso);
-        }
-        if (StringUtils.hasText(toRecordedAtIso)) {
-            builder.queryParam(SupabaseFields.RECORDED_AT, "lt." + toRecordedAtIso);
-        }
-        if (tags != null && !tags.isEmpty()) {
-            String tagFilter = buildTagOverlapFilter(tags);
-            if (StringUtils.hasText(tagFilter)) {
-                builder.queryParam(SupabaseFields.TAGS, tagFilter);
-            }
-        }
-        if (highlightsOnly) {
-            builder.queryParam(SupabaseFields.IS_HIGHLIGHT, "eq.true");
-        }
-    }
-
-    private List<String> listChildIdsForFamily(String authorizationHeader, String familyId) {
-        String uri = UriComponentsBuilder
-            .fromPath("/rest/v1/children")
-            .queryParam("select", SupabaseFields.ID)
-            .queryParam(SupabaseFields.FAMILY_ID, "eq." + familyId)
-            .build(true)
-            .toUriString();
-
-        JsonNode rows = callGet(uri, authorizationHeader);
-        if (!rows.isArray()) {
-            return List.of();
-        }
-
-        List<String> childIds = new ArrayList<>();
-        for (JsonNode row : rows) {
-            String childId = asText(row.get(SupabaseFields.ID));
-            if (!childId.isBlank()) {
-                childIds.add(childId);
-            }
-        }
-        return childIds;
-    }
-
-    String buildTagOverlapFilter(List<String> values) {
-        String tagArrayLiteral = toPostgresTextArrayLiteral(values);
-        if (!StringUtils.hasText(tagArrayLiteral)) {
-            return null;
-        }
-        return "ov." + tagArrayLiteral;
-    }
-
-    String toPostgresTextArrayLiteral(List<String> values) {
-        List<String> quotedValues = new ArrayList<>();
-        for (String value : values) {
-            if (!StringUtils.hasText(value)) {
-                continue;
-            }
-            String escaped = value.trim()
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"");
-            quotedValues.add("\"" + escaped + "\"");
-        }
-        if (quotedValues.isEmpty()) {
-            return null;
-        }
-        return "{" + String.join(",", quotedValues) + "}";
-    }
-
-    private JsonNode firstRow(JsonNode rows, org.springframework.http.HttpStatus status, String message) {
-        if (!rows.isArray() || rows.isEmpty()) {
-            throw new ResponseStatusException(status, message);
-        }
-        return rows.get(0);
-    }
-
-    private String memorySelect() {
-        return String.join(
-            ",",
-            SupabaseFields.ID,
-            SupabaseFields.CREATED_AT,
-            SupabaseFields.RECORDED_AT,
-            SupabaseFields.STATUS,
-            SupabaseFields.IS_HIGHLIGHT,
-            SupabaseFields.TITLE,
-            SupabaseFields.SUMMARY,
-            SupabaseFields.TRANSCRIPT,
-            SupabaseFields.ERROR_MESSAGE,
-            SupabaseFields.TAGS
-        );
-    }
-
-    private record SupabaseUser(String id, String email) {
+        return supabaseHttpClient.post(uri, payload, authorizationHeader, null, SupabaseHttpClient.REQUEST_FAILED_MESSAGE);
     }
 }
