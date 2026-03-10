@@ -289,6 +289,5 @@ export function useMemoryDetailEditor({ memory, canManageMemory, navigate }: Use
     onCancelTagsEditing,
     onCloseDateEditor,
     onDeleteDialogCancel,
-    canManageMemory,
   }
 }

@@ -1,5 +1,7 @@
 import { formatDateTime } from '../../../lib/utils'
 
+// Keep a memory-specific formatter wrapper so memory date display can diverge later
+// without updating all call sites.
 export function formatMemoryDate(isoValue: string | null | undefined): string {
   return formatDateTime(isoValue)
 }
