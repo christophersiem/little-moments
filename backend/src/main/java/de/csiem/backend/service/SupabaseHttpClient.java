@@ -18,6 +18,8 @@ import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
 final class SupabaseHttpClient {
 
+    static final String REQUEST_FAILED_MESSAGE = "Supabase request failed";
+
     private final AppProperties appProperties;
     private final ObjectMapper objectMapper;
 

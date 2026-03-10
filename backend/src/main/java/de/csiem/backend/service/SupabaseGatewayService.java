@@ -23,8 +23,6 @@ import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 @Service
 public class SupabaseGatewayService {
 
-    private static final String SUPABASE_REQUEST_FAILED = "Supabase request failed";
-
     private final AppProperties appProperties;
     private final SupabaseHttpClient supabaseHttpClient;
     private final SupabaseMemoryGateway supabaseMemoryGateway;
@@ -56,7 +54,7 @@ public class SupabaseGatewayService {
             .build(true)
             .toUriString();
 
-        JsonNode response = supabaseHttpClient.get(uri, authorizationHeader, SUPABASE_REQUEST_FAILED);
+        JsonNode response = supabaseHttpClient.get(uri, authorizationHeader, SupabaseHttpClient.REQUEST_FAILED_MESSAGE);
         if (!response.isArray() || response.isEmpty()) {
             return null;
         }
@@ -84,7 +82,7 @@ public class SupabaseGatewayService {
             .build(true)
             .toUriString();
 
-        JsonNode members = supabaseHttpClient.get(membersUri, authorizationHeader, SUPABASE_REQUEST_FAILED);
+        JsonNode members = supabaseHttpClient.get(membersUri, authorizationHeader, SupabaseHttpClient.REQUEST_FAILED_MESSAGE);
         if (!members.isArray()) {
             return List.of();
         }
@@ -123,7 +121,11 @@ public class SupabaseGatewayService {
             .build(true)
             .toUriString();
 
-        JsonNode membershipRows = supabaseHttpClient.get(membershipUri, authorizationHeader, SUPABASE_REQUEST_FAILED);
+        JsonNode membershipRows = supabaseHttpClient.get(
+            membershipUri,
+            authorizationHeader,
+            SupabaseHttpClient.REQUEST_FAILED_MESSAGE
+        );
         if (!membershipRows.isArray() || membershipRows.isEmpty()) {
             return List.of();
         }
@@ -146,7 +148,11 @@ public class SupabaseGatewayService {
             .build(true)
             .toUriString();
 
-        JsonNode familyRows = supabaseHttpClient.get(familiesUri, authorizationHeader, SUPABASE_REQUEST_FAILED);
+        JsonNode familyRows = supabaseHttpClient.get(
+            familiesUri,
+            authorizationHeader,
+            SupabaseHttpClient.REQUEST_FAILED_MESSAGE
+        );
         Map<String, String> familyNamesById = new HashMap<>();
         if (familyRows.isArray()) {
             for (JsonNode row : familyRows) {
@@ -232,7 +238,13 @@ public class SupabaseGatewayService {
             .build(true)
             .toUriString();
 
-        supabaseHttpClient.post(uri, body, authorizationHeader, profileEnsurePreferHeader(), SUPABASE_REQUEST_FAILED);
+        supabaseHttpClient.post(
+            uri,
+            body,
+            authorizationHeader,
+            profileEnsurePreferHeader(),
+            SupabaseHttpClient.REQUEST_FAILED_MESSAGE
+        );
     }
 
     public ProfileResponse getOwnProfile(String authorizationHeader) {
@@ -245,7 +257,7 @@ public class SupabaseGatewayService {
             .build(true)
             .toUriString();
 
-        JsonNode result = supabaseHttpClient.get(uri, authorizationHeader, SUPABASE_REQUEST_FAILED);
+        JsonNode result = supabaseHttpClient.get(uri, authorizationHeader, SupabaseHttpClient.REQUEST_FAILED_MESSAGE);
         if (!result.isArray() || result.isEmpty()) {
             return new ProfileResponse(user.id(), "Member");
         }
@@ -274,7 +286,7 @@ public class SupabaseGatewayService {
             ),
             authorizationHeader,
             "resolution=merge-duplicates,return=representation",
-            SUPABASE_REQUEST_FAILED
+            SupabaseHttpClient.REQUEST_FAILED_MESSAGE
         );
 
         if (!rows.isArray() || rows.isEmpty()) {
@@ -391,7 +403,7 @@ public class SupabaseGatewayService {
             .build(true)
             .toUriString();
 
-        JsonNode rows = supabaseHttpClient.get(uri, authorizationHeader, SUPABASE_REQUEST_FAILED);
+        JsonNode rows = supabaseHttpClient.get(uri, authorizationHeader, SupabaseHttpClient.REQUEST_FAILED_MESSAGE);
         if (!rows.isArray()) {
             return Map.of();
         }
@@ -409,6 +421,6 @@ public class SupabaseGatewayService {
 
     private JsonNode callRpc(String rpcName, Map<String, ?> payload, String authorizationHeader) {
         String uri = "/rest/v1/rpc/" + rpcName;
-        return supabaseHttpClient.post(uri, payload, authorizationHeader, null, SUPABASE_REQUEST_FAILED);
+        return supabaseHttpClient.post(uri, payload, authorizationHeader, null, SupabaseHttpClient.REQUEST_FAILED_MESSAGE);
     }
 }

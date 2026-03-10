@@ -1,7 +1,6 @@
 package de.csiem.backend.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.springframework.http.HttpStatus;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -16,8 +15,6 @@ import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 class SupabaseMemoryGateway {
-
-    private static final String SUPABASE_REQUEST_FAILED = "Supabase request failed";
 
     private final SupabaseHttpClient supabaseHttpClient;
 
@@ -40,7 +37,11 @@ class SupabaseMemoryGateway {
             .build(true)
             .toUriString();
 
-        JsonNode memoryRows = supabaseHttpClient.get(memoryUri, authorizationHeader, SUPABASE_REQUEST_FAILED);
+        JsonNode memoryRows = supabaseHttpClient.get(
+            memoryUri,
+            authorizationHeader,
+            SupabaseHttpClient.REQUEST_FAILED_MESSAGE
+        );
         if (!memoryRows.isArray() || memoryRows.isEmpty()) {
             throw new ResponseStatusException(NOT_FOUND, "Memory not found");
         }
@@ -72,7 +73,7 @@ class SupabaseMemoryGateway {
                 ),
                 authorizationHeader,
                 "return=representation",
-                SUPABASE_REQUEST_FAILED
+                SupabaseHttpClient.REQUEST_FAILED_MESSAGE
             ),
             NOT_FOUND,
             "Could not create memory"
@@ -110,7 +111,7 @@ class SupabaseMemoryGateway {
                 ),
                 authorizationHeader,
                 "return=representation",
-                SUPABASE_REQUEST_FAILED
+                SupabaseHttpClient.REQUEST_FAILED_MESSAGE
             ),
             NOT_FOUND,
             "Could not create split memory"
@@ -126,7 +127,13 @@ class SupabaseMemoryGateway {
             .toUriString();
 
         return SupabaseJson.firstRow(
-            supabaseHttpClient.patchForJson(uri, updates, authorizationHeader, "return=representation", SUPABASE_REQUEST_FAILED),
+            supabaseHttpClient.patchForJson(
+                uri,
+                updates,
+                authorizationHeader,
+                "return=representation",
+                SupabaseHttpClient.REQUEST_FAILED_MESSAGE
+            ),
             NOT_FOUND,
             "Memory not found"
         );
@@ -142,7 +149,7 @@ class SupabaseMemoryGateway {
             .toUriString();
 
         return SupabaseJson.firstRow(
-            supabaseHttpClient.get(uri, authorizationHeader, SUPABASE_REQUEST_FAILED),
+            supabaseHttpClient.get(uri, authorizationHeader, SupabaseHttpClient.REQUEST_FAILED_MESSAGE),
             NOT_FOUND,
             "Memory not found"
         );
@@ -176,7 +183,7 @@ class SupabaseMemoryGateway {
         );
 
         URI uri = builder.build().encode().toUri();
-        return supabaseHttpClient.get(uri, authorizationHeader, SUPABASE_REQUEST_FAILED);
+        return supabaseHttpClient.get(uri, authorizationHeader, SupabaseHttpClient.REQUEST_FAILED_MESSAGE);
     }
 
     long countMemories(
@@ -202,7 +209,7 @@ class SupabaseMemoryGateway {
         );
 
         URI uri = builder.build().encode().toUri();
-        JsonNode rows = supabaseHttpClient.get(uri, authorizationHeader, SUPABASE_REQUEST_FAILED);
+        JsonNode rows = supabaseHttpClient.get(uri, authorizationHeader, SupabaseHttpClient.REQUEST_FAILED_MESSAGE);
         if (!rows.isArray()) {
             return 0L;
         }
@@ -217,7 +224,12 @@ class SupabaseMemoryGateway {
             .build(true)
             .toUriString();
 
-        JsonNode deleted = supabaseHttpClient.delete(uri, authorizationHeader, "return=representation", SUPABASE_REQUEST_FAILED);
+        JsonNode deleted = supabaseHttpClient.delete(
+            uri,
+            authorizationHeader,
+            "return=representation",
+            SupabaseHttpClient.REQUEST_FAILED_MESSAGE
+        );
         if (!deleted.isArray() || deleted.isEmpty()) {
             throw new ResponseStatusException(NOT_FOUND, "Memory not found");
         }
@@ -257,7 +269,11 @@ class SupabaseMemoryGateway {
             .build(true)
             .toUriString();
 
-        JsonNode childRows = supabaseHttpClient.get(childUri, authorizationHeader, SUPABASE_REQUEST_FAILED);
+        JsonNode childRows = supabaseHttpClient.get(
+            childUri,
+            authorizationHeader,
+            SupabaseHttpClient.REQUEST_FAILED_MESSAGE
+        );
         if (!childRows.isArray() || childRows.isEmpty()) {
             throw new ResponseStatusException(NOT_FOUND, "Child not found");
         }
@@ -276,7 +292,11 @@ class SupabaseMemoryGateway {
             .build(true)
             .toUriString();
 
-        JsonNode membershipRows = supabaseHttpClient.get(membershipUri, authorizationHeader, SUPABASE_REQUEST_FAILED);
+        JsonNode membershipRows = supabaseHttpClient.get(
+            membershipUri,
+            authorizationHeader,
+            SupabaseHttpClient.REQUEST_FAILED_MESSAGE
+        );
         if (!membershipRows.isArray() || membershipRows.isEmpty()) {
             throw new ResponseStatusException(FORBIDDEN, errorMessage);
         }
@@ -329,7 +349,7 @@ class SupabaseMemoryGateway {
             .build(true)
             .toUriString();
 
-        JsonNode rows = supabaseHttpClient.get(uri, authorizationHeader, SUPABASE_REQUEST_FAILED);
+        JsonNode rows = supabaseHttpClient.get(uri, authorizationHeader, SupabaseHttpClient.REQUEST_FAILED_MESSAGE);
         if (!rows.isArray()) {
             return List.of();
         }
