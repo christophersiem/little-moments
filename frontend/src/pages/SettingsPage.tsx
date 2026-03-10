@@ -115,7 +115,7 @@ const AppearanceControls = styled.div`
 `
 
 const AppearanceOption = styled.button<{ $active: boolean }>`
-  min-height: 40px;
+  min-height: 30px;
   border-radius: ${({ theme }) => theme.radii.md};
   border: 1px solid
     ${({ theme, $active }) => ($active ? theme.colors.accentStrong : theme.colors.border)};
@@ -310,7 +310,6 @@ export function SettingsPage({ navigate, onLogout }: SettingsPageProps) {
             </ItemIcon>
             <ItemText>
               <ItemTitle>Appearance</ItemTitle>
-              <ItemSubtitle>System, Light or Dark theme</ItemSubtitle>
             </ItemText>
           </StaticItemRow>
           <AppearanceControls role="radiogroup" aria-label="Appearance">
