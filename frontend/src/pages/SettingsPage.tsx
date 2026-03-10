@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useRef, type KeyboardEvent, type ReactNode } from 'react'
 import styled from 'styled-components'
 import { useAppearance, type AppearanceMode } from '../app/appearance'
 import { APP_ROUTES } from '../app/routes'
@@ -255,6 +255,49 @@ export function SettingsPage({ navigate, onLogout }: SettingsPageProps) {
     { value: 'light', label: 'Light', icon: <LightThemeIcon /> },
     { value: 'dark', label: 'Dark', icon: <DarkThemeIcon /> },
   ]
+  const appearanceOptionRefs = useRef<Array<HTMLButtonElement | null>>([])
+
+  const modeIndex = appearanceOptions.findIndex((option) => option.value === mode)
+
+  const focusAndSelectAppearanceOption = (nextIndex: number) => {
+    const normalizedIndex = ((nextIndex % appearanceOptions.length) + appearanceOptions.length) % appearanceOptions.length
+    const nextOption = appearanceOptions[normalizedIndex]
+    setMode(nextOption.value)
+    window.requestAnimationFrame(() => {
+      appearanceOptionRefs.current[normalizedIndex]?.focus()
+    })
+  }
+
+  const handleAppearanceOptionKeyDown = (event: KeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      event.preventDefault()
+      focusAndSelectAppearanceOption(currentIndex + 1)
+      return
+    }
+
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      focusAndSelectAppearanceOption(currentIndex - 1)
+      return
+    }
+
+    if (event.key === 'Home') {
+      event.preventDefault()
+      focusAndSelectAppearanceOption(0)
+      return
+    }
+
+    if (event.key === 'End') {
+      event.preventDefault()
+      focusAndSelectAppearanceOption(appearanceOptions.length - 1)
+      return
+    }
+
+    if (event.key === ' ' || event.key === 'Enter') {
+      event.preventDefault()
+      focusAndSelectAppearanceOption(currentIndex)
+    }
+  }
 
   return (
     <Section>
@@ -271,15 +314,20 @@ export function SettingsPage({ navigate, onLogout }: SettingsPageProps) {
             </ItemText>
           </StaticItemRow>
           <AppearanceControls role="radiogroup" aria-label="Appearance">
-            {appearanceOptions.map((option) => (
+            {appearanceOptions.map((option, index) => (
               <AppearanceOption
                 key={option.value}
                 type="button"
                 role="radio"
                 aria-checked={mode === option.value}
                 aria-label={option.label}
+                tabIndex={modeIndex === index ? 0 : -1}
                 $active={mode === option.value}
+                ref={(element) => {
+                  appearanceOptionRefs.current[index] = element
+                }}
                 onClick={() => setMode(option.value)}
+                onKeyDown={(event) => handleAppearanceOptionKeyDown(event, index)}
               >
                 {option.icon}
               </AppearanceOption>
