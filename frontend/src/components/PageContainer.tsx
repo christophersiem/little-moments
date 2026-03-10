@@ -6,7 +6,7 @@ const Container = styled.div`
   max-width: 100%;
   margin: 0 auto;
   padding-inline: ${({ theme }) => `clamp(${theme.space.x4}, 5vw, ${theme.space.x5})`};
-  overflow-x: hidden;
+  overflow-x: clip;
 `
 
 export type PageContainerProps = HTMLAttributes<HTMLElement>

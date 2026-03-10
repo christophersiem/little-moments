@@ -24,9 +24,13 @@ interface MemoriesPageProps {
 const Section = styled.section`
   width: 100%;
   padding-top: ${({ theme }) => theme.space.x3};
+`
+
+const ContentStack = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.space.x3};
+  margin-top: ${({ theme }) => theme.space.x2};
 `
 
 const PageShell = styled.div`
@@ -172,13 +176,15 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
         <PageShell>
           <Section>
             {headerBlock}
-            {processingBanner}
-            <EmptyText>Loading your moments...</EmptyText>
-            <LoadingSkeleton />
-            <LoadingSkeleton />
-            <LoadingSkeleton />
-            <LoadingSkeleton />
-            <LoadingSkeleton />
+            <ContentStack>
+              {processingBanner}
+              <EmptyText>Loading your moments...</EmptyText>
+              <LoadingSkeleton />
+              <LoadingSkeleton />
+              <LoadingSkeleton />
+              <LoadingSkeleton />
+              <LoadingSkeleton />
+            </ContentStack>
           </Section>
         </PageShell>
       </PageContainer>
@@ -191,11 +197,13 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
         <PageShell>
           <Section>
             {headerBlock}
-            {processingBanner}
-            <ErrorText>{error}</ErrorText>
-            <Button variant="primary" onClick={reload}>
-              Try again
-            </Button>
+            <ContentStack>
+              {processingBanner}
+              <ErrorText>{error}</ErrorText>
+              <Button variant="primary" onClick={reload}>
+                Try again
+              </Button>
+            </ContentStack>
           </Section>
         </PageShell>
       </PageContainer>
@@ -207,26 +215,28 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
       <PageShell>
         <Section>
           {headerBlock}
-          {processingBanner}
-          {highlightError ? <ErrorText>{highlightError}</ErrorText> : null}
+          <ContentStack>
+            {processingBanner}
+            {highlightError ? <ErrorText>{highlightError}</ErrorText> : null}
 
-          {groups.length === 0 ? (
-            <MemoriesEmptyState highlightsOnly={filters.highlightsOnly} onRecordMoment={() => navigate(APP_ROUTES.record)} />
-          ) : (
-            <MemoriesTimeline
-              groups={groups}
-              pendingMemoryPrefix={PENDING_MEMORY_PREFIX}
-              highlightPendingById={highlightPendingById}
-              onOpenMemory={(id) => navigate(toMemoryDetailPath(id))}
-              onToggleHighlight={onToggleHighlight}
-              showLoadMoreHint={showLoadMoreHint}
-              hasMore={hasMore}
-              loadingMore={loadingMore}
-              loadMoreError={loadMoreError}
-              onRetryLoadMore={retryLoadMore}
-              loadMoreSentinelRef={loadMoreSentinelRef}
-            />
-          )}
+            {groups.length === 0 ? (
+              <MemoriesEmptyState highlightsOnly={filters.highlightsOnly} onRecordMoment={() => navigate(APP_ROUTES.record)} />
+            ) : (
+              <MemoriesTimeline
+                groups={groups}
+                pendingMemoryPrefix={PENDING_MEMORY_PREFIX}
+                highlightPendingById={highlightPendingById}
+                onOpenMemory={(id) => navigate(toMemoryDetailPath(id))}
+                onToggleHighlight={onToggleHighlight}
+                showLoadMoreHint={showLoadMoreHint}
+                hasMore={hasMore}
+                loadingMore={loadingMore}
+                loadMoreError={loadMoreError}
+                onRetryLoadMore={retryLoadMore}
+                loadMoreSentinelRef={loadMoreSentinelRef}
+              />
+            )}
+          </ContentStack>
         </Section>
 
         <MemoriesFilterSheet

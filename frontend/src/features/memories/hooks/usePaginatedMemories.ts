@@ -4,13 +4,18 @@ import type { Memory, MemoryListItem, MemoryTag } from '../types'
 import { appendMemoriesPage, type PaginationState } from './paginationState'
 
 const DEFAULT_PAGE_SIZE = 5
-const MEMORY_CACHE_TTL_MS = 300_000
+const MEMORY_CACHE_TTL_MS = 60_000
 
 interface CachedMemoriesState {
   items: MemoryListItem[]
   hasMore: boolean
   nextPage: number
   cachedAt: number
+}
+
+interface CachedMemoriesLookup {
+  state: CachedMemoriesState
+  isStale: boolean
 }
 
 const memoriesCache = new Map<string, CachedMemoriesState>()
@@ -127,18 +132,22 @@ function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Could not load memories.'
 }
 
-function readCachedState(queryKey: string): CachedMemoriesState | null {
+function readCachedState(queryKey: string, includeStale = false): CachedMemoriesLookup | null {
   const cached = memoriesCache.get(queryKey)
   if (!cached) {
     return null
   }
 
-  if (Date.now() - cached.cachedAt > MEMORY_CACHE_TTL_MS) {
+  const isStale = Date.now() - cached.cachedAt > MEMORY_CACHE_TTL_MS
+  if (isStale && !includeStale) {
     memoriesCache.delete(queryKey)
     return null
   }
 
-  return cached
+  return {
+    state: cached,
+    isStale,
+  }
 }
 
 function writeCachedState(queryKey: string, state: Omit<CachedMemoriesState, 'cachedAt'>): void {
@@ -163,36 +172,36 @@ export function usePaginatedMemories({
       `${normalizedFamilyId ?? ''}::${normalizedMonth ?? ''}::${normalizedTags.join('|')}::${highlightsOnly}::${pageSize}`,
     [highlightsOnly, normalizedFamilyId, normalizedMonth, normalizedTags, pageSize],
   )
-  const cachedState = useMemo(() => readCachedState(queryKey), [queryKey])
+  const cachedLookup = useMemo(() => readCachedState(queryKey, true), [queryKey])
 
-  const [items, setItems] = useState<MemoryListItem[]>(() => cachedState?.items ?? [])
-  const [loadingInitial, setLoadingInitial] = useState(() => !cachedState)
+  const [items, setItems] = useState<MemoryListItem[]>(() => cachedLookup?.state.items ?? [])
+  const [loadingInitial, setLoadingInitial] = useState(() => !cachedLookup)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
   const [loadMoreError, setLoadMoreError] = useState('')
-  const [hasMore, setHasMore] = useState(() => cachedState?.hasMore ?? false)
+  const [hasMore, setHasMore] = useState(() => cachedLookup?.state.hasMore ?? false)
   const [reloadIndex, setReloadIndex] = useState(0)
 
   const requestVersionRef = useRef(0)
   const loadingMoreRef = useRef(false)
-  const nextPageRef = useRef(cachedState?.nextPage ?? 0)
-  const hasMoreRef = useRef(cachedState?.hasMore ?? false)
-  const itemsRef = useRef<MemoryListItem[]>(cachedState?.items ?? [])
+  const nextPageRef = useRef(cachedLookup?.state.nextPage ?? 0)
+  const hasMoreRef = useRef(cachedLookup?.state.hasMore ?? false)
+  const itemsRef = useRef<MemoryListItem[]>(cachedLookup?.state.items ?? [])
 
   useEffect(() => {
     itemsRef.current = items
   }, [items])
 
   useEffect(() => {
-    const cached = readCachedState(queryKey)
+    const cached = readCachedState(queryKey, true)
     if (!cached) {
       return
     }
-    itemsRef.current = cached.items
-    nextPageRef.current = cached.nextPage
-    hasMoreRef.current = cached.hasMore
-    setItems(cached.items)
-    setHasMore(cached.hasMore)
+    itemsRef.current = cached.state.items
+    nextPageRef.current = cached.state.nextPage
+    hasMoreRef.current = cached.state.hasMore
+    setItems(cached.state.items)
+    setHasMore(cached.state.hasMore)
     setLoadingInitial(false)
     setError('')
   }, [queryKey])
@@ -206,13 +215,13 @@ export function usePaginatedMemories({
     requestVersionRef.current = requestVersion
 
     if (!forceRefresh) {
-      const cached = readCachedState(queryKey)
-      if (cached) {
-        itemsRef.current = cached.items
-        nextPageRef.current = cached.nextPage
-        hasMoreRef.current = cached.hasMore
-        setItems(cached.items)
-        setHasMore(cached.hasMore)
+      const cached = readCachedState(queryKey, true)
+      if (cached && !cached.isStale) {
+        itemsRef.current = cached.state.items
+        nextPageRef.current = cached.state.nextPage
+        hasMoreRef.current = cached.state.hasMore
+        setItems(cached.state.items)
+        setHasMore(cached.state.hasMore)
         setLoadingInitial(false)
         setError('')
         setLoadMoreError('')
@@ -220,7 +229,8 @@ export function usePaginatedMemories({
       }
     }
 
-    setLoadingInitial(true)
+    const hasVisibleItems = itemsRef.current.length > 0
+    setLoadingInitial(!hasVisibleItems)
     setError('')
     setLoadMoreError('')
     setLoadingMore(false)
@@ -261,11 +271,13 @@ export function usePaginatedMemories({
       if (requestVersion !== requestVersionRef.current) {
         return
       }
-      itemsRef.current = []
-      nextPageRef.current = 0
-      hasMoreRef.current = false
-      setItems([])
-      setHasMore(false)
+      if (!hasVisibleItems) {
+        itemsRef.current = []
+        nextPageRef.current = 0
+        hasMoreRef.current = false
+        setItems([])
+        setHasMore(false)
+      }
       setError(toErrorMessage(loadError))
     } finally {
       if (requestVersion === requestVersionRef.current) {

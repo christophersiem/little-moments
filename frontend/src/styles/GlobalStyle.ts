@@ -13,7 +13,7 @@ export const GlobalStyle = createGlobalStyle`
     max-width: 100%;
     height: 100%;
     min-height: 100%;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
 
   html,

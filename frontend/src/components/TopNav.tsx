@@ -14,10 +14,10 @@ interface TopNavProps {
 const Nav = styled.nav`
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  padding: 8px;
+  gap: ${({ theme }) => theme.space.x1};
+  padding: ${({ theme }) => theme.space.x2};
   border: 1px solid color-mix(in srgb, ${({ theme }) => theme.colors.border} 78%, ${({ theme }) => theme.colors.background});
-  border-radius: 29px;
+  border-radius: ${({ theme }) => theme.radii.pill};
   background: color-mix(in srgb, ${({ theme }) => theme.colors.surfaceStrong} 96%, #fff);
   box-shadow:
     0 10px 24px rgba(var(--lm-shadow), 0.08),
@@ -28,7 +28,7 @@ const NavItem = styled.span`
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: ${({ theme }) => theme.space.x1};
 `
 
 const NavIcon = styled.svg`
@@ -38,7 +38,7 @@ const NavIcon = styled.svg`
 `
 
 const NavLabel = styled.span`
-  font-size: 0.6rem;
+  font-size: calc(${({ theme }) => theme.typography.secondarySize} - 0.25rem);
   letter-spacing: 0.01em;
 `
 
@@ -47,19 +47,19 @@ const NavButton = styled.button<{ $active: boolean; $dimmed: boolean }>`
     ${({ theme, $active }) =>
       $active ? `color-mix(in srgb, ${theme.colors.border} 76%, ${theme.colors.background})` : 'transparent'};
   width: 100%;
-  min-height: 62px;
-  border-radius: 20px;
+  min-height: calc(${({ theme }) => theme.layout.minTouchTarget} + ${({ theme }) => theme.space.x4} + 2px);
+  border-radius: ${({ theme }) => theme.radii.xl};
   background: ${({ theme, $active }) =>
     $active
       ? `linear-gradient(180deg, color-mix(in srgb, ${theme.colors.surface} 90%, #fff), color-mix(in srgb, ${theme.colors.surfaceStrong} 88%, ${theme.colors.background}))`
       : 'transparent'};
   color: ${({ theme, $active }) => ($active ? theme.colors.accentStrong : `color-mix(in srgb, ${theme.colors.textMuted} 82%, ${theme.colors.text})`)};
-  padding: 8px 6px 6px;
-  cursor: pointer;
+  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x1} ${theme.space.x1}`};
+  cursor: ${({ $dimmed }) => ($dimmed ? 'not-allowed' : 'pointer')};
   opacity: ${({ $dimmed }) => ($dimmed ? 0.58 : 1)};
   transition: background-color 160ms ease, color 160ms ease, opacity 160ms ease, transform 160ms ease;
 
-  &:hover:not(:disabled) {
+  &:hover:not([aria-disabled='true']) {
     transform: translateY(-1px);
     background: ${({ theme, $active }) =>
       $active
@@ -168,7 +168,9 @@ export function TopNav({
         const active = pathname.startsWith(item.route)
         const disabledByLock = navigationLocked && !active
         const isRecordRoute = item.route === APP_ROUTES.record
-        const dimmed = !canRecord && isRecordRoute ? true : disabledByLock
+        const blockedByPermission = !canRecord && isRecordRoute
+        const isBlocked = disabledByLock || blockedByPermission
+        const dimmed = isBlocked
 
         return (
           <NavButton
@@ -177,7 +179,7 @@ export function TopNav({
             $active={active}
             $dimmed={dimmed}
             onClick={() => onNavigate(item.route)}
-            aria-disabled={disabledByLock}
+            aria-disabled={isBlocked}
             aria-current={active ? 'page' : undefined}
           >
             <NavItem>

@@ -17,7 +17,7 @@ const Section = styled.section`
 
 const Heading = styled.h2`
   margin: 0 0 ${({ theme }) => theme.space.x4};
-  font-size: 2rem;
+  font-size: 1.5rem;
   color: ${({ theme }) => theme.colors.text};
 `
 

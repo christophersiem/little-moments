@@ -8,7 +8,7 @@ interface ApiErrorResponse {
 }
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL?.trim() || '/api').replace(/\/+$/, '')
-const DEFAULT_GET_CACHE_TTL_MS = 300_000
+const DEFAULT_GET_CACHE_TTL_MS = 60_000
 
 interface CachedJsonPayload {
   expiresAt: number

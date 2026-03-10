@@ -45,38 +45,38 @@ const idleButtonBreath = keyframes`
 
 const idleHaloBreath = keyframes`
   0% {
-    opacity: 0.26;
+    opacity: 0.2;
     box-shadow:
-      0 0 0 7px color-mix(in srgb, var(--lm-accent) 10%, transparent),
-      0 10px 18px rgba(var(--lm-shadow-rgb), 0.11);
+      0 0 0 8px color-mix(in srgb, var(--lm-surface) 62%, transparent),
+      0 12px 22px rgba(var(--lm-shadow-rgb), 0.1);
     animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
   }
   30% {
-    opacity: 0.58;
+    opacity: 0.54;
     box-shadow:
-      0 0 0 17px color-mix(in srgb, var(--lm-accent) 18%, transparent),
-      0 12px 22px rgba(var(--lm-shadow-rgb), 0.17);
+      0 0 0 18px color-mix(in srgb, var(--lm-surface) 78%, transparent),
+      0 16px 28px rgba(var(--lm-shadow-rgb), 0.15);
     animation-timing-function: linear;
   }
   40% {
-    opacity: 0.58;
+    opacity: 0.54;
     box-shadow:
-      0 0 0 17px color-mix(in srgb, var(--lm-accent) 18%, transparent),
-      0 12px 22px rgba(var(--lm-shadow-rgb), 0.17);
+      0 0 0 18px color-mix(in srgb, var(--lm-surface) 78%, transparent),
+      0 16px 28px rgba(var(--lm-shadow-rgb), 0.15);
     animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
   70% {
-    opacity: 0.26;
+    opacity: 0.2;
     box-shadow:
-      0 0 0 7px color-mix(in srgb, var(--lm-accent) 10%, transparent),
-      0 10px 18px rgba(var(--lm-shadow-rgb), 0.11);
+      0 0 0 8px color-mix(in srgb, var(--lm-surface) 62%, transparent),
+      0 12px 22px rgba(var(--lm-shadow-rgb), 0.1);
     animation-timing-function: linear;
   }
   100% {
-    opacity: 0.26;
+    opacity: 0.2;
     box-shadow:
-      0 0 0 7px color-mix(in srgb, var(--lm-accent) 10%, transparent),
-      0 10px 18px rgba(var(--lm-shadow-rgb), 0.11);
+      0 0 0 8px color-mix(in srgb, var(--lm-surface) 62%, transparent),
+      0 12px 22px rgba(var(--lm-shadow-rgb), 0.1);
   }
 `
 
@@ -172,7 +172,7 @@ const Halo = styled.span<{ $state: VisualState }>`
   position: absolute;
   inset: -12px;
   border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--lm-accent) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--lm-border) 50%, var(--lm-surface));
   pointer-events: none;
 
   ${({ $state }) =>
@@ -186,16 +186,16 @@ const Halo = styled.span<{ $state: VisualState }>`
     $state === 'recording' &&
     css`
       box-shadow:
-        0 0 0 10px color-mix(in srgb, var(--lm-accent) 12%, transparent),
-        0 10px 18px rgba(var(--lm-shadow-rgb), 0.16);
+        0 0 0 11px color-mix(in srgb, var(--lm-accent) 14%, transparent),
+        0 12px 20px rgba(var(--lm-shadow-rgb), 0.18);
       animation: ${recordingHaloPulse} 1.8s ease-in-out infinite;
     `}
 
   ${({ $state }) =>
     $state === 'stopped' &&
     css`
-      opacity: 0.14;
-      box-shadow: 0 8px 14px rgba(var(--lm-shadow-rgb), 0.1);
+      opacity: 0.12;
+      box-shadow: 0 10px 16px rgba(var(--lm-shadow-rgb), 0.1);
     `}
 
   transition: opacity 260ms ease, box-shadow 260ms ease;
@@ -203,8 +203,8 @@ const Halo = styled.span<{ $state: VisualState }>`
   @media (hover: hover) and (pointer: fine) {
     ${TapTarget}:hover:not(:disabled) & {
       box-shadow:
-        0 0 0 12px color-mix(in srgb, var(--lm-accent) 14%, transparent),
-        0 14px 22px rgba(var(--lm-shadow-rgb), 0.18);
+        0 0 0 12px color-mix(in srgb, var(--lm-surface) 78%, transparent),
+        0 14px 24px rgba(var(--lm-shadow-rgb), 0.16);
     }
   }
 
@@ -220,10 +220,10 @@ const SoftOuterRing = styled.span<{ $state: VisualState }>`
   border: 2px solid
     ${({ $state }) =>
       $state === 'recording'
-        ? 'color-mix(in srgb, var(--lm-accent-strong) 75%, transparent)'
+        ? 'color-mix(in srgb, var(--lm-accent-strong) 72%, transparent)'
         : $state === 'stopped'
-          ? 'color-mix(in srgb, var(--lm-border) 78%, var(--lm-accent))'
-          : 'color-mix(in srgb, var(--lm-accent) 52%, transparent)'};
+          ? 'color-mix(in srgb, var(--lm-border) 86%, var(--lm-accent))'
+          : 'color-mix(in srgb, var(--lm-accent) 22%, var(--lm-border))'};
   pointer-events: none;
 `
 
@@ -237,27 +237,69 @@ const Core = styled.span<{ $state: VisualState; $disabled: boolean }>`
       $state === 'recording'
         ? 'color-mix(in srgb, var(--lm-accent-strong) 78%, var(--lm-accent))'
         : $state === 'stopped'
-          ? 'color-mix(in srgb, var(--lm-border) 80%, var(--lm-accent))'
-          : 'color-mix(in srgb, var(--lm-accent) 66%, transparent)'};
+          ? 'color-mix(in srgb, var(--lm-border) 85%, var(--lm-accent))'
+          : 'color-mix(in srgb, var(--lm-accent) 30%, var(--lm-border))'};
   background: ${({ $state }) =>
     $state === 'recording'
-      ? 'color-mix(in srgb, var(--lm-accent-strong) 78%, var(--lm-accent))'
+      ? 'linear-gradient(165deg, color-mix(in srgb, var(--lm-accent) 72%, #fff), color-mix(in srgb, var(--lm-accent-strong) 88%, var(--lm-accent)))'
       : $state === 'stopped'
-        ? 'color-mix(in srgb, var(--lm-surface) 94%, var(--lm-border))'
-        : 'var(--lm-accent)'};
-  box-shadow: 0 10px 18px rgba(var(--lm-shadow-rgb), ${({ $disabled }) => ($disabled ? 0.1 : 0.16)});
+        ? 'linear-gradient(165deg, color-mix(in srgb, var(--lm-surface) 88%, #fff), color-mix(in srgb, var(--lm-surface) 72%, var(--lm-border)))'
+        : 'linear-gradient(165deg, color-mix(in srgb, var(--lm-surface) 90%, #fff), color-mix(in srgb, var(--lm-surface) 66%, var(--lm-accent)))'};
+  box-shadow: ${({ $state, $disabled }) =>
+    $state === 'recording'
+      ? '0 18px 28px rgba(var(--lm-shadow-rgb), 0.22), 0 4px 8px rgba(var(--lm-shadow-rgb), 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -10px 14px color-mix(in srgb, var(--lm-accent-strong) 28%, transparent)'
+      : $state === 'stopped'
+        ? `0 10px 18px rgba(var(--lm-shadow-rgb), ${$disabled ? 0.08 : 0.12}), inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -8px 14px rgba(var(--lm-shadow-rgb), 0.06)`
+        : `0 16px 26px rgba(var(--lm-shadow-rgb), ${$disabled ? 0.11 : 0.18}), 0 2px 0 rgba(255, 255, 255, 0.48), inset 0 2px 0 rgba(255, 255, 255, 0.74), inset 0 -12px 16px rgba(var(--lm-shadow-rgb), 0.08)`};
   display: inline-flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+
+  ${TapTarget}:active:not(:disabled) & {
+    transform: translateY(2px);
+  }
+`
+
+const InnerPlate = styled.span<{ $state: VisualState }>`
+  width: 74%;
+  height: 74%;
+  border-radius: 50%;
+  border: 1px solid
+    ${({ $state }) =>
+      $state === 'recording'
+        ? 'color-mix(in srgb, var(--lm-accent-contrast) 24%, transparent)'
+        : 'color-mix(in srgb, var(--lm-border) 74%, var(--lm-surface))'};
+  background: ${({ $state }) =>
+    $state === 'recording'
+      ? 'linear-gradient(180deg, color-mix(in srgb, var(--lm-accent) 54%, #fff), color-mix(in srgb, var(--lm-accent-strong) 86%, var(--lm-accent)))'
+      : 'linear-gradient(180deg, color-mix(in srgb, var(--lm-surface) 93%, #fff), color-mix(in srgb, var(--lm-surface) 74%, var(--lm-accent)))'};
+  box-shadow: ${({ $state }) =>
+    $state === 'recording'
+      ? 'inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -6px 10px color-mix(in srgb, var(--lm-accent-strong) 34%, transparent)'
+      : 'inset 0 1px 0 rgba(255, 255, 255, 0.72), inset 0 -8px 12px rgba(var(--lm-shadow-rgb), 0.05), 0 5px 10px rgba(var(--lm-shadow-rgb), 0.08)'};
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+
+  ${TapTarget}:active:not(:disabled) & {
+    transform: scale(0.97);
+  }
 `
 
 const LogoMark = styled(RippleLogo)<{ $size: number; $state: VisualState }>`
   width: ${({ $size }) => `${$size}px`};
   height: ${({ $size }) => `${$size}px`};
   display: block;
-  color: var(--lm-bg);
-  opacity: ${({ $state }) => ($state === 'recording' ? 1 : 0.98)};
+  color: ${({ $state }) =>
+    $state === 'recording'
+      ? 'var(--lm-accent-contrast)'
+      : $state === 'stopped'
+        ? 'color-mix(in srgb, var(--lm-accent-strong) 72%, var(--lm-muted))'
+        : 'color-mix(in srgb, var(--lm-accent-strong) 86%, var(--lm-text))'};
+  opacity: ${({ $state }) => ($state === 'recording' ? 1 : 0.94)};
   transition: color 220ms ease, opacity 220ms ease;
 `
 
@@ -354,11 +396,13 @@ export function RecordButton({
           <Halo $state={visualState} />
           <SoftOuterRing $state={visualState} />
           <Core $state={visualState} $disabled={disabled}>
-            <LogoMark
-              $size={logoSize}
-              $state={visualState}
-              animate={isRecording ? 'recording' : visualState === 'stopped' ? 'stopped' : 'idle'}
-            />
+            <InnerPlate $state={visualState}>
+              <LogoMark
+                $size={logoSize}
+                $state={visualState}
+                animate={isRecording ? 'recording' : visualState === 'stopped' ? 'stopped' : 'idle'}
+              />
+            </InnerPlate>
           </Core>
         </Visual>
       </TapTarget>

@@ -10,8 +10,8 @@ interface MemoriesHeaderProps {
 
 const StickyHeader = styled.div`
   position: sticky;
-  top: 0;
-  z-index: 6;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 20;
   background: ${({ theme }) => theme.colors.background};
   padding: ${({ theme }) => `${theme.space.x1} 0 ${theme.space.x2}`};
   display: flex;
