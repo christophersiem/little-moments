@@ -1,4 +1,4 @@
-import { formatMonthYear } from '../../../lib/utils'
+import { formatMonthYear, formatMonthYearShort } from '../../../lib/utils'
 import type { MemoryListItem } from '../types'
 
 export interface MonthOption {
@@ -30,7 +30,7 @@ export function collectMonthOptions(items: MemoryListItem[]): MonthOption[] {
     const key = monthKey(eventDate)
     if (!seen.has(key)) {
       seen.add(key)
-      options.push({ key, label: formatMonthYear(eventDate) })
+      options.push({ key, label: formatMonthYearShort(eventDate) })
     }
   }
 

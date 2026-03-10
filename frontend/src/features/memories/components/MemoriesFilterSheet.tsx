@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import styled from 'styled-components'
 import { BottomSheet } from '../../../components/BottomSheet'
 import { Button } from '../../../components/Button'
@@ -93,6 +94,54 @@ const SheetSelectorRow = styled.button`
   cursor: pointer;
 `
 
+const MonthPickerGroups = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.x3};
+`
+
+const MonthYearGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.x2};
+`
+
+const MonthYearHeading = styled.h4`
+  margin: 0;
+  font-size: calc(${({ theme }) => theme.typography.secondarySize} - 1px);
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-weight: 600;
+`
+
+const MonthGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: ${({ theme }) => theme.space.x2};
+
+  @media (min-width: 400px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+`
+
+const MonthChip = styled.button<{ $selected: boolean }>`
+  min-height: 34px;
+  border-radius: ${({ theme }) => theme.radii.pill};
+  border: 1px solid
+    ${({ theme, $selected }) =>
+      $selected ? theme.colors.accentStrong : `color-mix(in srgb, ${theme.colors.border} 70%, transparent)`};
+  background: ${({ theme, $selected }) => ($selected ? theme.colors.surface : theme.colors.surfaceStrong)};
+  color: ${({ theme, $selected }) => ($selected ? theme.colors.accentStrong : theme.colors.textMuted)};
+  font-size: calc(${({ theme }) => theme.typography.secondarySize} - 1px);
+  padding: 0 ${({ theme }) => theme.space.x1};
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
+    outline-offset: 2px;
+  }
+`
+
 const SelectorLabel = styled.span`
   color: ${({ theme }) => theme.colors.text};
   font-size: ${({ theme }) => theme.typography.bodySize};
@@ -132,6 +181,17 @@ function ChevronGlyph() {
   )
 }
 
+function monthLabelFromKey(monthKey: string): string {
+  const [year, month] = monthKey.split('-')
+  const monthNumber = Number(month)
+  if (!year || Number.isNaN(monthNumber) || monthNumber < 1 || monthNumber > 12) {
+    return monthKey
+  }
+
+  const monthShort = new Date(Number(year), monthNumber - 1, 1).toLocaleString(undefined, { month: 'short' })
+  return monthShort.replace(/\.$/, '')
+}
+
 export function MemoriesFilterSheet({
   filterSheetOpen,
   monthPickerOpen,
@@ -149,6 +209,22 @@ export function MemoriesFilterSheet({
   onToggleDraftTag,
   onToggleDraftHighlightsOnly,
 }: MemoriesFilterSheetProps) {
+  const monthOptionsByYear = useMemo(() => {
+    const grouped = new Map<string, MonthOption[]>()
+    const yearOrder: string[] = []
+
+    for (const option of monthOptions) {
+      const year = option.key.slice(0, 4)
+      if (!grouped.has(year)) {
+        grouped.set(year, [])
+        yearOrder.push(year)
+      }
+      grouped.get(year)?.push(option)
+    }
+
+    return yearOrder.map((year) => ({ year, options: grouped.get(year) ?? [] }))
+  }, [monthOptions])
+
   return (
     <>
       <BottomSheet
@@ -219,18 +295,27 @@ export function MemoriesFilterSheet({
             All months
             {draftMonth === 'all' ? <CheckGlyph /> : null}
           </SheetRow>
-          {monthOptions.map((option) => (
-            <SheetRow
-              key={option.key}
-              type="button"
-              $selected={draftMonth === option.key}
-              onClick={() => onSelectDraftMonth(option.key)}
-              aria-pressed={draftMonth === option.key}
-            >
-              {option.label}
-              {draftMonth === option.key ? <CheckGlyph /> : null}
-            </SheetRow>
-          ))}
+          <MonthPickerGroups>
+            {monthOptionsByYear.map((yearGroup) => (
+              <MonthYearGroup key={yearGroup.year}>
+                <MonthYearHeading>{yearGroup.year}</MonthYearHeading>
+                <MonthGrid>
+                  {yearGroup.options.map((option) => (
+                    <MonthChip
+                      key={option.key}
+                      type="button"
+                      $selected={draftMonth === option.key}
+                      onClick={() => onSelectDraftMonth(option.key)}
+                      aria-pressed={draftMonth === option.key}
+                      aria-label={option.label}
+                    >
+                      {monthLabelFromKey(option.key)}
+                    </MonthChip>
+                  ))}
+                </MonthGrid>
+              </MonthYearGroup>
+            ))}
+          </MonthPickerGroups>
         </SheetSection>
       </BottomSheet>
     </>

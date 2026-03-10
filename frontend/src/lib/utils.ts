@@ -26,6 +26,17 @@ export function formatMonthYear(isoString: string | null | undefined): string {
   })
 }
 
+export function formatMonthYearShort(isoString: string | null | undefined): string {
+  if (!isoString) {
+    return ''
+  }
+
+  return new Date(isoString).toLocaleString(undefined, {
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
 export function formatMonthDay(isoString: string | null | undefined): string {
   if (!isoString) {
     return ''

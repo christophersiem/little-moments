@@ -34,6 +34,7 @@
 
 ## 4) Memories List
 - Reverse chronological, grouped by month.
+- Editorial two-column timeline: compact month rail on the left, memory entries on the right.
 - Sticky compact header with inline filter chips:
   - Month (single select)
   - Tags (multi-select)
