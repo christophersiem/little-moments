@@ -36,7 +36,7 @@ const MonthRail = styled.div<{ $active: boolean }>`
   align-self: start;
   padding-top: ${({ theme }) => theme.space.x2};
   opacity: ${({ $active }) => ($active ? 0.96 : 0.58)};
-  transition: opacity 180ms ease-out, color 180ms ease-out;
+  transition: opacity 180ms ease-out;
 
   @media (prefers-reduced-motion: reduce) {
     transition: none;
@@ -55,6 +55,11 @@ const GroupTitle = styled.h3<{ $active: boolean }>`
   font-weight: 500;
   letter-spacing: 0.01em;
   line-height: 1.35;
+  transition: color 180ms ease-out;
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 `
 
 const Groups = styled.div`

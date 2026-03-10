@@ -319,69 +319,69 @@ export function SettingsPage({ navigate, onLogout }: SettingsPageProps) {
           </HeadingRow>
         </HeaderBlock>
         <List>
-        <StaticItem>
-          <StaticItemRow>
+          <StaticItem>
+            <StaticItemRow>
+              <ItemIcon>
+                <AppearanceIcon />
+              </ItemIcon>
+              <ItemText>
+                <ItemTitle>Appearance</ItemTitle>
+              </ItemText>
+            </StaticItemRow>
+            <AppearanceControls role="radiogroup" aria-label="Appearance">
+              {appearanceOptions.map((option, index) => (
+                <AppearanceOption
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={mode === option.value}
+                  aria-label={option.label}
+                  tabIndex={modeIndex === index ? 0 : -1}
+                  $active={mode === option.value}
+                  ref={(element) => {
+                    appearanceOptionRefs.current[index] = element
+                  }}
+                  onClick={() => setMode(option.value)}
+                  onKeyDown={(event) => handleAppearanceOptionKeyDown(event, index)}
+                >
+                  {option.icon}
+                </AppearanceOption>
+              ))}
+            </AppearanceControls>
+          </StaticItem>
+
+          <Item type="button" $interactive onClick={() => navigate(APP_ROUTES.settingsAccount)}>
             <ItemIcon>
-              <AppearanceIcon />
+              <AccountIcon />
             </ItemIcon>
             <ItemText>
-              <ItemTitle>Appearance</ItemTitle>
+              <ItemTitle>Account</ItemTitle>
+              <ItemSubtitle>Name, email, password</ItemSubtitle>
             </ItemText>
-          </StaticItemRow>
-          <AppearanceControls role="radiogroup" aria-label="Appearance">
-            {appearanceOptions.map((option, index) => (
-              <AppearanceOption
-                key={option.value}
-                type="button"
-                role="radio"
-                aria-checked={mode === option.value}
-                aria-label={option.label}
-                tabIndex={modeIndex === index ? 0 : -1}
-                $active={mode === option.value}
-                ref={(element) => {
-                  appearanceOptionRefs.current[index] = element
-                }}
-                onClick={() => setMode(option.value)}
-                onKeyDown={(event) => handleAppearanceOptionKeyDown(event, index)}
-              >
-                {option.icon}
-              </AppearanceOption>
-            ))}
-          </AppearanceControls>
-        </StaticItem>
+            <Chevron>›</Chevron>
+          </Item>
 
-        <Item type="button" $interactive onClick={() => navigate(APP_ROUTES.settingsAccount)}>
-          <ItemIcon>
-            <AccountIcon />
-          </ItemIcon>
-          <ItemText>
-            <ItemTitle>Account</ItemTitle>
-            <ItemSubtitle>Name, email, password</ItemSubtitle>
-          </ItemText>
-          <Chevron>›</Chevron>
-        </Item>
+          <Item type="button" $interactive onClick={() => navigate(APP_ROUTES.settingsFamily)}>
+            <ItemIcon>
+              <FamilyIcon />
+            </ItemIcon>
+            <ItemText>
+              <ItemTitle>Family</ItemTitle>
+              <ItemSubtitle>Members & invite links</ItemSubtitle>
+            </ItemText>
+            <Chevron>›</Chevron>
+          </Item>
 
-        <Item type="button" $interactive onClick={() => navigate(APP_ROUTES.settingsFamily)}>
-          <ItemIcon>
-            <FamilyIcon />
-          </ItemIcon>
-          <ItemText>
-            <ItemTitle>Family</ItemTitle>
-            <ItemSubtitle>Members & invite links</ItemSubtitle>
-          </ItemText>
-          <Chevron>›</Chevron>
-        </Item>
-
-        <Item type="button" $interactive onClick={() => navigate(APP_ROUTES.settingsPrivacy)}>
-          <ItemIcon>
-            <PrivacyIcon />
-          </ItemIcon>
-          <ItemText>
-            <ItemTitle>Privacy</ItemTitle>
-            <ItemSubtitle>Privacy & data protection</ItemSubtitle>
-          </ItemText>
-          <Chevron>›</Chevron>
-        </Item>
+          <Item type="button" $interactive onClick={() => navigate(APP_ROUTES.settingsPrivacy)}>
+            <ItemIcon>
+              <PrivacyIcon />
+            </ItemIcon>
+            <ItemText>
+              <ItemTitle>Privacy</ItemTitle>
+              <ItemSubtitle>Privacy & data protection</ItemSubtitle>
+            </ItemText>
+            <Chevron>›</Chevron>
+          </Item>
         </List>
 
         <LogoutSection>
