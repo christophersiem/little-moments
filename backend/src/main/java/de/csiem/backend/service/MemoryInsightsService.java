@@ -29,7 +29,7 @@ public class MemoryInsightsService {
         "(?i)(?:\\bfirst(?:\\s+time)?\\b|for the first time|\\bfull\\s+sentences?\\b|\\bcomplete\\s+sentences?\\b|\\bwithout prompting\\b|\\bzum ersten mal\\b|\\berstmals?\\b|\\bganze[nsr]?\\s+s(?:a|ä)tze?\\b|\\bohne aufforderung\\b)"
     );
     private static final Pattern MILESTONE_TITLE_PATTERN = Pattern.compile(
-        "(?i)(?:\\bfirst\\b|\\berst(?:e|er|es)?(?:mal)?\\b|\\bsentence\\b|\\bsatz\\b|\\bwithout prompting\\b|\\bohne aufforderung\\b|\\bmilestone\\b)"
+        "(?i)(?:\\bfirst\\b|\\berst(?:e|er|es)?(?:mal)?\\b|\\berstmals?\\b|\\bsentences?\\b|\\bsatz\\b|\\bsätze\\b|\\bwithout prompting\\b|\\bohne aufforderung\\b|\\bmilestone\\b)"
     );
 
     // Title/Summary generation rules for Reduced MVP:
@@ -469,8 +469,8 @@ public class MemoryInsightsService {
         String summary = normalize(value)
             .replace('\n', ' ')
             .replace('\r', ' ');
-        summary = SUMMARY_META_LEADIN_PATTERN.matcher(summary).replaceFirst("");
         summary = LEADING_LIST_PATTERN.matcher(summary).replaceFirst("");
+        summary = SUMMARY_META_LEADIN_PATTERN.matcher(summary).replaceFirst("");
         summary = keepFirstSentence(summary);
         summary = limitSummaryWordCount(summary, MAX_SUMMARY_WORDS);
         if (summary.isBlank()) {
