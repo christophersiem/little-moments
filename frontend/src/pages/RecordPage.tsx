@@ -30,6 +30,7 @@ const NOOP = () => undefined
 const MIN_RECORDING_SECONDS = 3
 const MIN_RECORDING_BYTES = 10000
 const SHORT_HINT_DISPLAY_MS = 5200
+const RECORDING_HINT_FADE_DELAY_MS = 3400
 
 function isLikelyTooShort(blob: Blob, elapsedSeconds: number): boolean {
   return elapsedSeconds < MIN_RECORDING_SECONDS || blob.size < MIN_RECORDING_BYTES
@@ -92,10 +93,12 @@ const Timer = styled.div`
   color: ${({ theme }) => theme.colors.text};
 `
 
-const BodyText = styled.p`
+const BodyText = styled.p<{ $dimmed: boolean; $reducedMotion: boolean }>`
   max-width: 280px;
   color: ${({ theme }) => theme.colors.textMuted};
   font-size: ${({ theme }) => theme.typography.bodySize};
+  opacity: ${({ $dimmed }) => ($dimmed ? 0.35 : 1)};
+  transition: ${({ $reducedMotion }) => ($reducedMotion ? 'none' : 'opacity 760ms ease-in-out')};
 `
 
 const StoppedHint = styled.p`
@@ -222,6 +225,13 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
   const [viewportWidth, setViewportWidth] = useState(
     typeof window === 'undefined' ? 390 : window.innerWidth,
   )
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return false
+    }
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  })
+  const [recordingHintDimmed, setRecordingHintDimmed] = useState(false)
 
   const largeButtonDiameter = viewportWidth < 390 ? 176 : 196
   const stoppedButtonDiameter = viewportWidth < 390 ? 90 : 98
@@ -254,6 +264,24 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
   }, [])
 
   useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return
+    }
+
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const onChange = (event: MediaQueryListEvent) => setPrefersReducedMotion(event.matches)
+    setPrefersReducedMotion(mediaQuery.matches)
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', onChange)
+      return () => mediaQuery.removeEventListener('change', onChange)
+    }
+
+    mediaQuery.addListener(onChange)
+    return () => mediaQuery.removeListener(onChange)
+  }, [])
+
+  useEffect(() => {
     if (phase !== 'idle' || !errorMessage) {
       return
     }
@@ -264,6 +292,22 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
   useEffect(() => {
     onNavigationLockChange?.(phase === 'recording')
   }, [onNavigationLockChange, phase])
+
+  useEffect(() => {
+    if (phase !== 'recording') {
+      setRecordingHintDimmed(false)
+      return
+    }
+
+    if (prefersReducedMotion) {
+      setRecordingHintDimmed(true)
+      return
+    }
+
+    setRecordingHintDimmed(false)
+    const fadeTimer = window.setTimeout(() => setRecordingHintDimmed(true), RECORDING_HINT_FADE_DELAY_MS)
+    return () => window.clearTimeout(fadeTimer)
+  }, [phase, prefersReducedMotion])
 
   useEffect(() => {
     if (phase !== 'stopped' || stopDecisionState === 'hidden') {
@@ -405,6 +449,8 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
   }
 
   if (phase === 'recording') {
+    const dimHelperText = prefersReducedMotion || recordingHintDimmed
+
     return (
       <CenterStage>
         <CenterHero>
@@ -419,7 +465,9 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
             />
             <RecordingMeta>
               <Timer>{formatDuration(elapsedSeconds)}</Timer>
-              <BodyText>Speak naturally. We will structure this moment for you.</BodyText>
+              <BodyText $dimmed={dimHelperText} $reducedMotion={prefersReducedMotion}>
+                Speak naturally. We&apos;ll take care of the rest.
+              </BodyText>
             </RecordingMeta>
           </RecordAnchor>
         </CenterHero>
