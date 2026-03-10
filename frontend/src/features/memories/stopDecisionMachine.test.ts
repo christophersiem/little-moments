@@ -28,4 +28,12 @@ describe('stopDecisionMachine', () => {
     expect(confirmed.shouldDeleteLocalAudio).toBe(true)
     expect(confirmed.shouldUpload).toBe(false)
   })
+
+  it('can discard directly from choice when explicitly confirmed', () => {
+    const next = transitionStopDecision('choice', 'discard-confirmed')
+
+    expect(next.state).toBe('hidden')
+    expect(next.shouldDeleteLocalAudio).toBe(true)
+    expect(next.shouldUpload).toBe(false)
+  })
 })

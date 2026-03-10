@@ -27,7 +27,7 @@ interface RecordingPayload {
 }
 
 const NOOP = () => undefined
-const MIN_RECORDING_SECONDS = 2
+const MIN_RECORDING_SECONDS = 3
 const MIN_RECORDING_BYTES = 10000
 const SHORT_HINT_DISPLAY_MS = 5200
 
@@ -193,6 +193,13 @@ const SheetNote = styled.p`
   font-size: ${({ theme }) => theme.typography.secondarySize};
   line-height: ${({ theme }) => theme.typography.bodyLineHeight};
   opacity: 0.78;
+`
+
+const SheetValidationNote = styled.p`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.danger};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+  line-height: ${({ theme }) => theme.typography.bodyLineHeight};
 `
 
 const SheetActions = styled.div`
@@ -379,6 +386,11 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
     }
   }
 
+  const saveBlockedForShortRecording =
+    stopDecisionState === 'choice' &&
+    Boolean(latestRecordingRef.current) &&
+    isLikelyTooShort(latestRecordingRef.current.blob, elapsedSeconds)
+
   if (phase === 'error') {
     return (
       <Card>
@@ -444,13 +456,25 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
                     <SheetNote>Audio is transcribed to text and not stored as audio.</SheetNote>
                   </SheetCopy>
                   <SheetActions>
-                    <Button variant="primary" fullWidth autoFocus onClick={() => onStopDecision('save-selected')}>
+                    <Button
+                      variant="primary"
+                      fullWidth
+                      autoFocus
+                      disabled={saveBlockedForShortRecording}
+                      onClick={() => onStopDecision('save-selected')}
+                    >
                       Save recording
                     </Button>
-                    <Button fullWidth onClick={() => onStopDecision('discard-selected')}>
+                    <Button
+                      fullWidth
+                      onClick={() =>
+                        onStopDecision(saveBlockedForShortRecording ? 'discard-confirmed' : 'discard-selected')
+                      }
+                    >
                       Discard recording
                     </Button>
                   </SheetActions>
+                  {saveBlockedForShortRecording && <SheetValidationNote>{SHORT_TRANSCRIPT_MESSAGE}</SheetValidationNote>}
                 </>
               ) : (
                 <>
