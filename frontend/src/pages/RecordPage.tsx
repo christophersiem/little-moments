@@ -35,77 +35,73 @@ function isLikelyTooShort(blob: Blob, elapsedSeconds: number): boolean {
   return elapsedSeconds < MIN_RECORDING_SECONDS || blob.size < MIN_RECORDING_BYTES
 }
 
-const Stage = styled.section`
+const RecordCanvas = styled.section`
   width: 100%;
   min-height: 100%;
   display: flex;
   flex-direction: column;
-`
-
-const CenterStage = styled(Stage)`
-  justify-content: center;
-`
-
-const Hero = styled.div`
-  margin-top: clamp(56px, 14vh, 120px);
-  display: flex;
-  flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: ${({ theme }) => theme.space.x4};
+  padding: clamp(24px, 6.8vh, 64px) 0 0;
+  background:
+    radial-gradient(circle at 50% 34%, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0) 52%),
+    radial-gradient(circle at 50% 72%, rgba(203, 179, 148, 0.1), rgba(243, 237, 227, 0) 64%);
 `
 
-const CenterHero = styled.div`
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding-inline: ${({ theme }) => theme.space.x3};
-  padding-bottom: calc(${({ theme }) => theme.layout.bottomNavHeight} + ${({ theme }) => theme.space.x2});
-`
-
-const RecordAnchor = styled.div`
-  position: relative;
-  width: 100%;
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-`
-
-const RecordingMeta = styled.div`
-  position: absolute;
-  top: calc(100% + ${({ theme }) => theme.space.x4});
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(320px, calc(100dvw - 48px));
-  max-width: 100%;
+const HeaderBlock = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: ${({ theme }) => theme.space.x2};
 `
 
-const Timer = styled.div`
-  font-size: ${({ theme }) => theme.typography.timerSize};
-  letter-spacing: 0.08em;
-  color: ${({ theme }) => theme.colors.text};
+const Title = styled.h1`
+  margin: 0;
+  font-size: clamp(3.1rem, 10.8vw, 4.8rem);
+  line-height: 0.98;
+  letter-spacing: -0.01em;
+  font-family: ${({ theme }) => theme.typography.headingFamily};
+  font-weight: 500;
+  color: color-mix(in srgb, ${({ theme }) => theme.colors.text} 95%, #2f251d);
 `
 
-const BodyText = styled.p`
-  max-width: 280px;
+const Subtitle = styled.p`
+  font-size: clamp(1.65rem, 5.8vw, 2.3rem);
+  line-height: 1.2;
+  color: color-mix(in srgb, ${({ theme }) => theme.colors.text} 86%, ${({ theme }) => theme.colors.textMuted});
+`
+
+const RecordCluster = styled.div`
+  margin-top: clamp(54px, 10vh, 118px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(28px, 4vh, 46px);
+`
+
+const Timer = styled.p`
+  font-size: clamp(3.45rem, 12vw, 5.5rem);
+  line-height: 0.96;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, ${({ theme }) => theme.colors.text} 95%, #2b221b);
+`
+
+const PhaseHint = styled.p`
+  max-width: 320px;
+  margin-top: calc(${({ theme }) => theme.space.x1} * -1);
   color: ${({ theme }) => theme.colors.textMuted};
-  font-size: ${({ theme }) => theme.typography.bodySize};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
 `
 
 const HintBanner = styled.p`
   width: min(360px, calc(100dvw - 48px));
   max-width: 100%;
-  margin: ${({ theme }) => `${theme.space.x5} 0 0`};
+  margin-top: ${({ theme }) => theme.space.x2};
   padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3}`};
-  border: 1px solid ${({ theme }) => theme.colors.danger};
+  border: 1px solid color-mix(in srgb, ${({ theme }) => theme.colors.danger} 72%, ${({ theme }) => theme.colors.border});
   border-radius: ${({ theme }) => theme.radii.md};
-  background: ${({ theme }) => theme.colors.surfaceStrong};
+  background: color-mix(in srgb, ${({ theme }) => theme.colors.surfaceStrong} 88%, #fff);
   color: ${({ theme }) => theme.colors.danger};
   font-size: ${({ theme }) => theme.typography.bodySize};
   line-height: ${({ theme }) => theme.typography.bodyLineHeight};
@@ -183,8 +179,7 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
     typeof window === 'undefined' ? 390 : window.innerWidth,
   )
 
-  const largeButtonDiameter = viewportWidth < 390 ? 168 : 188
-  const stoppedButtonDiameter = viewportWidth < 390 ? 88 : 96
+  const largeButtonDiameter = viewportWidth < 390 ? 210 : 236
 
   const cleanupStream = () => {
     if (streamRef.current) {
@@ -359,98 +354,71 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
     )
   }
 
-  if (phase === 'recording') {
-    return (
-      <CenterStage>
-        <CenterHero>
-          <RecordAnchor>
-            <RecordButton
-              status="recording"
-              elapsedSec={elapsedSeconds}
-              maxDurationSec={60}
-              onStart={NOOP}
-              onStop={stopRecording}
-              diameter={largeButtonDiameter}
-            />
-            <RecordingMeta>
-              <Timer>{formatDuration(elapsedSeconds)}</Timer>
-              <BodyText>Speak naturally. We will structure this moment for you.</BodyText>
-            </RecordingMeta>
-          </RecordAnchor>
-        </CenterHero>
-      </CenterStage>
-    )
-  }
-
-  if (phase === 'stopped') {
-    return (
-      <>
-        <Stage>
-          <Hero>
-            <RecordButton
-              status="stopped"
-              elapsedSec={elapsedSeconds}
-              maxDurationSec={60}
-              onStart={NOOP}
-              onStop={NOOP}
-              diameter={stoppedButtonDiameter}
-            />
-            <BodyText>Your recording is ready to save.</BodyText>
-          </Hero>
-        </Stage>
-
-        {stopDecisionState !== 'hidden' && (
-          <ModalOverlay role="presentation">
-            <ModalSheet role="dialog" aria-modal="true" aria-label="Save or discard recording">
-              <SheetHandle aria-hidden />
-              {stopDecisionState === 'choice' ? (
-                <>
-                  <h2>Save this recording?</h2>
-                  <BodyText>Save now, or discard this moment.</BodyText>
-                  <PrivacyText>Audio is transcribed to text and not stored as audio.</PrivacyText>
-                  <SheetActions>
-                    <Button variant="primary" fullWidth autoFocus onClick={() => onStopDecision('save-selected')}>
-                      Save recording
-                    </Button>
-                    <Button fullWidth onClick={() => onStopDecision('discard-selected')}>
-                      Discard recording
-                    </Button>
-                  </SheetActions>
-                </>
-              ) : (
-                <>
-                  <h2>Discard this recording?</h2>
-                  <BodyText>This action cannot be undone.</BodyText>
-                  <SheetActions>
-                    <Button variant="danger" fullWidth autoFocus onClick={() => onStopDecision('discard-confirmed')}>
-                      Yes, discard recording
-                    </Button>
-                    <Button fullWidth onClick={() => onStopDecision('discard-canceled')}>
-                      Keep recording
-                    </Button>
-                  </SheetActions>
-                </>
-              )}
-            </ModalSheet>
-          </ModalOverlay>
-        )}
-      </>
-    )
-  }
+  const buttonStatus = phase === 'recording' ? 'recording' : phase === 'stopped' ? 'stopped' : 'idle'
+  const timerSeconds = phase === 'idle' ? 0 : elapsedSeconds
 
   return (
-    <CenterStage>
-      <CenterHero>
-        <RecordButton
-          status="idle"
-          elapsedSec={0}
-          maxDurationSec={60}
-          onStart={() => void startRecording()}
-          onStop={NOOP}
-          diameter={largeButtonDiameter}
-        />
-        {errorMessage && <HintBanner role="status">{errorMessage}</HintBanner>}
-      </CenterHero>
-    </CenterStage>
+    <>
+      <RecordCanvas>
+        <HeaderBlock>
+          <Title>Little Moments</Title>
+          <Subtitle>Capture a small moment</Subtitle>
+        </HeaderBlock>
+
+        <RecordCluster>
+          <RecordButton
+            status={buttonStatus}
+            elapsedSec={timerSeconds}
+            maxDurationSec={60}
+            onStart={phase === 'idle' ? () => void startRecording() : NOOP}
+            onStop={phase === 'recording' ? stopRecording : NOOP}
+            diameter={largeButtonDiameter}
+          />
+
+          <Timer>{formatDuration(timerSeconds)}</Timer>
+
+          {phase === 'recording' && <PhaseHint>Recording in progress.</PhaseHint>}
+          {phase === 'stopped' && <PhaseHint>Your recording is ready to save.</PhaseHint>}
+
+          {phase === 'idle' && errorMessage && <HintBanner role="status">{errorMessage}</HintBanner>}
+        </RecordCluster>
+      </RecordCanvas>
+
+      {phase === 'stopped' && stopDecisionState !== 'hidden' && (
+        <ModalOverlay role="presentation">
+          <ModalSheet role="dialog" aria-modal="true" aria-label="Save or discard recording">
+            <SheetHandle aria-hidden />
+            {stopDecisionState === 'choice' ? (
+              <>
+                <h2>Save this recording?</h2>
+                <PhaseHint>Save now, or discard this moment.</PhaseHint>
+                <PrivacyText>Audio is transcribed to text and not stored as audio.</PrivacyText>
+                <SheetActions>
+                  <Button variant="primary" fullWidth autoFocus onClick={() => onStopDecision('save-selected')}>
+                    Save recording
+                  </Button>
+                  <Button fullWidth onClick={() => onStopDecision('discard-selected')}>
+                    Discard recording
+                  </Button>
+                </SheetActions>
+              </>
+            ) : (
+              <>
+                <h2>Discard this recording?</h2>
+                <PhaseHint>This action cannot be undone.</PhaseHint>
+                <SheetActions>
+                  <Button variant="danger" fullWidth autoFocus onClick={() => onStopDecision('discard-confirmed')}>
+                    Yes, discard recording
+                  </Button>
+                  <Button fullWidth onClick={() => onStopDecision('discard-canceled')}>
+                    Keep recording
+                  </Button>
+                </SheetActions>
+              </>
+            )}
+          </ModalSheet>
+        </ModalOverlay>
+      )}
+    </>
   )
 }

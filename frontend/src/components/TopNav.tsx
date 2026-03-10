@@ -1,7 +1,6 @@
 import styled from 'styled-components'
 import type { BottomNavigationIcon, BottomNavigationItem } from '../app/navigation'
 import { APP_ROUTES } from '../app/routes'
-import { Button } from './Button'
 
 interface TopNavProps {
   pathname: string
@@ -15,28 +14,63 @@ interface TopNavProps {
 const Nav = styled.nav`
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: ${({ theme }) => theme.space.x1};
-  padding: ${({ theme }) => theme.space.x1};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: ${({ theme }) => theme.radii.lg};
-  background: ${({ theme }) => theme.colors.surfaceStrong};
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, ${({ theme }) => theme.colors.border} 78%, ${({ theme }) => theme.colors.background});
+  border-radius: 29px;
+  background: color-mix(in srgb, ${({ theme }) => theme.colors.surfaceStrong} 96%, #fff);
+  box-shadow:
+    0 10px 24px rgba(var(--lm-shadow), 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
 `
 
 const NavItem = styled.span`
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: ${({ theme }) => theme.space.x1};
+  gap: 4px;
 `
 
 const NavIcon = styled.svg`
-  width: 18px;
-  height: 18px;
+  width: 19px;
+  height: 19px;
   display: block;
 `
 
 const NavLabel = styled.span`
-  font-size: 0.75rem;
+  font-size: 0.6rem;
+  letter-spacing: 0.01em;
+`
+
+const NavButton = styled.button<{ $active: boolean; $dimmed: boolean }>`
+  border: 1px solid
+    ${({ theme, $active }) =>
+      $active ? `color-mix(in srgb, ${theme.colors.border} 76%, ${theme.colors.background})` : 'transparent'};
+  width: 100%;
+  min-height: 62px;
+  border-radius: 20px;
+  background: ${({ theme, $active }) =>
+    $active
+      ? `linear-gradient(180deg, color-mix(in srgb, ${theme.colors.surface} 90%, #fff), color-mix(in srgb, ${theme.colors.surfaceStrong} 88%, ${theme.colors.background}))`
+      : 'transparent'};
+  color: ${({ theme, $active }) => ($active ? theme.colors.accentStrong : `color-mix(in srgb, ${theme.colors.textMuted} 82%, ${theme.colors.text})`)};
+  padding: 8px 6px 6px;
+  cursor: pointer;
+  opacity: ${({ $dimmed }) => ($dimmed ? 0.58 : 1)};
+  transition: background-color 160ms ease, color 160ms ease, opacity 160ms ease, transform 160ms ease;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    background: ${({ theme, $active }) =>
+      $active
+        ? `linear-gradient(180deg, color-mix(in srgb, ${theme.colors.surface} 90%, #fff), color-mix(in srgb, ${theme.colors.surfaceStrong} 88%, ${theme.colors.background}))`
+        : `color-mix(in srgb, ${theme.colors.surface} 78%, ${theme.colors.background})`};
+  }
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
+    outline-offset: 2px;
+  }
 `
 
 function RecordIcon() {
@@ -134,22 +168,23 @@ export function TopNav({
         const active = pathname.startsWith(item.route)
         const disabledByLock = navigationLocked && !active
         const isRecordRoute = item.route === APP_ROUTES.record
-        const opacity = !canRecord && isRecordRoute ? 0.62 : disabledByLock ? 0.62 : 1
+        const dimmed = !canRecord && isRecordRoute ? true : disabledByLock
 
         return (
-          <Button
+          <NavButton
             key={item.route}
-            variant="nav"
-            active={active}
+            type="button"
+            $active={active}
+            $dimmed={dimmed}
             onClick={() => onNavigate(item.route)}
             aria-disabled={disabledByLock}
-            style={{ opacity }}
+            aria-current={active ? 'page' : undefined}
           >
             <NavItem>
               {iconFor(item.icon)}
               <NavLabel>{item.label}</NavLabel>
             </NavItem>
-          </Button>
+          </NavButton>
         )
       })}
     </Nav>
