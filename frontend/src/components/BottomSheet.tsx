@@ -26,7 +26,7 @@ const Backdrop = styled.button<{ $visible: boolean }>`
   border: none;
   margin: 0;
   padding: 0;
-  background: rgba(0, 0, 0, 0.12);
+  background: ${({ theme }) => theme.colors.overlay};
   opacity: ${({ $visible }) => ($visible ? 1 : 0)};
   transition: opacity ${ANIMATION_MS}ms ease;
 `
@@ -40,9 +40,9 @@ const Panel = styled.section<{ $visible: boolean }>`
   height: min(55vh, 520px);
   max-height: 75vh;
   background: ${({ theme }) => theme.colors.surfaceStrong};
-  border: 1px solid rgba(67, 57, 49, 0.1);
+  border: 1px solid color-mix(in srgb, ${({ theme }) => theme.colors.border} 72%, transparent);
   border-radius: 24px;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.14), 0 -6px 18px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 18px 50px rgba(var(--lm-shadow-rgb), 0.28), 0 -6px 18px rgba(var(--lm-shadow-rgb), 0.12);
   display: flex;
   flex-direction: column;
   transform: ${({ $visible }) =>

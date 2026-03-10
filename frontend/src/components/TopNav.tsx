@@ -15,13 +15,13 @@ const Nav = styled.nav`
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: ${({ theme }) => theme.space.x1};
-  padding: ${({ theme }) => theme.space.x2};
+  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3}`};
   border: 1px solid color-mix(in srgb, ${({ theme }) => theme.colors.border} 78%, ${({ theme }) => theme.colors.background});
   border-radius: ${({ theme }) => theme.radii.pill};
-  background: color-mix(in srgb, ${({ theme }) => theme.colors.surfaceStrong} 96%, #fff);
+  background: color-mix(in srgb, ${({ theme }) => theme.colors.surfaceStrong} 96%, ${({ theme }) => theme.colors.backgroundAlt});
   box-shadow:
     0 10px 24px rgba(var(--lm-shadow), 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+    inset 0 1px 0 rgba(var(--lm-highlight-rgb), 0.62);
 `
 
 const NavItem = styled.span`
@@ -47,11 +47,11 @@ const NavButton = styled.button<{ $active: boolean; $dimmed: boolean }>`
     ${({ theme, $active }) =>
       $active ? `color-mix(in srgb, ${theme.colors.border} 76%, ${theme.colors.background})` : 'transparent'};
   width: 100%;
-  min-height: calc(${({ theme }) => theme.layout.minTouchTarget} + ${({ theme }) => theme.space.x4} + 2px);
+  min-height: calc(${({ theme }) => theme.layout.minTouchTarget} + ${({ theme }) => theme.space.x3});
   border-radius: ${({ theme }) => theme.radii.xl};
   background: ${({ theme, $active }) =>
     $active
-      ? `linear-gradient(180deg, color-mix(in srgb, ${theme.colors.surface} 90%, #fff), color-mix(in srgb, ${theme.colors.surfaceStrong} 88%, ${theme.colors.background}))`
+      ? `linear-gradient(180deg, color-mix(in srgb, ${theme.colors.surface} 90%, ${theme.colors.backgroundAlt}), color-mix(in srgb, ${theme.colors.surfaceStrong} 88%, ${theme.colors.background}))`
       : 'transparent'};
   color: ${({ theme, $active }) => ($active ? theme.colors.accentStrong : `color-mix(in srgb, ${theme.colors.textMuted} 82%, ${theme.colors.text})`)};
   padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x1} ${theme.space.x1}`};
@@ -63,7 +63,7 @@ const NavButton = styled.button<{ $active: boolean; $dimmed: boolean }>`
     transform: translateY(-1px);
     background: ${({ theme, $active }) =>
       $active
-        ? `linear-gradient(180deg, color-mix(in srgb, ${theme.colors.surface} 90%, #fff), color-mix(in srgb, ${theme.colors.surfaceStrong} 88%, ${theme.colors.background}))`
+        ? `linear-gradient(180deg, color-mix(in srgb, ${theme.colors.surface} 90%, ${theme.colors.backgroundAlt}), color-mix(in srgb, ${theme.colors.surfaceStrong} 88%, ${theme.colors.background}))`
         : `color-mix(in srgb, ${theme.colors.surface} 78%, ${theme.colors.background})`};
   }
 

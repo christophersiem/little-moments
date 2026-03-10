@@ -23,33 +23,77 @@
   --line-height-body: 1.5;
   --line-height-relaxed: 1.6;
 
-  --color-bg: #f3f1ef;
-  --color-bg-alt: #f3f1ef;
-  --color-bg-glow-start: #f3f1ef;
-  --color-bg-glow-end: #f3f1ef;
-  --color-surface: #f8f5f2;
-  --color-surface-strong: #fbf9f7;
-  --color-border: #e7e1dc;
-  --color-text: #433931;
-  --color-text-muted: #8f8378;
-  --color-accent: #c49a76;
-  --color-accent-strong: #ad8564;
-  --color-danger: #b35c55;
-  --color-on-accent: #fff9f4;
-  --color-overlay: rgba(51, 41, 33, 0.26);
+  --bg-app: #f6f3ef;
+  --bg-surface: #fbf9f6;
+  --bg-card: #fffdfb;
+  --bg-primary: var(--bg-app);
+  --bg-secondary: var(--bg-surface);
+  --card-bg: var(--bg-card);
+  --text-primary: #3f3732;
+  --text-secondary: #6b625b;
+  --border-color: #e6ddd4;
+  --accent: #b88c5a;
+  --accent-hover: #a67c4d;
+  --danger: #b85c5c;
 
-  --shadow-card: 0 4px 14px rgba(48, 39, 33, 0.05);
-  --shadow-sheet: 0 14px 28px rgba(48, 39, 33, 0.13);
+  --overlay-color: rgba(51, 41, 33, 0.26);
+  --shadow-rgb: 67, 57, 49;
+  --highlight-rgb: 255, 251, 246;
+
+  --color-bg: var(--bg-app);
+  --color-bg-alt: var(--bg-secondary);
+  --color-bg-glow-start: var(--bg-secondary);
+  --color-bg-glow-end: var(--bg-app);
+  --color-surface: var(--bg-secondary);
+  --color-surface-strong: var(--card-bg);
+  --color-border: var(--border-color);
+  --color-text: var(--text-primary);
+  --color-text-muted: var(--text-secondary);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-hover);
+  --color-danger: var(--danger);
+  --color-on-accent: #fff9f4;
+  --color-overlay: var(--overlay-color);
+
+  --shadow-card: 0 6px 18px rgba(var(--shadow-rgb), 0.08);
+  --shadow-sheet: 0 16px 30px rgba(var(--shadow-rgb), 0.16);
 
   --lm-accent: var(--color-accent);
   --lm-surface: var(--color-surface-strong);
   --lm-text: var(--color-text);
   --lm-muted: var(--color-text-muted);
-  --lm-shadow: 67, 57, 49;
+  --lm-shadow: var(--shadow-rgb);
+  --lm-shadow-rgb: var(--shadow-rgb);
+  --lm-highlight-rgb: var(--highlight-rgb);
 
   --layout-max-width: 430px;
   --layout-min-touch-target: 44px;
   --layout-primary-button-height: 48px;
   --layout-center-card-min-height: 320px;
   --layout-bottom-nav-height: 78px;
+
+  color-scheme: light;
+}
+
+html[data-theme='dark'] {
+  --bg-app: #1f1b18;
+  --bg-surface: #2a2420;
+  --bg-card: #312a25;
+  --text-primary: #f3ede6;
+  --text-secondary: #c7bbb0;
+  --border-color: #4a4038;
+  --accent: #d2a574;
+  --accent-hover: #e0b385;
+  --danger: #d17b7b;
+
+  --overlay-color: rgba(9, 7, 6, 0.58);
+  --shadow-rgb: 8, 6, 5;
+  --highlight-rgb: 243, 237, 230;
+  --color-on-accent: #1f1b18;
+
+  color-scheme: dark;
+}
+
+html[data-theme='light'] {
+  color-scheme: light;
 }

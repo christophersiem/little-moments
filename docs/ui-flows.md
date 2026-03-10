@@ -59,7 +59,12 @@
 - Member can view list but cannot manage invites or roles.
 
 ## 7) Settings and Account
-- Settings entries: Account, Family, Privacy, Logout.
+- Settings entries: Appearance, Account, Family, Privacy, Logout.
+- Appearance supports:
+  - System (follows `prefers-color-scheme`)
+  - Light
+  - Dark
+  - persisted locally on device
 - Account page supports:
   - display name update
   - email update

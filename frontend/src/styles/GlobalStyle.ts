@@ -14,6 +14,7 @@ export const GlobalStyle = createGlobalStyle`
     height: 100%;
     min-height: 100%;
     overflow-x: clip;
+    background: ${({ theme }) => theme.colors.background};
   }
 
   html,
@@ -26,7 +27,6 @@ export const GlobalStyle = createGlobalStyle`
     font-family: ${({ theme }) => theme.typography.bodyFamily};
     font-size: ${({ theme }) => theme.typography.bodySize};
     color: ${({ theme }) => theme.colors.text};
-    background: linear-gradient(180deg, ${({ theme }) => theme.colors.background}, ${({ theme }) => theme.colors.backgroundAlt});
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
