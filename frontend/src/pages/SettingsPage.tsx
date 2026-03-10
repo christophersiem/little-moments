@@ -1,4 +1,6 @@
+import { useRef, type KeyboardEvent, type ReactNode } from 'react'
 import styled from 'styled-components'
+import { useAppearance, type AppearanceMode } from '../app/appearance'
 import { APP_ROUTES } from '../app/routes'
 
 interface SettingsPageProps {
@@ -88,6 +90,64 @@ const Chevron = styled.span`
   line-height: 1;
 `
 
+const StaticItem = styled.div`
+  width: 100%;
+  min-height: 76px;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.lg};
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.x3};
+  padding: ${({ theme }) => `${theme.space.x3} ${theme.space.x4}`};
+`
+
+const StaticItemRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.x3};
+`
+
+const AppearanceControls = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: ${({ theme }) => theme.space.x2};
+`
+
+const AppearanceOption = styled.button<{ $active: boolean }>`
+  min-height: 40px;
+  border-radius: ${({ theme }) => theme.radii.md};
+  border: 1px solid
+    ${({ theme, $active }) => ($active ? theme.colors.accentStrong : theme.colors.border)};
+  background: ${({ theme, $active }) =>
+    $active ? theme.colors.accent : theme.colors.surface};
+  color: ${({ theme, $active }) =>
+    $active ? theme.colors.onAccent : theme.colors.text};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
+    outline-offset: 2px;
+  }
+`
+
+const AppearanceToggleIcon = styled.svg`
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+`
+
 const LogoutItem = styled(Item)`
   border-color: ${({ theme }) => theme.colors.danger};
   background: ${({ theme }) => theme.colors.surface};
@@ -141,6 +201,42 @@ function PrivacyIcon() {
   )
 }
 
+function AppearanceIcon() {
+  return (
+    <Glyph viewBox="0 0 24 24" aria-hidden>
+      <path d="M12 3.5a8.5 8.5 0 1 0 0 17V3.5Z" />
+      <path d="M12 3.5a8.5 8.5 0 0 1 0 17" />
+    </Glyph>
+  )
+}
+
+function SystemThemeIcon() {
+  return (
+    <AppearanceToggleIcon viewBox="0 0 24 24" aria-hidden>
+      <rect x="4" y="5.5" width="16" height="11" rx="2" />
+      <path d="M9.2 19h5.6" />
+      <path d="M12 16.5V19" />
+    </AppearanceToggleIcon>
+  )
+}
+
+function LightThemeIcon() {
+  return (
+    <AppearanceToggleIcon viewBox="0 0 24 24" aria-hidden>
+      <circle cx="12" cy="12" r="4.2" />
+      <path d="M12 3.2v2.1M12 18.7v2.1M20.8 12h-2.1M5.3 12H3.2M18.2 5.8l-1.5 1.5M7.3 16.7l-1.5 1.5M18.2 18.2l-1.5-1.5M7.3 7.3 5.8 5.8" />
+    </AppearanceToggleIcon>
+  )
+}
+
+function DarkThemeIcon() {
+  return (
+    <AppearanceToggleIcon viewBox="0 0 24 24" aria-hidden>
+      <path d="M15.8 4.5a7.4 7.4 0 1 0 3.7 13.8 8 8 0 1 1-3.7-13.8Z" />
+    </AppearanceToggleIcon>
+  )
+}
+
 function LogoutArrowIcon() {
   return (
     <Glyph viewBox="0 0 24 24" aria-hidden>
@@ -152,10 +248,93 @@ function LogoutArrowIcon() {
 }
 
 export function SettingsPage({ navigate, onLogout }: SettingsPageProps) {
+  const { mode, setMode } = useAppearance()
+
+  const appearanceOptions: Array<{ value: AppearanceMode; label: string; icon: ReactNode }> = [
+    { value: 'system', label: 'System', icon: <SystemThemeIcon /> },
+    { value: 'light', label: 'Light', icon: <LightThemeIcon /> },
+    { value: 'dark', label: 'Dark', icon: <DarkThemeIcon /> },
+  ]
+  const appearanceOptionRefs = useRef<Array<HTMLButtonElement | null>>([])
+
+  const modeIndex = appearanceOptions.findIndex((option) => option.value === mode)
+
+  const focusAndSelectAppearanceOption = (nextIndex: number) => {
+    const normalizedIndex = ((nextIndex % appearanceOptions.length) + appearanceOptions.length) % appearanceOptions.length
+    const nextOption = appearanceOptions[normalizedIndex]
+    setMode(nextOption.value)
+    window.requestAnimationFrame(() => {
+      appearanceOptionRefs.current[normalizedIndex]?.focus()
+    })
+  }
+
+  const handleAppearanceOptionKeyDown = (event: KeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      event.preventDefault()
+      focusAndSelectAppearanceOption(currentIndex + 1)
+      return
+    }
+
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      focusAndSelectAppearanceOption(currentIndex - 1)
+      return
+    }
+
+    if (event.key === 'Home') {
+      event.preventDefault()
+      focusAndSelectAppearanceOption(0)
+      return
+    }
+
+    if (event.key === 'End') {
+      event.preventDefault()
+      focusAndSelectAppearanceOption(appearanceOptions.length - 1)
+      return
+    }
+
+    if (event.key === ' ' || event.key === 'Enter') {
+      event.preventDefault()
+      focusAndSelectAppearanceOption(currentIndex)
+    }
+  }
+
   return (
     <Section>
       <Heading>Settings</Heading>
       <List>
+        <StaticItem>
+          <StaticItemRow>
+            <ItemIcon>
+              <AppearanceIcon />
+            </ItemIcon>
+            <ItemText>
+              <ItemTitle>Appearance</ItemTitle>
+              <ItemSubtitle>System, Light or Dark theme</ItemSubtitle>
+            </ItemText>
+          </StaticItemRow>
+          <AppearanceControls role="radiogroup" aria-label="Appearance">
+            {appearanceOptions.map((option, index) => (
+              <AppearanceOption
+                key={option.value}
+                type="button"
+                role="radio"
+                aria-checked={mode === option.value}
+                aria-label={option.label}
+                tabIndex={modeIndex === index ? 0 : -1}
+                $active={mode === option.value}
+                ref={(element) => {
+                  appearanceOptionRefs.current[index] = element
+                }}
+                onClick={() => setMode(option.value)}
+                onKeyDown={(event) => handleAppearanceOptionKeyDown(event, index)}
+              >
+                {option.icon}
+              </AppearanceOption>
+            ))}
+          </AppearanceControls>
+        </StaticItem>
+
         <Item type="button" $interactive onClick={() => navigate(APP_ROUTES.settingsAccount)}>
           <ItemIcon>
             <AccountIcon />

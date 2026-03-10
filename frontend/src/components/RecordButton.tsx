@@ -241,16 +241,16 @@ const Core = styled.span<{ $state: VisualState; $disabled: boolean }>`
           : 'color-mix(in srgb, var(--lm-accent) 30%, var(--lm-border))'};
   background: ${({ $state }) =>
     $state === 'recording'
-      ? 'linear-gradient(165deg, color-mix(in srgb, var(--lm-accent) 72%, #fff), color-mix(in srgb, var(--lm-accent-strong) 88%, var(--lm-accent)))'
+      ? 'linear-gradient(165deg, color-mix(in srgb, var(--lm-accent) 72%, rgb(var(--lm-highlight-rgb))), color-mix(in srgb, var(--lm-accent-strong) 88%, var(--lm-accent)))'
       : $state === 'stopped'
-        ? 'linear-gradient(165deg, color-mix(in srgb, var(--lm-surface) 88%, #fff), color-mix(in srgb, var(--lm-surface) 72%, var(--lm-border)))'
-        : 'linear-gradient(165deg, color-mix(in srgb, var(--lm-surface) 90%, #fff), color-mix(in srgb, var(--lm-surface) 66%, var(--lm-accent)))'};
+        ? 'linear-gradient(165deg, color-mix(in srgb, var(--lm-surface) 88%, rgb(var(--lm-highlight-rgb))), color-mix(in srgb, var(--lm-surface) 72%, var(--lm-border)))'
+        : 'linear-gradient(165deg, color-mix(in srgb, var(--lm-surface) 90%, rgb(var(--lm-highlight-rgb))), color-mix(in srgb, var(--lm-surface) 66%, var(--lm-accent)))'};
   box-shadow: ${({ $state, $disabled }) =>
     $state === 'recording'
-      ? '0 18px 28px rgba(var(--lm-shadow-rgb), 0.22), 0 4px 8px rgba(var(--lm-shadow-rgb), 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -10px 14px color-mix(in srgb, var(--lm-accent-strong) 28%, transparent)'
+      ? '0 18px 28px rgba(var(--lm-shadow-rgb), 0.22), 0 4px 8px rgba(var(--lm-shadow-rgb), 0.16), inset 0 1px 0 rgba(var(--lm-highlight-rgb), 0.22), inset 0 -10px 14px color-mix(in srgb, var(--lm-accent-strong) 28%, transparent)'
       : $state === 'stopped'
-        ? `0 10px 18px rgba(var(--lm-shadow-rgb), ${$disabled ? 0.08 : 0.12}), inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -8px 14px rgba(var(--lm-shadow-rgb), 0.06)`
-        : `0 16px 26px rgba(var(--lm-shadow-rgb), ${$disabled ? 0.11 : 0.18}), 0 2px 0 rgba(255, 255, 255, 0.48), inset 0 2px 0 rgba(255, 255, 255, 0.74), inset 0 -12px 16px rgba(var(--lm-shadow-rgb), 0.08)`};
+        ? `0 10px 18px rgba(var(--lm-shadow-rgb), ${$disabled ? 0.08 : 0.12}), inset 0 1px 0 rgba(var(--lm-highlight-rgb), 0.48), inset 0 -8px 14px rgba(var(--lm-shadow-rgb), 0.06)`
+        : `0 16px 26px rgba(var(--lm-shadow-rgb), ${$disabled ? 0.11 : 0.18}), 0 2px 0 rgba(var(--lm-highlight-rgb), 0.42), inset 0 2px 0 rgba(var(--lm-highlight-rgb), 0.64), inset 0 -12px 16px rgba(var(--lm-shadow-rgb), 0.08)`};
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -273,12 +273,12 @@ const InnerPlate = styled.span<{ $state: VisualState }>`
         : 'color-mix(in srgb, var(--lm-border) 74%, var(--lm-surface))'};
   background: ${({ $state }) =>
     $state === 'recording'
-      ? 'linear-gradient(180deg, color-mix(in srgb, var(--lm-accent) 54%, #fff), color-mix(in srgb, var(--lm-accent-strong) 86%, var(--lm-accent)))'
-      : 'linear-gradient(180deg, color-mix(in srgb, var(--lm-surface) 93%, #fff), color-mix(in srgb, var(--lm-surface) 74%, var(--lm-accent)))'};
+      ? 'linear-gradient(180deg, color-mix(in srgb, var(--lm-accent) 54%, rgb(var(--lm-highlight-rgb))), color-mix(in srgb, var(--lm-accent-strong) 86%, var(--lm-accent)))'
+      : 'linear-gradient(180deg, color-mix(in srgb, var(--lm-surface) 93%, rgb(var(--lm-highlight-rgb))), color-mix(in srgb, var(--lm-surface) 74%, var(--lm-accent)))'};
   box-shadow: ${({ $state }) =>
     $state === 'recording'
-      ? 'inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -6px 10px color-mix(in srgb, var(--lm-accent-strong) 34%, transparent)'
-      : 'inset 0 1px 0 rgba(255, 255, 255, 0.72), inset 0 -8px 12px rgba(var(--lm-shadow-rgb), 0.05), 0 5px 10px rgba(var(--lm-shadow-rgb), 0.08)'};
+      ? 'inset 0 1px 0 rgba(var(--lm-highlight-rgb), 0.22), inset 0 -6px 10px color-mix(in srgb, var(--lm-accent-strong) 34%, transparent)'
+      : 'inset 0 1px 0 rgba(var(--lm-highlight-rgb), 0.62), inset 0 -8px 12px rgba(var(--lm-shadow-rgb), 0.05), 0 5px 10px rgba(var(--lm-shadow-rgb), 0.08)'};
   display: inline-flex;
   align-items: center;
   justify-content: center;

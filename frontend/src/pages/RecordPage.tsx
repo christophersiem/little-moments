@@ -40,7 +40,6 @@ const Stage = styled.section`
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  background: ${({ theme }) => theme.colors.background};
 `
 
 const CenterStage = styled(Stage)`

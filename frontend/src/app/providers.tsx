@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { ThemeProvider } from 'styled-components'
+import { AppearanceProvider } from './appearance'
 import { GlobalStyle } from '../styles/GlobalStyle'
 import { theme } from '../styles/theme'
 
@@ -9,10 +10,12 @@ interface AppProvidersProps {
 
 export function AppProviders({ children }: AppProvidersProps) {
   return (
-    <ThemeProvider theme={theme}>
-      <GlobalStyle />
-      {children}
-    </ThemeProvider>
+    <AppearanceProvider>
+      <ThemeProvider theme={theme}>
+        <GlobalStyle />
+        {children}
+      </ThemeProvider>
+    </AppearanceProvider>
   )
 }
 
