@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { RecordPage } from './RecordPage'
 import { renderWithProviders } from '../test/renderWithProviders'
+import { SHORT_TRANSCRIPT_MESSAGE } from '../features/memories/constants'
 
 const { startMemoryUploadMock } = vi.hoisted(() => ({
   startMemoryUploadMock: vi.fn(() => ({ clientId: 'client-123' })),
@@ -103,6 +104,25 @@ describe('RecordPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /start recording/i })).toBeInTheDocument()
       expect(startMemoryUploadMock).not.toHaveBeenCalled()
+    })
+  })
+
+  it('returns to idle with hint when saving a too-short recording', async () => {
+    const user = userEvent.setup()
+    const navigate = vi.fn()
+
+    renderWithProviders(<RecordPage navigate={navigate} childId="child-1" />)
+
+    await user.click(screen.getByRole('button', { name: /start recording/i }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /stop recording/i })).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: /stop recording/i }))
+    await user.click(screen.getByRole('button', { name: /save recording/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /start recording/i })).toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent(SHORT_TRANSCRIPT_MESSAGE)
+      expect(startMemoryUploadMock).not.toHaveBeenCalled()
+      expect(navigate).not.toHaveBeenCalled()
     })
   })
 })
