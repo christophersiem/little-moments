@@ -269,7 +269,7 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
     }
 
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const onChange = (event: MediaQueryListEvent) => setPrefersReducedMotion(event.matches)
+    const onChange = () => setPrefersReducedMotion(mediaQuery.matches)
     setPrefersReducedMotion(mediaQuery.matches)
 
     if (typeof mediaQuery.addEventListener === 'function') {
