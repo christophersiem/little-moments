@@ -1,4 +1,5 @@
 import { StatusBanner } from '../../../components/StatusBanner'
+import { PROCESSING_BANNER_DETAIL, PROCESSING_BANNER_TITLE, SHORT_TRANSCRIPT_MESSAGE } from '../constants'
 import type { ActiveUploadSession } from '../hooks/uploadSessionStore'
 
 type ProcessingState = 'PROCESSING' | 'READY' | 'FAILED' | 'IDLE' | 'TIMEOUT'
@@ -11,8 +12,6 @@ interface ProcessingBannerProps {
   onRetry: () => void
 }
 
-const SHORT_TRANSCRIPT_ERROR = 'Recording too short. Please speak at least 8 words.'
-
 function toReadableProcessingError(message: string | null | undefined): string {
   const raw = (message ?? '').trim()
   if (!raw) {
@@ -20,7 +19,7 @@ function toReadableProcessingError(message: string | null | undefined): string {
   }
   const normalized = raw.toLowerCase()
   if (normalized.includes('transcription response was empty') || normalized.includes('too short')) {
-    return SHORT_TRANSCRIPT_ERROR
+    return SHORT_TRANSCRIPT_MESSAGE
   }
   return raw
 }
@@ -37,7 +36,7 @@ export function ProcessingBanner({
   }
 
   if (activeUpload.status === 'uploading') {
-    return <StatusBanner title="Saving your moment… It will appear here shortly." detail="You can keep scrolling." />
+    return <StatusBanner title={PROCESSING_BANNER_TITLE} detail={PROCESSING_BANNER_DETAIL} />
   }
 
   if (activeUpload.status === 'processing') {
@@ -54,8 +53,8 @@ export function ProcessingBanner({
 
     return (
       <StatusBanner
-        title="Saving your moment… It will appear here shortly."
-        detail={isProcessingPolling ? 'You can keep scrolling.' : undefined}
+        title={PROCESSING_BANNER_TITLE}
+        detail={isProcessingPolling ? PROCESSING_BANNER_DETAIL : undefined}
       />
     )
   }

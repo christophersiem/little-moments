@@ -211,7 +211,7 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
           {highlightError ? <ErrorText>{highlightError}</ErrorText> : null}
 
           {groups.length === 0 ? (
-            <MemoriesEmptyState highlightsOnly={filters.highlightsOnly} onRecordMoment={() => navigate(APP_ROUTES.RECORD)} />
+            <MemoriesEmptyState highlightsOnly={filters.highlightsOnly} onRecordMoment={() => navigate(APP_ROUTES.record)} />
           ) : (
             <MemoriesTimeline
               groups={groups}

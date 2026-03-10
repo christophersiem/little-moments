@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { APP_ROUTES } from '../../../app/routes'
 import {
   setActiveUploadStatusFromPolling,
   retryActiveMemoryUpload,
@@ -75,7 +76,7 @@ export function useMemoriesProcessing({ reload }: UseMemoriesProcessingOptions) 
       return
     }
 
-    window.history.replaceState({}, '', '/memories')
+    window.history.replaceState({}, '', APP_ROUTES.memories)
   }, [activeUpload])
 
   const onRetryProcessing = () => {
