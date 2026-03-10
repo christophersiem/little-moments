@@ -4,14 +4,17 @@ import { MemoriesPage } from './MemoriesPage'
 import { renderWithProviders } from '../test/renderWithProviders'
 import type { MemoryListItem } from '../features/memories/types'
 
-const { usePaginatedMemoriesMock, useActiveMemoryUploadMock, useProcessingMemoryMock } = vi.hoisted(() => ({
-  usePaginatedMemoriesMock: vi.fn(),
+const { useMemoriesMock, useActiveMemoryUploadMock, useProcessingMemoryMock } = vi.hoisted(() => ({
+  useMemoriesMock: vi.fn(),
   useActiveMemoryUploadMock: vi.fn(),
   useProcessingMemoryMock: vi.fn(),
 }))
 
+vi.mock('../features/memories/hooks/useMemories', () => ({
+  useMemories: useMemoriesMock,
+}))
+
 vi.mock('../features/memories/hooks/usePaginatedMemories', () => ({
-  usePaginatedMemories: usePaginatedMemoriesMock,
   updateMemoryHighlightInCache: vi.fn(),
 }))
 
@@ -43,9 +46,9 @@ function buildItem(overrides: Partial<MemoryListItem>): MemoryListItem {
 }
 
 function setDefaultHookState(items: MemoryListItem[] = []) {
-  usePaginatedMemoriesMock.mockReturnValue({
-    items,
-    loadingInitial: false,
+  useMemoriesMock.mockReturnValue({
+    memories: items,
+    loading: false,
     loadingMore: false,
     error: '',
     loadMoreError: '',
@@ -68,9 +71,9 @@ function setDefaultHookState(items: MemoryListItem[] = []) {
 describe('MemoriesPage', () => {
   it('renders loading state', () => {
     setDefaultHookState()
-    usePaginatedMemoriesMock.mockReturnValue({
-      items: [],
-      loadingInitial: true,
+    useMemoriesMock.mockReturnValue({
+      memories: [],
+      loading: true,
       loadingMore: false,
       error: '',
       loadMoreError: '',
