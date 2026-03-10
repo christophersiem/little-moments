@@ -76,7 +76,7 @@ const RecordAnchor = styled.div`
 
 const RecordingMeta = styled.div`
   position: absolute;
-  top: calc(100% + ${({ theme }) => theme.space.x4});
+  top: calc(100% + ${({ theme }) => theme.space.x5});
   left: 50%;
   transform: translateX(-50%);
   width: min(320px, calc(100dvw - 48px));
@@ -88,9 +88,9 @@ const RecordingMeta = styled.div`
 `
 
 const Timer = styled.div`
-  font-size: calc(${({ theme }) => theme.typography.timerSize} - 0.85rem);
+  font-size: calc(${({ theme }) => theme.typography.timerSize} - 1.2rem);
   letter-spacing: 0.08em;
-  color: ${({ theme }) => theme.colors.text};
+  color: ${({ theme }) => `color-mix(in srgb, ${theme.colors.text} 88%, ${theme.colors.textMuted})`};
 `
 
 const BodyText = styled.p<{ $dimmed: boolean; $reducedMotion: boolean }>`
