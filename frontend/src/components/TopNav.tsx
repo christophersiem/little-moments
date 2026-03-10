@@ -38,7 +38,7 @@ const NavIcon = styled.svg`
 `
 
 const NavLabel = styled.span`
-  font-size: 0.78rem;
+  font-size: 0.6rem;
   letter-spacing: 0.01em;
 `
 
@@ -54,7 +54,7 @@ const NavButton = styled.button<{ $active: boolean; $dimmed: boolean }>`
       ? `linear-gradient(180deg, color-mix(in srgb, ${theme.colors.surface} 90%, #fff), color-mix(in srgb, ${theme.colors.surfaceStrong} 88%, ${theme.colors.background}))`
       : 'transparent'};
   color: ${({ theme, $active }) => ($active ? theme.colors.accentStrong : `color-mix(in srgb, ${theme.colors.textMuted} 82%, ${theme.colors.text})`)};
-  padding: 7px 6px 8px;
+  padding: 8px 6px 6px;
   cursor: pointer;
   opacity: ${({ $dimmed }) => ($dimmed ? 0.58 : 1)};
   transition: background-color 160ms ease, color 160ms ease, opacity 160ms ease, transform 160ms ease;
