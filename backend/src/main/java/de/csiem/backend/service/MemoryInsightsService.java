@@ -22,6 +22,15 @@ public class MemoryInsightsService {
     private static final Pattern JSON_SUMMARY_PATTERN = Pattern.compile("\"summary\"\\s*:\\s*\"((?:\\\\.|[^\\\"])*)\"", Pattern.CASE_INSENSITIVE);
     private static final Pattern LEADING_LIST_PATTERN = Pattern.compile("^(?:[-*]|\\d+[.)])\\s*");
     private static final Pattern FIRST_SENTENCE_PATTERN = Pattern.compile("^(.+?[.!?])(?:\\s+.*)?$");
+    private static final Pattern SUMMARY_META_LEADIN_PATTERN = Pattern.compile(
+        "(?i)^(?:transcript says|the transcript describes|according to (?:the )?(?:transcript|recording)|im transkript|laut dem transkript)\\s*[:,-]?\\s*"
+    );
+    private static final Pattern MILESTONE_TRANSCRIPT_PATTERN = Pattern.compile(
+        "(?i)(?:\\bfirst(?:\\s+time)?\\b|for the first time|\\bfull\\s+sentences?\\b|\\bcomplete\\s+sentences?\\b|\\bwithout prompting\\b|\\bzum ersten mal\\b|\\berstmals?\\b|\\bganze[nsr]?\\s+s(?:a|ä)tze?\\b|\\bohne aufforderung\\b)"
+    );
+    private static final Pattern MILESTONE_TITLE_PATTERN = Pattern.compile(
+        "(?i)(?:\\bfirst\\b|\\berst(?:e|er|es)?(?:mal)?\\b|\\bsentence\\b|\\bsatz\\b|\\bwithout prompting\\b|\\bohne aufforderung\\b|\\bmilestone\\b)"
+    );
 
     // Title/Summary generation rules for Reduced MVP:
     // - title: specific, timeline-friendly, max 10 words, avoid generic filler terms
@@ -45,10 +54,15 @@ public class MemoryInsightsService {
           - Do NOT add emotion, intent, developmental meaning, or context not directly stated.
           - Keep uncertainty words if present (e.g., maybe, perhaps, not sure, vielleicht).
         - Title: 2-6 words, max 6 words. Make it specific and scannable.
-          - Describe the concrete moment (what happened).
+          - Describe the concrete moment (what happened), not just a quote.
+          - Prioritize milestones/first-time events over objects or catchphrases.
+          - If transcript mentions first-time or full-sentence behavior, reflect that in the title.
           - Avoid generic words like "moment", "memory", "today".
           - The title value must be plain text only: no surrounding quotes, no backslashes, no JSON snippets.
         - Summary: exactly 1 sentence, max 22 words, factual and literal.
+          - Write naturally as a memory description, not as meta commentary.
+          - Do NOT reference transcripts, recordings, prompts, AI, or model behavior.
+          - Never start with phrases like "Transcript says", "The transcript describes", or "According to...".
           - Stay neutral for low-information / test / noisy transcripts.
           - No advice, diagnosis, speculation, or embellishment.
 
@@ -56,7 +70,7 @@ public class MemoryInsightsService {
         Input transcript:
         "At breakfast, he asked for more apples and said the full sentence without prompting."
         Output:
-        {"title":"Asked for more apples","summary":"He asked for more apples in a full sentence at breakfast."}
+        {"title":"Asked in a full sentence","summary":"He asked for more apples in a full sentence at breakfast."}
 
         Input transcript:
         "Test eins, zwei, drei."
@@ -68,6 +82,8 @@ public class MemoryInsightsService {
     private static final String JSON_RETRY_NOTE = "Return ONLY valid JSON with exactly the keys \"title\" and \"summary\".";
     private static final String SPECIFIC_TITLE_RETRY_NOTE =
         "Your title is too generic. Make it concrete and timeline-friendly. Avoid words like moment, memory, today, nice, sweet, or a day.";
+    private static final String MILESTONE_TITLE_RETRY_NOTE =
+        "Your title misses the main milestone. Prioritize the first-time/full-sentence development in plain, concise words.";
     private static final Set<String> TITLE_GENERIC_PATTERNS = Set.of(
         "moment", "memory", "today", "a day", "nice", "sweet"
     );
@@ -182,7 +198,19 @@ public class MemoryInsightsService {
                 }
             }
 
-            if (processed.valid() && !processed.genericTitle()) {
+            if (processed.valid() && processed.missingMilestoneFocus()) {
+                String retryPrompt = basePrompt + "\n\n" + MILESTONE_TITLE_RETRY_NOTE;
+                ProcessedInsights milestoneRetry = parseAndValidateModelOutput(
+                    requestInsights(client, apiKey, model, retryPrompt),
+                    transcript,
+                    transcriptLanguage
+                );
+                if (milestoneRetry.valid()) {
+                    processed = milestoneRetry;
+                }
+            }
+
+            if (processed.valid() && !processed.genericTitle() && !processed.missingMilestoneFocus()) {
                 return processed.insights();
             }
             return null;
@@ -226,32 +254,33 @@ public class MemoryInsightsService {
         DetectedLanguage transcriptLanguage
     ) {
         if (modelJson == null || modelJson.isBlank()) {
-            return ProcessedInsights.invalid(false);
+            return ProcessedInsights.invalid(false, false);
         }
 
         String titleRaw = extractJsonValue(modelJson, JSON_TITLE_PATTERN);
         String summaryRaw = extractJsonValue(modelJson, JSON_SUMMARY_PATTERN);
         if (titleRaw.isBlank() || summaryRaw.isBlank()) {
-            return ProcessedInsights.invalid(false);
+            return ProcessedInsights.invalid(false, false);
         }
 
         String title = sanitizeTitle(titleRaw, transcript);
         String summary = sanitizeSummary(summaryRaw, transcript, title);
         if (title.isBlank() || summary.isBlank()) {
-            return ProcessedInsights.invalid(false);
+            return ProcessedInsights.invalid(false, false);
         }
         if (!isGroundedSummary(summary, transcript, transcriptLanguage)) {
-            return ProcessedInsights.invalid(false);
+            return ProcessedInsights.invalid(false, false);
         }
         if (containsUncertaintyMarker(transcript) && !containsUncertaintyMarker(summary)) {
-            return ProcessedInsights.invalid(false);
+            return ProcessedInsights.invalid(false, false);
         }
         if (!matchesLanguage(title, transcriptLanguage) || !matchesLanguage(summary, transcriptLanguage)) {
-            return ProcessedInsights.invalid(false);
+            return ProcessedInsights.invalid(false, false);
         }
 
         boolean genericTitle = isGenericTitle(title);
-        return new ProcessedInsights(new MemoryInsights(title, summary), true, genericTitle);
+        boolean missingMilestoneFocus = transcriptSignalsMilestone(transcript) && !titleCapturesMilestone(title);
+        return new ProcessedInsights(new MemoryInsights(title, summary), true, genericTitle, missingMilestoneFocus);
     }
 
     private String extractJsonValue(String json, Pattern pattern) {
@@ -372,8 +401,7 @@ public class MemoryInsightsService {
         if (literal.isBlank()) {
             return emptyTranscriptSummary(language);
         }
-        String withPrefix = (language == DetectedLanguage.GERMAN ? "Im Transkript: " : "Transcript says: ") + literal;
-        literal = limitSummaryWordCount(withPrefix, MAX_SUMMARY_WORDS);
+        literal = limitSummaryWordCount(literal, MAX_SUMMARY_WORDS);
         if (!literal.endsWith(".") && !literal.endsWith("!") && !literal.endsWith("?")) {
             literal = literal + ".";
         }
@@ -441,6 +469,7 @@ public class MemoryInsightsService {
         String summary = normalize(value)
             .replace('\n', ' ')
             .replace('\r', ' ');
+        summary = SUMMARY_META_LEADIN_PATTERN.matcher(summary).replaceFirst("");
         summary = LEADING_LIST_PATTERN.matcher(summary).replaceFirst("");
         summary = keepFirstSentence(summary);
         summary = limitSummaryWordCount(summary, MAX_SUMMARY_WORDS);
@@ -539,6 +568,22 @@ public class MemoryInsightsService {
             }
         }
         return false;
+    }
+
+    private boolean transcriptSignalsMilestone(String transcript) {
+        String normalizedTranscript = normalize(transcript);
+        if (normalizedTranscript.isBlank()) {
+            return false;
+        }
+        return MILESTONE_TRANSCRIPT_PATTERN.matcher(normalizedTranscript).find();
+    }
+
+    private boolean titleCapturesMilestone(String title) {
+        String normalizedTitle = normalize(title);
+        if (normalizedTitle.isBlank()) {
+            return false;
+        }
+        return MILESTONE_TITLE_PATTERN.matcher(normalizedTitle).find();
     }
 
     private List<String> splitWords(String text) {
@@ -661,17 +706,31 @@ public class MemoryInsightsService {
         Set<String> transcriptWordSet = Set.copyOf(transcriptWords);
         Set<String> stopWords = language == DetectedLanguage.GERMAN ? STOP_WORDS_DE : STOP_WORDS_EN;
 
+        int contentWords = 0;
+        int groundedContentWords = 0;
         int unsupportedContentWords = 0;
         for (String word : tokenize(summary)) {
             if (word.length() <= 2 || stopWords.contains(word) || word.matches("\\d+")) {
                 continue;
             }
+            contentWords++;
             if (!transcriptWordSet.contains(word)) {
                 unsupportedContentWords++;
+            } else {
+                groundedContentWords++;
             }
         }
 
-        return unsupportedContentWords == 0;
+        if (contentWords == 0) {
+            return false;
+        }
+        if (contentWords <= 4) {
+            return groundedContentWords >= 1 && unsupportedContentWords <= 2;
+        }
+
+        double groundedRatio = (double) groundedContentWords / (double) contentWords;
+        int allowedUnsupportedWords = Math.max(2, (int) Math.floor(contentWords * 0.60));
+        return groundedRatio >= 0.45 && unsupportedContentWords <= allowedUnsupportedWords;
     }
 
     private boolean containsUncertaintyMarker(String text) {
@@ -735,9 +794,9 @@ public class MemoryInsightsService {
     public record MemoryInsights(String title, String summary) {
     }
 
-    record ProcessedInsights(MemoryInsights insights, boolean valid, boolean genericTitle) {
-        static ProcessedInsights invalid(boolean genericTitle) {
-            return new ProcessedInsights(null, false, genericTitle);
+    record ProcessedInsights(MemoryInsights insights, boolean valid, boolean genericTitle, boolean missingMilestoneFocus) {
+        static ProcessedInsights invalid(boolean genericTitle, boolean missingMilestoneFocus) {
+            return new ProcessedInsights(null, false, genericTitle, missingMilestoneFocus);
         }
     }
 
