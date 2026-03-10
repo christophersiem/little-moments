@@ -88,7 +88,7 @@ const RecordingMeta = styled.div`
 `
 
 const Timer = styled.div`
-  font-size: ${({ theme }) => theme.typography.timerSize};
+  font-size: calc(${({ theme }) => theme.typography.timerSize} - 0.85rem);
   letter-spacing: 0.08em;
   color: ${({ theme }) => theme.colors.text};
 `
@@ -97,6 +97,14 @@ const BodyText = styled.p`
   max-width: 280px;
   color: ${({ theme }) => theme.colors.textMuted};
   font-size: ${({ theme }) => theme.typography.bodySize};
+`
+
+const StoppedHint = styled.p`
+  max-width: 320px;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+  opacity: 0.78;
+  text-align: center;
 `
 
 const HintBanner = styled.p`
@@ -111,13 +119,6 @@ const HintBanner = styled.p`
   font-size: ${({ theme }) => theme.typography.bodySize};
   line-height: ${({ theme }) => theme.typography.bodyLineHeight};
   text-align: center;
-`
-
-const PrivacyText = styled.p`
-  max-width: 320px;
-  color: ${({ theme }) => theme.colors.textMuted};
-  text-align: center;
-  font-size: ${({ theme }) => theme.typography.secondarySize};
 `
 
 const ErrorText = styled.p`
@@ -150,7 +151,8 @@ const ModalSheet = styled.section`
   padding: ${({ theme }) => theme.space.x4};
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.space.x3};
+  gap: ${({ theme }) => theme.space.x2};
+  text-align: left;
   box-shadow: ${({ theme }) => theme.shadows.sheet};
   animation: rise-in 220ms ease-out;
 `
@@ -163,10 +165,41 @@ const SheetHandle = styled.div`
   background: ${({ theme }) => theme.colors.border};
 `
 
+const SheetCopy = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.x1};
+  align-items: flex-start;
+`
+
+const SheetTitle = styled.h2`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.text};
+  font-size: 1.38rem;
+  line-height: 1.2;
+`
+
+const SheetSupportingText = styled.p`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.bodySize};
+  line-height: ${({ theme }) => theme.typography.bodyLineHeight};
+  max-width: 34ch;
+`
+
+const SheetNote = styled.p`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+  line-height: ${({ theme }) => theme.typography.bodyLineHeight};
+  opacity: 0.78;
+`
+
 const SheetActions = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.space.x2};
+  margin-top: ${({ theme }) => theme.space.x2};
 `
 
 export function RecordPage({ navigate, childId, onNavigationLockChange }: RecordPageProps) {
@@ -396,7 +429,7 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
               onStop={NOOP}
               diameter={stoppedButtonDiameter}
             />
-            <BodyText>Your recording is ready to save.</BodyText>
+            <StoppedHint>Your recording is ready to save.</StoppedHint>
           </Hero>
         </Stage>
 
@@ -406,9 +439,10 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
               <SheetHandle aria-hidden />
               {stopDecisionState === 'choice' ? (
                 <>
-                  <h2>Save this recording?</h2>
-                  <BodyText>Save now, or discard this moment.</BodyText>
-                  <PrivacyText>Audio is transcribed to text and not stored as audio.</PrivacyText>
+                  <SheetCopy>
+                    <SheetTitle>Save this recording?</SheetTitle>
+                    <SheetNote>Audio is transcribed to text and not stored as audio.</SheetNote>
+                  </SheetCopy>
                   <SheetActions>
                     <Button variant="primary" fullWidth autoFocus onClick={() => onStopDecision('save-selected')}>
                       Save recording
@@ -420,8 +454,10 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
                 </>
               ) : (
                 <>
-                  <h2>Discard this recording?</h2>
-                  <BodyText>This action cannot be undone.</BodyText>
+                  <SheetCopy>
+                    <SheetTitle>Discard this recording?</SheetTitle>
+                    <SheetSupportingText>This action cannot be undone.</SheetSupportingText>
+                  </SheetCopy>
                   <SheetActions>
                     <Button variant="danger" fullWidth autoFocus onClick={() => onStopDecision('discard-confirmed')}>
                       Yes, discard recording
