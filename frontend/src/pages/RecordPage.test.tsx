@@ -75,7 +75,7 @@ describe('RecordPage', () => {
     await user.click(screen.getByRole('button', { name: /start recording/i }))
     await waitFor(() => expect(screen.getByRole('button', { name: /stop recording/i })).toBeInTheDocument())
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 2200))
+      await new Promise((resolve) => setTimeout(resolve, 3200))
     })
     await user.click(screen.getByRole('button', { name: /stop recording/i }))
     await user.click(screen.getByRole('button', { name: /save recording/i }))
@@ -94,6 +94,9 @@ describe('RecordPage', () => {
 
     await user.click(screen.getByRole('button', { name: /start recording/i }))
     await waitFor(() => expect(screen.getByRole('button', { name: /stop recording/i })).toBeInTheDocument())
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 3200))
+    })
     await user.click(screen.getByRole('button', { name: /stop recording/i }))
     await user.click(screen.getByRole('button', { name: /discard recording/i }))
 
@@ -107,7 +110,24 @@ describe('RecordPage', () => {
     })
   })
 
-  it('returns to idle with hint when saving a too-short recording', async () => {
+  it('discards too-short recording immediately without confirm dialog', async () => {
+    const user = userEvent.setup()
+
+    renderWithProviders(<RecordPage navigate={vi.fn()} childId="child-1" />)
+
+    await user.click(screen.getByRole('button', { name: /start recording/i }))
+    await waitFor(() => expect(screen.getByRole('button', { name: /stop recording/i })).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: /stop recording/i }))
+    await user.click(screen.getByRole('button', { name: /discard recording/i }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('Discard this recording?')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /start recording/i })).toBeInTheDocument()
+      expect(startMemoryUploadMock).not.toHaveBeenCalled()
+    })
+  })
+
+  it('disables save for too-short recordings', async () => {
     const user = userEvent.setup()
     const navigate = vi.fn()
 
@@ -116,13 +136,13 @@ describe('RecordPage', () => {
     await user.click(screen.getByRole('button', { name: /start recording/i }))
     await waitFor(() => expect(screen.getByRole('button', { name: /stop recording/i })).toBeInTheDocument())
     await user.click(screen.getByRole('button', { name: /stop recording/i }))
-    await user.click(screen.getByRole('button', { name: /save recording/i }))
+    const saveButton = screen.getByRole('button', { name: /save recording/i })
+    expect(saveButton).toBeDisabled()
+    expect(screen.getByText(SHORT_TRANSCRIPT_MESSAGE)).toBeInTheDocument()
+    await user.click(saveButton)
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /start recording/i })).toBeInTheDocument()
-      expect(screen.getByRole('status')).toHaveTextContent(SHORT_TRANSCRIPT_MESSAGE)
-      expect(startMemoryUploadMock).not.toHaveBeenCalled()
-      expect(navigate).not.toHaveBeenCalled()
-    })
+    expect(startMemoryUploadMock).not.toHaveBeenCalled()
+    expect(navigate).not.toHaveBeenCalled()
+    expect(screen.getByText('Save this recording?')).toBeInTheDocument()
   })
 })
