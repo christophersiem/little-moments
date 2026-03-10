@@ -1,142 +1,106 @@
-# AGENTS.md — Little Moments (Reduced MVP)
+# AGENTS.md — Little Moments (Current MVP Guardrails)
 
-## Goal (Reduced MVP)
-Ship the smallest usable version:
-User records audio → app shows “Saving your moment…” → transcript saved → list + detail view.
-No feature beyond that until this is stable.
+## Goal
+Ship and stabilize the current MVP flow:
+record -> save -> processing -> list -> detail,
+with family sharing (owner/member roles) and invite links.
 
-Reference: Reduced MVP Scope – Little Moments (internal doc). Keep scope strictly aligned. :contentReference[oaicite:1]{index=1}
+## Scope Guardrails
+Build only what supports the current MVP directly.
 
-## Non-goals (Deliberately NOT building in this phase)
-- No audio playback
-- No audio file storage (no Supabase Storage bucket for audio)
-- No AI categorization / tags
-- No visual timeline
-- No semantic search / RAG
-- No monthly summaries
-- No sharing
-- No complex authentication (single-user mode only)
+Out of scope unless explicitly requested:
+- social/public sharing
+- analytics dashboards
+- medical/diagnostic interpretation
+- large architectural rewrites
 
-## Product flow (must match)
-Essential screens:
-1) Record Screen (one-tap start/stop, visible timer, no metadata)
-2) Processing State (“Saving your moment…”, clear loading)
-3) Saved Confirmation (short message + 1–2 lines transcript preview + CTA)
-4) Memories List (reverse chronological, date + 1–2 line snippet)
-5) Entry Detail (full transcript, timestamp, read-only)
-   :contentReference[oaicite:2]{index=2}
+## Current Runtime Architecture
+- Frontend: React + Vite + TypeScript
+- Backend: Spring Boot REST
+- Auth: frontend talks directly to Supabase Auth
+- App data: frontend -> backend `/api` -> Supabase Postgres/RPC
+- Audio: uploaded to backend for transcription; not stored in default flow
 
-## Repo structure (expected)
-- frontend/   (React + Vite)
-- backend/    (Spring Boot)
-- docs/       (spec + decisions)
-- AGENTS.md
+## Current Core Flows
+- Record: idle -> recording -> stopped -> save/discard
+- Save: starts upload only after explicit save, then navigates to `/memories`
+- Memories page: shows processing banner/pending item and polls status
+- Detail page: owner can edit title/date/transcript/tags and delete; member is read-only
+- Family page: owner manages invites and member roles; member can only view
+
+## Routes
+- `/record`
+- `/memories`
+- `/memories/:id`
+- `/onboarding`
+- `/invite/accept`
+- `/settings`
+- `/settings/account`
+- `/settings/family`
+- `/settings/privacy`
+
+## Repo Structure
+- `frontend/`
+- `backend/`
+- `docs/`
+- `AGENTS.md`
 
 ## Commands
 
-### Frontend (Vite + React)
-- Install: cd frontend && npm install
-- Dev: cd frontend && npm run dev
-- Build: cd frontend && npm run build
-- Test: cd frontend && npm run test
-- Lint: cd frontend && npm run lint
+### Frontend
+- Install: `cd frontend && npm install`
+- Dev: `cd frontend && npm run dev`
+- Build: `cd frontend && npm run build`
+- Test: `cd frontend && npm run test`
+- Lint: `cd frontend && npm run lint`
 
-## Architecture & Conventions
+### Backend
+- Build: `cd backend && ./mvnw -q clean package`
+- Dev: `cd backend && ./mvnw spring-boot:run`
+- Test: `cd backend && ./mvnw test`
 
-### Frontend (React + Vite)
-- No feature logic in App.jsx. App.jsx only defines routes/layout.
-- Use folder structure:
-  - src/app/ (routing, providers)
-  - src/pages/ (route-level screens)
-  - src/components/ (reusable UI)
-  - src/features/memories/ (feature module: api, hooks, components)
-  - src/lib/ (http client, utils)
-  - src/styles/ (global styles)
-- New pages must be in src/pages and imported via router.
-### Frontend language
-- Migrate frontend to TypeScript.
-- New code must be TypeScript (.ts/.tsx). Do not add new .js/.jsx files.
-- Add strict-ish typing (at least noImplicitAny), and type public boundaries (API responses, props, hooks).
+## Engineering Conventions
 
-### Backend (Spring Boot)
-- Enforce layered architecture:
-  - controller/ (REST endpoints, DTO mapping, validation)
-  - service/ (business logic)
-  - repository/ (Spring Data JPA)
-  - model/ (entities)
-  - dto/ (request/response DTOs)
-  - config/ (CORS, security, beans)
-  - exception/ (error handling, ProblemDetails)
-- Controllers must not access repositories directly.
-- Services are the only layer allowed to call repositories.
-- Use constructor injection only.
+### Frontend
+- Keep `App.tsx` focused on routing/bootstrap/layout; feature logic belongs in `features/*` and pages.
+- New code in TypeScript only (`.ts` / `.tsx`).
+- Keep feature boundaries typed (API responses, hooks, component props).
+- Use existing structure:
+  - `src/app/`
+  - `src/pages/`
+  - `src/components/`
+  - `src/features/*`
+  - `src/lib/`
+  - `src/styles/`
 
-### Naming
-- MemoryController, MemoryService, MemoryRepository
-- DTOs: CreateMemoryRequest, MemoryResponse
+### Backend
+- Layered architecture:
+  - `controller/`
+  - `service/`
+  - `repository/`
+  - `model/`
+  - `dto/`
+  - `config/`
+  - `exception/`
+- Controllers do not access repositories directly.
+- Constructor injection only.
 
-### Backend (Spring Boot)
-- Build: cd backend && ./mvnw -q clean package
-- Dev: cd backend && ./mvnw spring-boot:run
-- Test: cd backend && ./mvnw test
+## Data and Security Rules
+- Supabase SQL files in `docs/sql/*.sql` are schema/RLS/RPC source of truth.
+- RLS is authoritative for data access.
+- Owner/member checks must be enforced server-side (RPC/RLS/backend), not only UI-side.
 
-## Backend responsibilities (Reduced MVP)
-1) Ephemeral audio handling
-- Client sends audio blob to backend
-- Backend forwards audio directly to Speech-to-Text API
-- Audio is not stored; discarded after transcription
+## Docs Maintenance Rule
+When behavior changes, update docs in the same PR:
+- API changes -> `docs/api.md`
+- schema/RLS/RPC changes -> `docs/sql/*` + `docs/data-model.md`
+- UX flow changes -> `docs/ui-flows.md` and relevant `docs/specs/*`
+- architecture/env changes -> `docs/tech.md`
 
-2) Entry lifecycle
-- On upload: create memory with status=PROCESSING
-- On success: store transcript, status=READY
-- On failure: status=FAILED + error_message
+See `docs/README.md` for documentation ownership and source-of-truth mapping.
 
-3) Retrieval
-- GET /memories (paginated, newest first)
-- GET /memories/:id
-
-Auth: single-user mode (no full auth flows).
-:contentReference[oaicite:3]{index=3}
-
-## Minimal data model (Postgres)
-users:
-- id (uuid)
-- email (optional)
-- created_at
-
-memories:
-- id (uuid)
-- user_id (uuid)
-- created_at
-- recorded_at
-- transcript (text)
-- status (PROCESSING | READY | FAILED)
-- error_message (nullable text)
-  :contentReference[oaicite:4]{index=4}
-
-[//]: # (## API contract &#40;Reduced MVP&#41;)
-- POST /memories
-  - multipart/form-data with audio blob OR raw bytes (implementation choice)
-  - response: { id, status }
-- GET /memories?page=&size=
-- GET /memories/{id}
-
-## Frontend routes (Reduced MVP)
-- /record (default)
-- /memories
-- /memories/:id
-  :contentReference[oaicite:5]{index=5}
-
-## Implementation rules for Codex
-- Keep PRs small and vertical-slice oriented (end-to-end per feature).
-- Prefer explicit status handling over cleverness.
-- Any new feature must be justified by the Reduced MVP doc; otherwise reject it.
-- Add basic error states + retry where needed (especially on upload/transcription).
-- Update docs/ if any assumption changes.
-
-## Definition of Done (for any task)
-- Compiles (frontend build + backend package)
-- Basic happy path works end-to-end:
-  record → processing → saved → list → detail
-- Handles failure states (FAILED + error message)
-- No audio stored server-side or in DB/storage
+## Definition of Done
+- Frontend and backend compile.
+- Happy path works end-to-end.
+- Failure states are handled with user-facing feedback.
+- No undocumented behavior drift between code and docs.

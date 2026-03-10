@@ -1,40 +1,57 @@
-# AI Prompts (MVP)
+# AI Prompting Notes (Current)
 
-## 1. Structuring Prompt
+## 1) Memory Insights Prompt (title + summary)
 
-System:
-You are an assistant that structures short parental memory transcripts.
+Used in backend `MemoryInsightsService` to generate structured metadata from transcript text.
 
-User Input:
-Raw transcript text.
-
-Expected JSON Output:
+Expected JSON output:
+```json
 {
-"title": "...",
-"summary": "...",
-"tags": ["..."],
-"child_age_months": 24,
-"mood": "joyful"
+  "title": "...",
+  "summary": "..."
 }
+```
 
-Rules:
-- Title max 8 words
-- Summary max 3 sentences
-- Tags 3–6 items
-- No medical interpretation
-- No speculation beyond transcript
+Key enforced rules:
+- Title should be specific and timeline-friendly.
+- Title max 10 words; avoid generic fillers (`moment`, `memory`, `today`, etc.).
+- Summary must be one sentence, max ~22 words.
+- Summary should include what happened + why it mattered (without speculation).
+- Output must be valid JSON only.
 
----
+Post-processing and validation:
+- JSON parsing with one retry if invalid.
+- Generic-title detection and one retry for specificity.
+- Deterministic cleanup for length and language consistency.
 
-## 2. Monthly Summary Prompt
+## 2) Memory Splitting Prompt
 
-Input:
-All summaries from one month.
+Used by splitter service to detect multiple distinct moments in one transcript.
 
-Output:
-- Short reflective paragraph
-- 3 bullet highlight moments
+Expected JSON output:
+```json
+{
+  "memories": [
+    {
+      "excerpt": "string",
+      "date_text": "string | null",
+      "confidence": 0.0
+    }
+  ]
+}
+```
 
-Tone:
-Warm but concise.
-Not sentimental exaggeration.
+Key rules:
+- Split only when events are clearly distinct.
+- Keep contiguous transcript excerpts.
+- Cap number of splits and ignore tiny fragments.
+- When uncertain, return a single memory.
+
+Date resolution is deterministic in Java (not delegated to model output).
+
+## 3) Tag Assignment
+
+Tags are currently assigned by backend keyword heuristics (`MemoryTaggingService`), not by LLM prompt.
+
+## Out of Scope
+- Monthly summary generation prompt is not active in current runtime flow.

@@ -1,4 +1,4 @@
-# Spec — Stop Recording: Save vs Discard (Reduced MVP)
+# Spec — Stop Recording: Save vs Discard
 
 ## Goal
 When user taps "Stop recording", they must choose between:
@@ -18,11 +18,12 @@ When user taps "Stop recording", they must choose between:
 
 3b) If user taps "Save"
 - Close modal
-- Transition to "Saving your moment..." state
-- Upload audio to backend
+- Start upload to backend
+- Navigate immediately to `/memories`
+- Show non-blocking processing banner in list view
 - Backend starts transcription only after Save (no transcription before)
-- On success: show saved confirmation + transcript preview
-- On failure: show error + retry (retry re-uploads same audio if still available)
+- On success: pending item resolves to READY in list/detail
+- On failure: show error banner + retry (re-upload if local audio still available)
 
 ## State Rules
 - No transcription request is made until user selects "Save".
@@ -30,7 +31,8 @@ When user taps "Stop recording", they must choose between:
 - Back navigation during choice modal returns to recording stopped state (audio retained) unless Discard confirmed.
 
 ## Acceptance Criteria
-- Stop always shows Save/Discard choice
-- Discard always asks for confirmation
-- Save triggers backend request and shows processing UI
-- No backend call happens if user discards
+- Stop always shows Save/Discard choice.
+- Discard always asks for confirmation.
+- Save triggers backend request only after user confirmation.
+- User is routed to `/memories` after save and sees processing state there.
+- No backend call happens if user discards.

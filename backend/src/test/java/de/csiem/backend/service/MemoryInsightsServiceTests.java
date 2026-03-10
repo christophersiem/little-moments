@@ -3,103 +3,223 @@ package de.csiem.backend.service;
 import de.csiem.backend.config.AppProperties;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MemoryInsightsServiceTests {
 
-    @Test
-    void generatesGermanFallbackMetadataForGermanTranscript() {
+    private static final String BREAKFAST_TRANSCRIPT =
+        "Yesterday at breakfast, he surprised me by asking for more apples using full sentences.";
+    private static final String GROUNDED_BREAKFAST_SUMMARY =
+        "At breakfast, he was asking for more apples using full sentences.";
+
+    private MemoryInsightsService fallbackOnlyService() {
         AppProperties properties = new AppProperties();
         properties.getInsights().setEnabled(false);
+        return new MemoryInsightsService(properties);
+    }
 
-        MemoryInsightsService service = new MemoryInsightsService(properties);
-        MemoryInsightsService.MemoryInsights insights = service.generate(
-            "Heute waren wir im Zoo und unser Kind hat zum ersten Mal den Löwen erkannt."
-        );
+    private MemoryInsightsService parsingService() {
+        return new MemoryInsightsService(new AppProperties());
+    }
+
+    @Test
+    void generatesNeutralLiteralSummaryForTestRecording() {
+        MemoryInsightsService.MemoryInsights insights = fallbackOnlyService().generate("Test eins, zwei, drei.");
 
         assertFalse(insights.title().isBlank());
-        assertTrue(insights.summary().startsWith("Ein besonderer Moment"));
-        assertFalse(insights.summary().startsWith("A meaningful moment"));
+        assertEquals("Kurze Testaufnahme: \"Test eins, zwei, drei\"", insights.summary());
+        assertFalse(insights.summary().toLowerCase().contains("freud"));
+        assertFalse(insights.summary().toLowerCase().contains("entwicklung"));
     }
 
     @Test
-    void generatesEnglishFallbackMetadataForEnglishTranscript() {
-        AppProperties properties = new AppProperties();
-        properties.getInsights().setEnabled(false);
-
-        MemoryInsightsService service = new MemoryInsightsService(properties);
-        MemoryInsightsService.MemoryInsights insights = service.generate(
-            "Today we went to the park and she climbed the slide all by herself."
-        );
+    void generatesLiteralSummaryForShortFactualMemory() {
+        String transcript = "Today she stacked four blocks on her own.";
+        MemoryInsightsService.MemoryInsights insights = fallbackOnlyService().generate(transcript);
 
         assertFalse(insights.title().isBlank());
-        assertTrue(insights.summary().startsWith("A meaningful moment"));
+        assertTrue(insights.summary().contains("stacked four blocks"));
     }
 
     @Test
-    void marksGenericTitlesSoCallerCanRetryWithSpecificPrompt() {
+    void keepsExplicitEmotionOnlyWhenItIsInTranscript() {
+        String transcript = "He said he was happy after finishing the puzzle.";
+        MemoryInsightsService.MemoryInsights insights = fallbackOnlyService().generate(transcript);
+
+        assertTrue(insights.summary().toLowerCase().contains("happy"));
+    }
+
+    @Test
+    void keepsVagueTranscriptVagueWithoutAddedMeaning() {
+        String transcript = "We had a day outside and did things together.";
+        MemoryInsightsService.MemoryInsights insights = fallbackOnlyService().generate(transcript);
+
+        assertTrue(insights.summary().contains("did things together"));
+        assertFalse(insights.summary().toLowerCase().contains("confidence"));
+        assertFalse(insights.summary().toLowerCase().contains("development"));
+    }
+
+    @Test
+    void handlesEmptyTranscriptSafely() {
+        MemoryInsightsService.MemoryInsights insights = fallbackOnlyService().generate("   ");
+
+        assertEquals("Untitled Memory", insights.title());
+        assertEquals("No clear spoken memory in the transcript.", insights.summary());
+    }
+
+    @Test
+    void generatesNeutralSummaryForNoisyTranscript() {
+        MemoryInsightsService.MemoryInsights insights = fallbackOnlyService().generate("um uh hmm ah");
+
+        assertFalse(insights.title().isBlank());
+        assertEquals("Short recording: \"um uh hmm ah\"", insights.summary());
+        assertFalse(insights.summary().toLowerCase().contains("emotion"));
+    }
+
+    @Test
+    void preservesUncertaintyInSummary() {
+        String transcript = "Maybe she said apple, I'm not sure.";
+        MemoryInsightsService.MemoryInsights insights = fallbackOnlyService().generate(transcript);
+
+        assertTrue(insights.summary().toLowerCase().contains("maybe"));
+        assertTrue(insights.summary().toLowerCase().contains("not sure"));
+    }
+
+    @Test
+    void acceptsReasonablyGroundedParaphrasedSummary() {
+        MemoryInsightsService.ProcessedInsights processed = parsingService().postProcessModelOutputForTest(
+            "{\"title\":\"Asked for more apples\",\"summary\":\"At breakfast, he requested extra apples in a full sentence.\"}",
+            BREAKFAST_TRANSCRIPT
+        );
+
+        assertTrue(processed.valid());
+        assertEquals("At breakfast, he requested extra apples in a full sentence.", processed.insights().summary());
+    }
+
+    @Test
+    void flagsTitleThatMissesMilestoneFocus() {
+        MemoryInsightsService.ProcessedInsights processed = parsingService().postProcessModelOutputForTest(
+            "{\"title\":\"Asked for more apples\",\"summary\":\"At breakfast, he was asking for more apples using full sentences.\"}",
+            BREAKFAST_TRANSCRIPT
+        );
+
+        assertTrue(processed.valid());
+        assertTrue(processed.missingMilestoneFocus());
+    }
+
+    @Test
+    void acceptsMilestoneFocusedTitle() {
+        MemoryInsightsService.ProcessedInsights processed = parsingService().postProcessModelOutputForTest(
+            "{\"title\":\"First full sentence at breakfast\",\"summary\":\"At breakfast, he was asking for more apples using full sentences.\"}",
+            BREAKFAST_TRANSCRIPT
+        );
+
+        assertTrue(processed.valid());
+        assertFalse(processed.missingMilestoneFocus());
+    }
+
+    @Test
+    void acceptsMilestoneFocusedTitleWithPluralOrErstmalsWording() {
+        MemoryInsightsService.ProcessedInsights english = parsingService().postProcessModelOutputForTest(
+            "{\"title\":\"First full sentences at breakfast\",\"summary\":\"At breakfast, he was asking for more apples using full sentences.\"}",
+            BREAKFAST_TRANSCRIPT
+        );
+        MemoryInsightsService.ProcessedInsights german = parsingService().postProcessModelOutputForTest(
+            "{\"title\":\"Erstmals ganze Sätze\",\"summary\":\"Beim Frühstück bat er erstmals in ganzen Sätzen um mehr Äpfel.\"}",
+            "Beim Frühstück bat er erstmals in ganzen Sätzen um mehr Äpfel."
+        );
+
+        assertTrue(english.valid());
+        assertFalse(english.missingMilestoneFocus());
+        assertTrue(german.valid());
+        assertFalse(german.missingMilestoneFocus());
+    }
+
+    @Test
+    void stripsTranscriptSaysLeadInFromModelSummary() {
+        MemoryInsightsService.ProcessedInsights processed = parsingService().postProcessModelOutputForTest(
+            "{\"title\":\"Asked for more apples\",\"summary\":\"Transcript says: At breakfast, he was asking for more apples using full sentences.\"}",
+            BREAKFAST_TRANSCRIPT
+        );
+
+        assertTrue(processed.valid());
+        assertEquals("At breakfast, he was asking for more apples using full sentences.", processed.insights().summary());
+    }
+
+    @Test
+    void stripsListPrefixBeforeTranscriptMetaLeadIn() {
+        MemoryInsightsService.ProcessedInsights processed = parsingService().postProcessModelOutputForTest(
+            "{\"title\":\"Asked for more apples\",\"summary\":\"- Transcript says: At breakfast, he was asking for more apples using full sentences.\"}",
+            BREAKFAST_TRANSCRIPT
+        );
+
+        assertTrue(processed.valid());
+        assertEquals("At breakfast, he was asking for more apples using full sentences.", processed.insights().summary());
+    }
+
+    @Test
+    void rejectsUngroundedModelSummary() {
         AppProperties properties = new AppProperties();
         MemoryInsightsService service = new MemoryInsightsService(properties);
 
         String modelJson = """
-            {"title":"Sweet memory today","summary":"She asked for apples in a full sentence, and it felt like a clear language step."}
+            {"title":"Testaufnahme","summary":"Er freute sich sehr und zeigte eine starke Entwicklung."}
             """;
 
         MemoryInsightsService.ProcessedInsights processed = service.postProcessModelOutputForTest(
             modelJson,
-            "At breakfast she asked for more apples in a full sentence and smiled."
+            "Test eins, zwei, drei."
         );
 
-        assertTrue(processed.valid());
-        assertTrue(processed.genericTitle());
-        assertNotNull(processed.insights());
+        assertFalse(processed.valid());
+        assertNotNull(processed);
     }
 
     @Test
-    void enforcesSingleSentenceAndWordLimitForSummary() {
-        AppProperties properties = new AppProperties();
-        MemoryInsightsService service = new MemoryInsightsService(properties);
-
-        String modelJson = """
-            {"title":"First full sentence at breakfast","summary":"She independently asked for more apples in a full sentence and clapped with joy while everyone smiled around the table. Another sentence that should be removed."}
-            """;
-
-        MemoryInsightsService.ProcessedInsights processed = service.postProcessModelOutputForTest(
-            modelJson,
-            "At breakfast she asked for more apples in a full sentence and clapped for herself."
+    void keepsCleanTitleForSimpleModelOutput() {
+        MemoryInsightsService.ProcessedInsights processed = parsingService().postProcessModelOutputForTest(
+            "{\"title\":\"More Apples Please\",\"summary\":\"" + GROUNDED_BREAKFAST_SUMMARY + "\"}",
+            BREAKFAST_TRANSCRIPT
         );
 
         assertTrue(processed.valid());
-        assertNotNull(processed.insights());
-        String summary = processed.insights().summary();
-        assertFalse(summary.contains("Another sentence"));
-        assertFalse(summary.contains("\n"));
-        assertFalse(summary.toLowerCase().contains("independently"));
-        assertFalse(summary.toLowerCase().contains("atmosphere"));
-        assertTrue(summary.endsWith("."));
-        assertTrue(summary.split("\\s+").length <= 22);
+        assertEquals("More Apples Please", processed.insights().title());
+        assertFalse(processed.insights().title().contains("\\"));
     }
 
     @Test
-    void trimsTitleToMaximumWordCount() {
-        AppProperties properties = new AppProperties();
-        MemoryInsightsService service = new MemoryInsightsService(properties);
-
-        String modelJson = """
-            {"title":"A very special and beautiful little morning memory about apples and clapping together today","summary":"She asked clearly for apples and clapped for herself, which showed new confidence at breakfast."}
-            """;
-
-        MemoryInsightsService.ProcessedInsights processed = service.postProcessModelOutputForTest(
-            modelJson,
-            "At breakfast she asked for apples and clapped."
+    void stripsSurroundingQuotesFromGeneratedTitle() {
+        MemoryInsightsService.ProcessedInsights processed = parsingService().postProcessModelOutputForTest(
+            "{\"title\":\"\\\"More Apples, Please.\\\"\",\"summary\":\"" + GROUNDED_BREAKFAST_SUMMARY + "\"}",
+            BREAKFAST_TRANSCRIPT
         );
 
         assertTrue(processed.valid());
-        assertNotNull(processed.insights());
-        assertTrue(processed.insights().title().split("\\s+").length <= 10);
-        assertFalse(processed.insights().title().toLowerCase().contains("memory"));
-        assertFalse(processed.insights().title().toLowerCase().contains("today"));
+        assertEquals("More Apples, Please.", processed.insights().title());
+    }
+
+    @Test
+    void stripsTrailingBackslashFromGeneratedTitle() {
+        MemoryInsightsService.ProcessedInsights processed = parsingService().postProcessModelOutputForTest(
+            "{\"title\":\"More Apples, Please.\\\\\",\"summary\":\"" + GROUNDED_BREAKFAST_SUMMARY + "\"}",
+            BREAKFAST_TRANSCRIPT
+        );
+
+        assertTrue(processed.valid());
+        assertEquals("More Apples, Please.", processed.insights().title());
+    }
+
+    @Test
+    void extractsTitleWhenModelReturnsJsonSnippetAsTitleValue() {
+        MemoryInsightsService.ProcessedInsights processed = parsingService().postProcessModelOutputForTest(
+            "{\"title\":\"{\\\"title\\\":\\\"More Apples, Please.\\\"}\",\"summary\":\"" + GROUNDED_BREAKFAST_SUMMARY + "\"}",
+            BREAKFAST_TRANSCRIPT
+        );
+
+        assertTrue(processed.valid());
+        assertEquals("More Apples, Please.", processed.insights().title());
     }
 }

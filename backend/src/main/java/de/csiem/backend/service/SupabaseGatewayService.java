@@ -237,7 +237,11 @@ public class SupabaseGatewayService {
             .build(true)
             .toUriString();
 
-        callPost(uri, body, authorizationHeader, "resolution=merge-duplicates,return=minimal");
+        callPost(uri, body, authorizationHeader, profileEnsurePreferHeader());
+    }
+
+    String profileEnsurePreferHeader() {
+        return "resolution=ignore-duplicates,return=minimal";
     }
 
     public ProfileResponse getOwnProfile(String authorizationHeader) {
@@ -538,7 +542,8 @@ public class SupabaseGatewayService {
         String familyId,
         String fromRecordedAtIso,
         String toRecordedAtIso,
-        List<String> tags
+        List<String> tags,
+        boolean highlightsOnly
     ) {
         UriComponentsBuilder builder = UriComponentsBuilder
             .fromPath("/rest/v1/memories")
@@ -547,7 +552,15 @@ public class SupabaseGatewayService {
             .queryParam("offset", offset)
             .queryParam("limit", limit);
 
-        applyMemoryFilters(builder, authorizationHeader, familyId, fromRecordedAtIso, toRecordedAtIso, tags);
+        applyMemoryFilters(
+            builder,
+            authorizationHeader,
+            familyId,
+            fromRecordedAtIso,
+            toRecordedAtIso,
+            tags,
+            highlightsOnly
+        );
         return callGet(builder.build().encode().toUri(), authorizationHeader);
     }
 
@@ -556,13 +569,22 @@ public class SupabaseGatewayService {
         String familyId,
         String fromRecordedAtIso,
         String toRecordedAtIso,
-        List<String> tags
+        List<String> tags,
+        boolean highlightsOnly
     ) {
         UriComponentsBuilder builder = UriComponentsBuilder
             .fromPath("/rest/v1/memories")
             .queryParam("select", "id");
 
-        applyMemoryFilters(builder, authorizationHeader, familyId, fromRecordedAtIso, toRecordedAtIso, tags);
+        applyMemoryFilters(
+            builder,
+            authorizationHeader,
+            familyId,
+            fromRecordedAtIso,
+            toRecordedAtIso,
+            tags,
+            highlightsOnly
+        );
         JsonNode rows = callGet(builder.build().encode().toUri(), authorizationHeader);
         if (!rows.isArray()) {
             return 0L;
@@ -878,7 +900,8 @@ public class SupabaseGatewayService {
         String familyId,
         String fromRecordedAtIso,
         String toRecordedAtIso,
-        List<String> tags
+        List<String> tags,
+        boolean highlightsOnly
     ) {
         if (StringUtils.hasText(familyId)) {
             List<String> childIds = listChildIdsForFamily(authorizationHeader, familyId);
@@ -899,6 +922,9 @@ public class SupabaseGatewayService {
             if (StringUtils.hasText(tagFilter)) {
                 builder.queryParam("tags", tagFilter);
             }
+        }
+        if (highlightsOnly) {
+            builder.queryParam("is_highlight", "eq.true");
         }
     }
 
@@ -972,7 +998,7 @@ public class SupabaseGatewayService {
     }
 
     private String memorySelect() {
-        return "id,created_at,recorded_at,status,title,summary,transcript,error_message,tags,audio_path,audio_mime_type,audio_size_bytes,audio_duration_seconds";
+        return "id,created_at,recorded_at,status,is_highlight,title,summary,transcript,error_message,tags,audio_path,audio_mime_type,audio_size_bytes,audio_duration_seconds";
     }
 
     private record SupabaseUser(String id, String email) {

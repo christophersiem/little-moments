@@ -137,12 +137,18 @@ export function AuthGate({ configurationError }: AuthGateProps) {
     setIsSubmitting(true)
     try {
       if (mode === 'login') {
-        const { error: loginError } = await supabase.auth.signInWithPassword({
+        const { data, error: loginError } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password,
         })
         if (loginError) {
           setError(loginError.message)
+        } else if (data.user) {
+          try {
+            await ensureOwnProfileForSession(data.user)
+          } catch {
+            // Profile sync should not block sign-in.
+          }
         }
       } else {
         const { data, error: registerError } = await supabase.auth.signUp({
@@ -205,7 +211,7 @@ export function AuthGate({ configurationError }: AuthGateProps) {
             </FieldWrap>
             {mode === 'register' && (
               <FieldWrap>
-                Display name
+                Your name
                 <Input
                   type="text"
                   name="displayName"

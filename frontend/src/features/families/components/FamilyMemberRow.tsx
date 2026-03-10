@@ -1,6 +1,7 @@
 import styled from 'styled-components'
 import { OverflowMenu, type OverflowMenuAction } from '../../../components/OverflowMenu'
 import type { FamilyMember } from '../api'
+import { FAMILY_MEMBER_FALLBACK_NAME } from '../roles'
 import { RoleBadge } from './RoleBadge'
 
 interface FamilyMemberRowProps {
@@ -94,7 +95,7 @@ export function FamilyMemberRow({
   menuActions,
   actionsDisabled = false,
 }: FamilyMemberRowProps) {
-  const safeName = member.displayName?.trim() || 'Member'
+  const safeName = member.displayName?.trim() || FAMILY_MEMBER_FALLBACK_NAME
 
   return (
     <Row>
@@ -109,7 +110,7 @@ export function FamilyMemberRow({
           </MetaRow>
         </TextWrap>
       </Leading>
-      <OverflowMenu actions={menuActions} ariaLabel="Member actions" disabled={actionsDisabled} />
+      <OverflowMenu actions={menuActions} ariaLabel="Viewer actions" disabled={actionsDisabled} />
     </Row>
   )
 }

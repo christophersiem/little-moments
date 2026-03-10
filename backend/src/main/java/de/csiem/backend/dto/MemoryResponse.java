@@ -11,6 +11,7 @@ public record MemoryResponse(
     Instant createdAt,
     Instant recordedAt,
     MemoryStatus status,
+    boolean isHighlight,
     String title,
     String summary,
     String transcript,

@@ -49,8 +49,11 @@ Rules:
 - Disable primary button only when required; show why (e.g., "Recording…").
 
 ## Inputs
-Avoid text input in Reduced MVP.
-If unavoidable later: large tap targets, clear labels, no placeholder-as-label.
+Inputs are allowed for auth/settings/family flows.
+Rules:
+- Large tap targets (>= 44px)
+- Clear labels (no placeholder-as-label)
+- Calm error and success states close to the field
 
 ## Loading / processing
 - Show a single clear message: "Saving your moment…"
@@ -78,9 +81,11 @@ Must have:
 - AppShell (top area + content)
 - PrimaryButton / SecondaryButton
 - Card (for memory list items)
-- BottomSheet (Save/Discard choice)
+- BottomSheet (record decision + pickers)
 - ConfirmDialog (Discard confirmation)
 - Toast or inline error (one pattern only)
+- OverflowMenu (detail/family actions)
+- RoleBadge / MemberRow (family management)
 
 ## Accessibility (minimum)
 - Tap targets ≥ 44px

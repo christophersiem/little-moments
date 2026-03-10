@@ -25,6 +25,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.containsStringIgnoringCase;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -86,7 +87,7 @@ class MemoryControllerIntegrationTests {
             .andExpect(jsonPath("$.title").isNotEmpty())
             .andExpect(jsonPath("$.summary").isNotEmpty())
             .andExpect(jsonPath("$.title").value(not("Today my child stacked four blocks without help.")))
-            .andExpect(jsonPath("$.summary").value(not("Today my child stacked four blocks without help.")))
+            .andExpect(jsonPath("$.summary").value(not(containsStringIgnoringCase("transcript says"))))
             .andExpect(jsonPath("$.tags").isArray())
             .andExpect(jsonPath("$.tags", hasItem("Motor Skills")))
             .andExpect(jsonPath("$.count").value(1))
@@ -109,6 +110,12 @@ class MemoryControllerIntegrationTests {
             .andExpect(jsonPath("$.summary").isNotEmpty())
             .andExpect(jsonPath("$.transcript").value("Today my child stacked four blocks without help."))
             .andExpect(jsonPath("$.tags", hasItem("Motor Skills")));
+    }
+
+    @Test
+    void returnsNotFoundForUnknownMemoryId() throws Exception {
+        mockMvc.perform(get("/api/memories/{id}", UUID.randomUUID()))
+            .andExpect(status().isNotFound());
     }
 
     @Test
@@ -432,10 +439,134 @@ class MemoryControllerIntegrationTests {
             .andExpect(jsonPath("$.id").value(id))
             .andExpect(jsonPath("$.title").value("Said 'No!' for the First Time"))
             .andExpect(jsonPath("$.summary").isNotEmpty())
-            .andExpect(jsonPath("$.summary").value(not("When asked if she wanted more peas, Mila looked me in the eye and said no with confidence.")))
+            .andExpect(jsonPath("$.summary").value(not(containsStringIgnoringCase("transcript says"))))
             .andExpect(jsonPath("$.transcript").value("When asked if she wanted more peas, Mila looked me in the eye and said no with confidence."))
             .andExpect(jsonPath("$.tags", hasItem("Language")))
             .andExpect(jsonPath("$.tags", hasItem("Milestone")));
+    }
+
+    @Test
+    void regeneratesTitleAndSummaryWhenOnlyTranscriptChanges() throws Exception {
+        stubTranscriptionService.setFailure(null);
+        stubTranscriptionService.setTranscript("She stacked blocks in silence.");
+
+        MockMultipartFile audioFile = new MockMultipartFile(
+            "audio",
+            "moment.webm",
+            "audio/webm",
+            "fake-audio".getBytes()
+        );
+
+        MvcResult createResult = mockMvc.perform(
+                multipart("/api/memories")
+                    .file(audioFile)
+                    .param("durationSeconds", "10")
+                    .param("recordedAt", "2026-01-30T10:00:00Z")
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+            )
+            .andExpect(status().isCreated())
+            .andReturn();
+
+        String id = extractId(createResult.getResponse().getContentAsString());
+
+        MvcResult initialDetailResult = mockMvc.perform(get("/api/memories/{id}", id))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        String initialPayload = initialDetailResult.getResponse().getContentAsString();
+        String initialTitle = extractStringField(initialPayload, "title");
+        String initialSummary = extractStringField(initialPayload, "summary");
+
+        mockMvc.perform(
+                patch("/api/memories/{id}", id)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "transcript": "He built a complete tower alone and asked for another challenge right away."
+                        }
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value(id))
+            .andExpect(jsonPath("$.title").isNotEmpty())
+            .andExpect(jsonPath("$.summary").isNotEmpty())
+            .andExpect(jsonPath("$.transcript").value("He built a complete tower alone and asked for another challenge right away."));
+
+        MvcResult updatedDetailResult = mockMvc.perform(get("/api/memories/{id}", id))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        String updatedPayload = updatedDetailResult.getResponse().getContentAsString();
+        String updatedTitle = extractStringField(updatedPayload, "title");
+        String updatedSummary = extractStringField(updatedPayload, "summary");
+
+        assertNotNull(initialTitle);
+        assertNotNull(initialSummary);
+        assertNotNull(updatedTitle);
+        assertNotNull(updatedSummary);
+        assertFalse(updatedTitle.isBlank());
+        assertFalse(updatedSummary.isBlank());
+        assertFalse(initialTitle.equals(updatedTitle));
+        assertFalse(initialSummary.equals(updatedSummary));
+    }
+
+    @Test
+    void togglesHighlightAndFiltersListByHighlights() throws Exception {
+        stubTranscriptionService.setFailure(null);
+        MockMultipartFile audioFile = new MockMultipartFile(
+            "audio",
+            "moment.webm",
+            "audio/webm",
+            "fake-audio".getBytes()
+        );
+
+        stubTranscriptionService.setTranscript("First memory for highlight.");
+        MvcResult firstCreateResult = mockMvc.perform(
+                multipart("/api/memories")
+                    .file(audioFile)
+                    .param("durationSeconds", "10")
+                    .param("recordedAt", "2044-02-26T18:20:00Z")
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+            )
+            .andExpect(status().isCreated())
+            .andReturn();
+        String highlightId = extractId(firstCreateResult.getResponse().getContentAsString());
+
+        stubTranscriptionService.setTranscript("Second memory without highlight.");
+        mockMvc.perform(
+                multipart("/api/memories")
+                    .file(audioFile)
+                    .param("durationSeconds", "10")
+                    .param("recordedAt", "2044-02-27T18:20:00Z")
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+            )
+            .andExpect(status().isCreated());
+
+        mockMvc.perform(
+                patch("/api/memories/{id}", highlightId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "isHighlight": true
+                        }
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.isHighlight").value(true));
+
+        mockMvc.perform(get("/api/memories/{id}", highlightId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.isHighlight").value(true));
+
+        mockMvc.perform(
+                get("/api/memories")
+                    .param("month", "2044-02")
+                    .param("highlights", "true")
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].id").value(highlightId))
+            .andExpect(jsonPath("$.items[0].isHighlight").value(true));
     }
 
     @Test
@@ -547,5 +678,14 @@ class MemoryControllerIntegrationTests {
             ids.add(idMatcher.group(1));
         }
         return ids;
+    }
+
+    private String extractStringField(String json, String fieldName) {
+        Pattern pattern = Pattern.compile("\"" + fieldName + "\"\\s*:\\s*\"([^\"]*)\"");
+        Matcher matcher = pattern.matcher(json);
+        if (!matcher.find()) {
+            return null;
+        }
+        return matcher.group(1);
     }
 }

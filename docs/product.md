@@ -1,77 +1,42 @@
-# Little Moments — Product Overview
+# Little Moments — Product Overview (Current MVP)
 
 ## Core Idea
-Voice-first journaling app for parents of young children (1–4 years).
-Users record short (30–60s) audio memories in the evening.
-The system transcribes, structures, stores, and later enables reflection.
+Little Moments is a voice-first journaling app for parents.
+Users quickly record a moment, save it, and get a structured memory they can revisit.
 
----
+## Primary User Context
+- Evening use
+- Low energy
+- One-handed, low-friction interaction
 
-## Target User
-Parents with low cognitive energy (evening use case).
-Primary context: 9:30pm, child asleep, user tired.
+## Current MVP Capabilities
+- Record -> Stop -> Save/Discard flow
+- Backend transcription from audio upload
+- Memory status lifecycle (`PROCESSING`, `READY`, `FAILED`)
+- Auto-generated title and summary from transcript
+- Auto-assigned tags from transcript content
+- Memories list with month and tag filters
+- Memory detail view with owner edit/delete controls
+- Family model with roles (`OWNER`, `MEMBER`)
+- Invite link flow with role assignment on invite
+- Account/profile settings (display name, email, password)
 
----
+## Current Core Flow
+1. User records audio.
+2. User stops and explicitly chooses Save.
+3. App navigates to Memories and shows non-blocking processing state.
+4. Backend transcribes and enriches memory.
+5. Memory appears as READY in list/detail.
 
-## Core Problem
-Parents want to preserve meaningful small moments.
-Writing feels too effortful.
-Photos miss emotional nuance.
-Memories fade quickly.
+## Product Rules in Current Build
+- Members can view memories but cannot record or mutate memory data.
+- Owners can record, edit, delete, and manage invites/members.
+- Access control is enforced by Supabase RLS + RPC checks.
+- Audio is processed for transcription and not persisted in default flow.
 
----
-
-## MVP Scope (Strict)
-
-### Must Have
-- Record or upload audio
-- Store audio in storage bucket
-- Async transcription
-- Structured memory generation:
-    - title
-    - short summary
-    - tags
-    - optional child_age
-    - mood
-- Store transcript + metadata in database
-- Simple list/timeline view
-- Basic semantic search over memories
-
-### Out of Scope (MVP)
-- Social sharing
-- Advanced analytics
-- Multi-child profiles
-- Complex auth logic
-- Push notifications
-- Medical or developmental assessments
-
----
-
-## Core Flow (MVP)
-
-1. User records audio
-2. Audio uploaded to storage
-3. DB row created (status = UPLOADED)
-4. Background process:
-    - Transcribe
-    - Structure with LLM
-    - Generate embedding
-5. Memory visible in timeline
-
----
-
-## Success Criteria
-
-- Memory can be recorded in < 10 seconds
-- Transcription fully automated
-- System robust against partial failure
-- User never sees technical states
-
----
-
-## Future Vision (Post-MVP)
-
-- Monthly summaries
-- “Ask about my child’s language development”
-- AI-powered reflection prompts
-- Print-ready memory book
+## Out of Scope (Current MVP)
+- Public sharing / social feed
+- Ads and growth loops
+- Medical/diagnostic interpretation
+- Advanced analytics dashboards
+- Automated email invite sending (invite links are copied manually)

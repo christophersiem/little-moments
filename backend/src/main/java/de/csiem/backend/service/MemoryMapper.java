@@ -1,6 +1,5 @@
 package de.csiem.backend.service;
 
-import de.csiem.backend.dto.CreateMemoryResponse;
 import de.csiem.backend.dto.MemoryListItemResponse;
 import de.csiem.backend.dto.MemoryResponse;
 import de.csiem.backend.model.MemoryEntity;
@@ -14,26 +13,13 @@ final class MemoryMapper {
     private MemoryMapper() {
     }
 
-    static CreateMemoryResponse toCreateMemoryResponse(MemoryEntity memory, String transcriptPreview) {
-        return new CreateMemoryResponse(
-            memory.getId(),
-            List.of(memory.getId()),
-            1,
-            memory.getStatus(),
-            memory.getErrorMessage(),
-            transcriptPreview,
-            memory.getTitle(),
-            memory.getSummary(),
-            toTagLabels(memory)
-        );
-    }
-
     static MemoryListItemResponse toMemoryListItemResponse(MemoryEntity memory, String transcriptSnippet) {
         return new MemoryListItemResponse(
             memory.getId(),
             memory.getCreatedAt(),
             memory.getRecordedAt(),
             memory.getStatus(),
+            memory.isHighlight(),
             memory.getTitle(),
             transcriptSnippet,
             toTagLabels(memory)
@@ -46,6 +32,7 @@ final class MemoryMapper {
             memory.getCreatedAt(),
             memory.getRecordedAt(),
             memory.getStatus(),
+            memory.isHighlight(),
             memory.getTitle(),
             memory.getSummary(),
             memory.getTranscript(),

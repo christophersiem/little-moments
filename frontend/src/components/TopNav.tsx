@@ -1,9 +1,11 @@
 import styled from 'styled-components'
-import { Button } from './Button'
+import type { BottomNavigationIcon, BottomNavigationItem } from '../app/navigation'
+import { APP_ROUTES } from '../app/routes'
 
 interface TopNavProps {
   pathname: string
   navigate: (nextPath: string) => void
+  items: readonly BottomNavigationItem[]
   canRecord?: boolean
   navigationLocked?: boolean
   onLockedNavigationAttempt?: () => void
@@ -13,14 +15,13 @@ const Nav = styled.nav`
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: ${({ theme }) => theme.space.x1};
-  padding: ${({ theme }) => theme.space.x1};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: ${({ theme }) => theme.radii.lg};
-  background: ${({ theme }) => theme.colors.surfaceStrong};
-`
-
-const NavTwoColumns = styled(Nav)`
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3}`};
+  border: 1px solid color-mix(in srgb, ${({ theme }) => theme.colors.border} 78%, ${({ theme }) => theme.colors.background});
+  border-radius: ${({ theme }) => theme.radii.pill};
+  background: color-mix(in srgb, ${({ theme }) => theme.colors.surfaceStrong} 96%, ${({ theme }) => theme.colors.backgroundAlt});
+  box-shadow:
+    0 10px 24px rgba(var(--lm-shadow), 0.08),
+    inset 0 1px 0 rgba(var(--lm-highlight-rgb), 0.62);
 `
 
 const NavItem = styled.span`
@@ -31,13 +32,45 @@ const NavItem = styled.span`
 `
 
 const NavIcon = styled.svg`
-  width: 18px;
-  height: 18px;
+  width: 19px;
+  height: 19px;
   display: block;
 `
 
 const NavLabel = styled.span`
-  font-size: 0.75rem;
+  font-size: calc(${({ theme }) => theme.typography.secondarySize} - 0.25rem);
+  letter-spacing: 0.01em;
+`
+
+const NavButton = styled.button<{ $active: boolean; $dimmed: boolean }>`
+  border: 1px solid
+    ${({ theme, $active }) =>
+      $active ? `color-mix(in srgb, ${theme.colors.border} 76%, ${theme.colors.background})` : 'transparent'};
+  width: 100%;
+  min-height: calc(${({ theme }) => theme.layout.minTouchTarget} + ${({ theme }) => theme.space.x3});
+  border-radius: ${({ theme }) => theme.radii.xl};
+  background: ${({ theme, $active }) =>
+    $active
+      ? `linear-gradient(180deg, color-mix(in srgb, ${theme.colors.surface} 90%, ${theme.colors.backgroundAlt}), color-mix(in srgb, ${theme.colors.surfaceStrong} 88%, ${theme.colors.background}))`
+      : 'transparent'};
+  color: ${({ theme, $active }) => ($active ? theme.colors.accentStrong : `color-mix(in srgb, ${theme.colors.textMuted} 82%, ${theme.colors.text})`)};
+  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x1} ${theme.space.x1}`};
+  cursor: ${({ $dimmed }) => ($dimmed ? 'not-allowed' : 'pointer')};
+  opacity: ${({ $dimmed }) => ($dimmed ? 0.58 : 1)};
+  transition: background-color 160ms ease, color 160ms ease, opacity 160ms ease, transform 160ms ease;
+
+  &:hover:not([aria-disabled='true']) {
+    transform: translateY(-1px);
+    background: ${({ theme, $active }) =>
+      $active
+        ? `linear-gradient(180deg, color-mix(in srgb, ${theme.colors.surface} 90%, ${theme.colors.backgroundAlt}), color-mix(in srgb, ${theme.colors.surfaceStrong} 88%, ${theme.colors.background}))`
+        : `color-mix(in srgb, ${theme.colors.surface} 78%, ${theme.colors.background})`};
+  }
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
+    outline-offset: 2px;
+  }
 `
 
 function RecordIcon() {
@@ -99,17 +132,30 @@ function SettingsIcon() {
   )
 }
 
+function iconFor(icon: BottomNavigationIcon) {
+  if (icon === 'record') {
+    return <RecordIcon />
+  }
+  if (icon === 'settings') {
+    return <SettingsIcon />
+  }
+  return <BookIcon />
+}
+
 export function TopNav({
   pathname,
   navigate,
-  canRecord = true,
+  items,
+  canRecord = false,
   navigationLocked = false,
   onLockedNavigationAttempt,
 }: TopNavProps) {
-  const NavContainer = canRecord ? Nav : NavTwoColumns
-
   const onNavigate = (nextPath: string) => {
     if (navigationLocked && pathname !== nextPath) {
+      onLockedNavigationAttempt?.()
+      return
+    }
+    if (nextPath === APP_ROUTES.record && !canRecord) {
       onLockedNavigationAttempt?.()
       return
     }
@@ -117,45 +163,32 @@ export function TopNav({
   }
 
   return (
-    <NavContainer>
-      <Button
-        variant="nav"
-        active={pathname.startsWith('/memories')}
-        onClick={() => onNavigate('/memories')}
-        aria-disabled={navigationLocked && !pathname.startsWith('/memories')}
-        style={{ opacity: navigationLocked && !pathname.startsWith('/memories') ? 0.62 : 1 }}
-      >
-        <NavItem>
-          <BookIcon />
-          <NavLabel>Memories</NavLabel>
-        </NavItem>
-      </Button>
-      {canRecord && (
-        <Button
-          variant="nav"
-          active={pathname.startsWith('/record')}
-          onClick={() => onNavigate('/record')}
-          aria-disabled={navigationLocked && !pathname.startsWith('/record')}
-          style={{ opacity: navigationLocked && !pathname.startsWith('/record') ? 0.62 : 1 }}
-        >
-          <NavItem>
-            <RecordIcon />
-            <NavLabel>Record</NavLabel>
-          </NavItem>
-        </Button>
-      )}
-      <Button
-        variant="nav"
-        active={pathname.startsWith('/settings')}
-        onClick={() => onNavigate('/settings')}
-        aria-disabled={navigationLocked && !pathname.startsWith('/settings')}
-        style={{ opacity: navigationLocked && !pathname.startsWith('/settings') ? 0.62 : 1 }}
-      >
-        <NavItem>
-          <SettingsIcon />
-          <NavLabel>Settings</NavLabel>
-        </NavItem>
-      </Button>
-    </NavContainer>
+    <Nav>
+      {items.map((item) => {
+        const active = pathname.startsWith(item.route)
+        const disabledByLock = navigationLocked && !active
+        const isRecordRoute = item.route === APP_ROUTES.record
+        const blockedByPermission = !canRecord && isRecordRoute
+        const isBlocked = disabledByLock || blockedByPermission
+        const dimmed = isBlocked
+
+        return (
+          <NavButton
+            key={item.route}
+            type="button"
+            $active={active}
+            $dimmed={dimmed}
+            onClick={() => onNavigate(item.route)}
+            aria-disabled={isBlocked}
+            aria-current={active ? 'page' : undefined}
+          >
+            <NavItem>
+              {iconFor(item.icon)}
+              <NavLabel>{item.label}</NavLabel>
+            </NavItem>
+          </NavButton>
+        )
+      })}
+    </Nav>
   )
 }

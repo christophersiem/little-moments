@@ -9,17 +9,24 @@ export const GlobalStyle = createGlobalStyle`
   html,
   body,
   #root {
+    width: 100%;
+    max-width: 100%;
     height: 100%;
     min-height: 100%;
+    overflow-x: clip;
+    background: ${({ theme }) => theme.colors.background};
+  }
+
+  html,
+  body {
+    scrollbar-gutter: stable both-edges;
   }
 
   body {
     margin: 0;
-    min-width: 320px;
     font-family: ${({ theme }) => theme.typography.bodyFamily};
     font-size: ${({ theme }) => theme.typography.bodySize};
     color: ${({ theme }) => theme.colors.text};
-    background: linear-gradient(180deg, ${({ theme }) => theme.colors.background}, ${({ theme }) => theme.colors.backgroundAlt});
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }

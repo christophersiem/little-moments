@@ -4,7 +4,7 @@ import { Button } from '../components/Button'
 import { Card } from '../components/Card'
 import { RecordButton } from '../components/RecordButton'
 import { ToggleSwitch } from '../components/ToggleSwitch'
-import { MAX_RECORDING_SECONDS } from '../features/memories/constants'
+import { MAX_RECORDING_SECONDS, SHORT_TRANSCRIPT_MESSAGE } from '../features/memories/constants'
 import { startMemoryUpload } from '../features/memories/hooks/uploadSessionStore'
 import {
   transitionStopDecision,
@@ -30,7 +30,6 @@ interface RecordingPayload {
 const NOOP = () => undefined
 const MIN_RECORDING_SECONDS = 2
 const MIN_RECORDING_BYTES = 10000
-const SHORT_RECORDING_HINT = 'Recording too short. Please speak at least 5 words.'
 const SHORT_HINT_DISPLAY_MS = 5200
 const MAX_DURATION_HINT = `Max ${MAX_RECORDING_SECONDS}s`
 
@@ -192,6 +191,12 @@ const SheetActions = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.space.x2};
+`
+
+const SheetValidationText = styled.p`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.danger};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
 `
 
 const PreferenceRow = styled(ToggleSwitch)`
@@ -376,7 +381,7 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
         setStopDecisionState('hidden')
         setPhase('idle')
         setElapsedSeconds(0)
-        setErrorMessage(SHORT_RECORDING_HINT)
+        setErrorMessage(SHORT_TRANSCRIPT_MESSAGE)
         return
       }
 
@@ -396,6 +401,11 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
       window.history.replaceState({}, '', `/memories?pending=${encodeURIComponent(session.clientId)}`)
     }
   }
+
+  const saveBlockedForShortRecording =
+    stopDecisionState === 'choice' &&
+    Boolean(latestRecordingRef.current) &&
+    isLikelyTooShort(latestRecordingRef.current.blob, elapsedSeconds)
 
   if (phase === 'error') {
     return (
@@ -467,13 +477,25 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
                       : 'Audio is transcribed to text and not stored as audio.'}
                   </PrivacyText>
                   <SheetActions>
-                    <Button variant="primary" fullWidth autoFocus onClick={() => onStopDecision('save-selected')}>
+                    <Button
+                      variant="primary"
+                      fullWidth
+                      autoFocus
+                      disabled={saveBlockedForShortRecording}
+                      onClick={() => onStopDecision('save-selected')}
+                    >
                       Save recording
                     </Button>
-                    <Button fullWidth onClick={() => onStopDecision('discard-selected')}>
+                    <Button
+                      fullWidth
+                      onClick={() =>
+                        onStopDecision(saveBlockedForShortRecording ? 'discard-confirmed' : 'discard-selected')
+                      }
+                    >
                       Discard recording
                     </Button>
                   </SheetActions>
+                  {saveBlockedForShortRecording && <SheetValidationText>{SHORT_TRANSCRIPT_MESSAGE}</SheetValidationText>}
                 </>
               ) : (
                 <>

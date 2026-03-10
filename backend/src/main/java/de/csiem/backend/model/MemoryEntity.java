@@ -58,6 +58,9 @@ public class MemoryEntity {
     @Column(name = "is_parent", nullable = false)
     private boolean isParent;
 
+    @Column(name = "is_highlight", nullable = false)
+    private boolean highlight;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private MemoryStatus status;
@@ -80,6 +83,7 @@ public class MemoryEntity {
         this.recordedAt = recordedAt;
         this.status = status;
         this.isParent = false;
+        this.highlight = false;
     }
 
     @PrePersist
@@ -207,6 +211,14 @@ public class MemoryEntity {
 
     public MemoryStatus getStatus() {
         return status;
+    }
+
+    public boolean isHighlight() {
+        return highlight;
+    }
+
+    public void setHighlight(boolean highlight) {
+        this.highlight = highlight;
     }
 
     public String getErrorMessage() {

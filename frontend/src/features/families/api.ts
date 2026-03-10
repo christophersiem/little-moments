@@ -1,9 +1,14 @@
 import { backendRequestJson, backendRequestVoid } from '../../lib/backendApi'
+import {
+  FAMILY_MEMBER_FALLBACK_NAME,
+  normalizeFamilyMemberRole,
+  type FamilyMemberRole,
+} from './roles'
 
 /*
  * Security notes:
  * - The frontend never simulates authorization rules.
- * - Role/member writes run through backend RPC wrappers.
+ * - Role/viewer writes run through backend RPC wrappers.
  * - Supabase RLS remains the source of truth for data visibility.
  */
 
@@ -49,11 +54,11 @@ export async function createFamilyWithOwner(name: string): Promise<string> {
 export interface FamilyMember {
   userId: string
   displayName: string
-  role: 'OWNER' | 'MEMBER'
+  role: FamilyMemberRole
   joinedAt: string
 }
 
-export type FamilyMemberRole = 'OWNER' | 'MEMBER'
+export type { FamilyMemberRole } from './roles'
 
 export interface FamilySummary {
   familyId: string
@@ -84,17 +89,13 @@ export async function ensureDefaultChildForFamily(familyId: string): Promise<str
   return payload.childId
 }
 
-function mapRole(role: string): FamilyMemberRole {
-  return role === 'OWNER' ? 'OWNER' : 'MEMBER'
-}
-
 export async function listMyFamilies(): Promise<FamilySummary[]> {
   const rows = await backendRequestJson<FamilySummaryApiResponse[]>('/families')
 
   return (rows ?? []).map((row) => ({
     familyId: String(row.familyId),
     familyName: typeof row.familyName === 'string' && row.familyName.trim() ? row.familyName : 'Family',
-    role: mapRole(String(row.role)),
+    role: normalizeFamilyMemberRole(String(row.role)),
     joinedAt: String(row.joinedAt),
   }))
 }
@@ -106,8 +107,9 @@ export async function listFamilyMembers(familyId: string): Promise<FamilyMember[
 
   return (rows ?? []).map((row) => ({
     userId: String(row.userId),
-    displayName: typeof row.displayName === 'string' && row.displayName.trim() ? row.displayName : 'Member',
-    role: mapRole(String(row.role)),
+    displayName:
+      typeof row.displayName === 'string' && row.displayName.trim() ? row.displayName : FAMILY_MEMBER_FALLBACK_NAME,
+    role: normalizeFamilyMemberRole(String(row.role)),
     joinedAt: String(row.joinedAt),
   }))
 }

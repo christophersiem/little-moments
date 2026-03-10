@@ -1,98 +1,40 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo } from 'react'
 import styled from 'styled-components'
+import { APP_ROUTES, toMemoryDetailPath } from '../app/routes'
 import { Button } from '../components/Button'
 import { PageContainer } from '../components/PageContainer'
-import { StatusBanner } from '../components/StatusBanner'
-import { FilterChipBar } from '../features/memories/components/FilterChipBar'
-import { MemoryListItemCard } from '../features/memories/components/MemoryListItemCard'
-import { MonthPickerSheet } from '../features/memories/components/MonthPickerSheet'
-import { TagPickerSheet } from '../features/memories/components/TagPickerSheet'
-import { setActiveUploadStatusFromPolling, retryActiveMemoryUpload, useActiveMemoryUpload } from '../features/memories/hooks/uploadSessionStore'
-import { usePaginatedMemories } from '../features/memories/hooks/usePaginatedMemories'
-import { useProcessingMemory } from '../features/memories/hooks/useProcessingMemory'
-import { MEMORY_TAG_OPTIONS, type MemoryListItem, type MemoryTag } from '../features/memories/types'
-import { formatMonthYear } from '../lib/utils'
+import { MemoriesEmptyState } from '../features/memories/components/MemoriesEmptyState'
+import { MemoriesFilterSheet } from '../features/memories/components/MemoriesFilterSheet'
+import { MemoriesHeader } from '../features/memories/components/MemoriesHeader'
+import { MemoriesTimeline } from '../features/memories/components/MemoriesTimeline'
+import { ProcessingBanner } from '../features/memories/components/ProcessingBanner'
+import { useMemories } from '../features/memories/hooks/useMemories'
+import { useMemoriesFilter } from '../features/memories/hooks/useMemoriesFilter'
+import { useMemoriesInfiniteScroll } from '../features/memories/hooks/useMemoriesInfiniteScroll'
+import { useMemoriesProcessing } from '../features/memories/hooks/useMemoriesProcessing'
+import { useMemoryHighlights } from '../features/memories/hooks/useMemoryHighlights'
+import { collectMonthOptions, groupMemoriesByMonth } from '../features/memories/lib/groupMemoriesByMonth'
+import type { MemoryListItem } from '../features/memories/types'
 
 interface MemoriesPageProps {
   navigate: (nextPath: string) => void
   familyId: string | null
 }
 
-interface MonthOption {
-  key: string
-  label: string
-}
-
-interface MonthGroup {
-  key: string
-  label: string
-  items: MemoryListItem[]
-}
-
 const Section = styled.section`
   width: 100%;
   padding-top: ${({ theme }) => theme.space.x3};
-  display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.space.x4};
 `
 
-const PageShell = styled.div`
-  min-height: 100vh;
-`
-
-const StickyHeader = styled.div`
-  position: sticky;
-  top: 0;
-  z-index: 6;
-  background: ${({ theme }) => theme.colors.background};
-  padding: ${({ theme }) => `${theme.space.x1} 0 ${theme.space.x2}`};
-  display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.space.x2};
-`
-
-const HeadingRow = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-`
-
-const Heading = styled.h2`
-  margin: 0;
-  font-size: ${({ theme }) => theme.typography.h1Size};
-  color: ${({ theme }) => theme.colors.text};
-`
-
-const Group = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.space.x1};
-`
-
-const GroupTitle = styled.h3`
-  margin: 0;
-  padding: ${({ theme }) => `${theme.space.x1} 0 ${theme.space.x2}`};
-  color: ${({ theme }) => theme.colors.text};
-  font-family: ${({ theme }) => theme.typography.headingFamily};
-  font-size: ${({ theme }) => theme.typography.h2Size};
-  font-weight: 500;
-`
-
-const Groups = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.space.x5};
-`
-
-const EmptyState = styled.div`
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: ${({ theme }) => theme.radii.lg};
-  background: ${({ theme }) => theme.colors.surfaceStrong};
-  padding: ${({ theme }) => theme.space.x4};
+const ContentStack = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${({ theme }) => theme.space.x3};
+  margin-top: ${({ theme }) => theme.space.x2};
+`
+
+const PageShell = styled.div`
+  min-height: 100%;
 `
 
 const EmptyText = styled.p`
@@ -111,103 +53,20 @@ const LoadingSkeleton = styled.div`
   opacity: 0.7;
 `
 
-const FooterArea = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: ${({ theme }) => theme.space.x2};
-  padding: ${({ theme }) => `${theme.space.x2} 0 ${theme.space.x3}`};
-`
-
-const FooterText = styled.p`
-  color: ${({ theme }) => theme.colors.textMuted};
-  font-size: ${({ theme }) => theme.typography.secondarySize};
-`
-
-const RetryLoadMoreButton = styled.button`
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: ${({ theme }) => theme.radii.pill};
-  background: ${({ theme }) => theme.colors.surfaceStrong};
-  color: ${({ theme }) => theme.colors.accentStrong};
-  min-height: ${({ theme }) => theme.layout.minTouchTarget};
-  padding: ${({ theme }) => `0 ${theme.space.x3}`};
-  font-size: ${({ theme }) => theme.typography.secondarySize};
-  cursor: pointer;
-`
-
-const ScrollSentinel = styled.div`
-  width: 100%;
-  height: 1px;
-`
-
 const PENDING_MEMORY_PREFIX = 'pending-memory-'
 
-function getEventDate(item: MemoryListItem): string {
-  return item.recordedAt || item.createdAt
-}
-
-function monthKey(dateIso: string): string {
-  const date = new Date(dateIso)
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-}
-
-function collectMonthOptions(items: MemoryListItem[]): MonthOption[] {
-  const seen = new Set<string>()
-  const options: MonthOption[] = []
-
-  for (const item of items) {
-    const eventDate = getEventDate(item)
-    const key = monthKey(eventDate)
-    if (!seen.has(key)) {
-      seen.add(key)
-      options.push({ key, label: formatMonthYear(eventDate) })
-    }
+function toMonthLabel(month: string, monthOptions: Array<{ key: string; label: string }>) {
+  if (month === 'all') {
+    return 'All months'
   }
-
-  return options
-}
-
-function groupByMonth(items: MemoryListItem[]): MonthGroup[] {
-  const groups: MonthGroup[] = []
-
-  for (const item of items) {
-    const eventDate = getEventDate(item)
-    const key = monthKey(eventDate)
-    const current = groups[groups.length - 1]
-    if (!current || current.key !== key) {
-      groups.push({ key, label: formatMonthYear(eventDate), items: [item] })
-      continue
-    }
-    current.items.push(item)
-  }
-
-  return groups
+  return monthOptions.find((option) => option.key === month)?.label || month
 }
 
 export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
-  const [monthPickerOpen, setMonthPickerOpen] = useState(false)
-  const [tagPickerOpen, setTagPickerOpen] = useState(false)
-  const [selectedMonth, setSelectedMonth] = useState('all')
-  const [selectedTags, setSelectedTags] = useState<MemoryTag[]>([])
-  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null)
-  const hasShownLoadMoreHintRef = useRef(false)
-  const [nearListEnd, setNearListEnd] = useState(false)
-  const [showLoadMoreHint, setShowLoadMoreHint] = useState(false)
-  const lastSettledUploadRef = useRef('')
-  const activeUpload = useActiveMemoryUpload()
-  const processingMemoryId = activeUpload?.status === 'processing' ? activeUpload.memoryId : undefined
+  const filters = useMemoriesFilter()
   const {
-    status: processingStatus,
-    error: processingError,
-    isPolling: isProcessingPolling,
-    startPolling,
-    stopPolling,
-  } = useProcessingMemory({ memoryId: processingMemoryId, pollIntervalMs: 2500, timeoutMs: 60000 })
-
-  const monthFilter = selectedMonth !== 'all' ? selectedMonth : undefined
-  const {
-    items,
-    loadingInitial,
+    memories: items,
+    loading,
     loadingMore,
     error,
     loadMoreError,
@@ -215,12 +74,16 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
     loadMore,
     retryLoadMore,
     reload,
-  } = usePaginatedMemories({
-    familyId: familyId ?? undefined,
-    month: monthFilter,
-    tags: selectedTags,
+  } = useMemories({
+    familyId,
+    month: filters.selectedMonth,
+    tags: filters.selectedTags,
+    highlightsOnly: filters.highlightsOnly,
     pageSize: 5,
   })
+
+  const { activeUpload, processingStatus, processingError, isProcessingPolling, onRetryProcessing } =
+    useMemoriesProcessing({ reload })
 
   const displayItems = useMemo(() => {
     if (!activeUpload || (activeUpload.status !== 'uploading' && activeUpload.status !== 'processing')) {
@@ -237,6 +100,7 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
       createdAt: activeUpload.startedAt,
       recordedAt: activeUpload.recordedAt,
       status: 'PROCESSING',
+      isHighlight: false,
       title: null,
       transcriptSnippet: 'Saving your moment…',
       tags: [],
@@ -245,236 +109,83 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
     return [pendingItem, ...items]
   }, [activeUpload, items])
 
-  const monthOptions = useMemo(() => collectMonthOptions(displayItems), [displayItems])
+  const { effectiveItems, highlightPendingById, highlightError, onToggleHighlight } = useMemoryHighlights({
+    items: displayItems,
+    pendingMemoryPrefix: PENDING_MEMORY_PREFIX,
+  })
 
-  const selectedMonthLabel = useMemo(() => {
-    if (selectedMonth === 'all') {
-      return 'All months'
-    }
-    return monthOptions.find((option) => option.key === selectedMonth)?.label || selectedMonth
-  }, [monthOptions, selectedMonth])
+  const monthOptions = useMemo(() => collectMonthOptions(effectiveItems), [effectiveItems])
+  const selectedMonthLabel = useMemo(
+    () => toMonthLabel(filters.selectedMonth, monthOptions),
+    [filters.selectedMonth, monthOptions],
+  )
+  const draftMonthLabel = useMemo(() => toMonthLabel(filters.draftMonth, monthOptions), [filters.draftMonth, monthOptions])
 
-  const groups = useMemo(() => groupByMonth(displayItems), [displayItems])
+  const timelineItems = useMemo(
+    () => (filters.highlightsOnly ? effectiveItems.filter((item) => item.isHighlight) : effectiveItems),
+    [effectiveItems, filters.highlightsOnly],
+  )
+  const groups = useMemo(() => groupMemoriesByMonth(timelineItems), [timelineItems])
 
-  const hasActiveFilters = selectedMonth !== 'all' || selectedTags.length > 0
-  const tagsChipLabel = useMemo(() => {
-    if (selectedTags.length === 0) {
-      return 'All tags'
-    }
-    if (selectedTags.length === 1) {
-      return selectedTags[0]
-    }
-    return `${selectedTags[0]} +${selectedTags.length - 1}`
-  }, [selectedTags])
+  const filterSummary = useMemo(() => {
+    const monthPart = filters.selectedMonth === 'all' ? 'All months' : selectedMonthLabel
+    const tagsPart =
+      filters.selectedTags.length === 0
+        ? 'No tags'
+        : filters.selectedTags.length === 1
+          ? filters.selectedTags[0]
+          : `${filters.selectedTags[0]} +${filters.selectedTags.length - 1}`
+    const highlightPart = filters.highlightsOnly ? 'Highlights only' : null
+    return [monthPart, tagsPart, highlightPart].filter(Boolean).join(' · ')
+  }, [filters.highlightsOnly, filters.selectedMonth, filters.selectedTags, selectedMonthLabel])
 
-  const clearFilters = () => {
-    setSelectedMonth('all')
-    setSelectedTags([])
-  }
-
-  useEffect(() => {
-    hasShownLoadMoreHintRef.current = false
-    setShowLoadMoreHint(false)
-  }, [monthFilter, selectedTags])
-
-  useEffect(() => {
-    if (!activeUpload || activeUpload.status !== 'processing' || !activeUpload.memoryId) {
-      stopPolling()
-      return
-    }
-
-    startPolling(activeUpload.memoryId)
-    return () => stopPolling()
-  }, [activeUpload, startPolling, stopPolling])
-
-  useEffect(() => {
-    if (!activeUpload || activeUpload.status !== 'processing') {
-      return
-    }
-
-    if (processingStatus === 'READY') {
-      setActiveUploadStatusFromPolling('READY')
-      void reload()
-      return
-    }
-
-    if (processingStatus === 'FAILED') {
-      setActiveUploadStatusFromPolling('FAILED', processingError)
-      void reload()
-    }
-  }, [activeUpload, processingError, processingStatus, reload])
-
-  useEffect(() => {
-    if (!activeUpload) {
-      return
-    }
-    if (activeUpload.status !== 'ready' && activeUpload.status !== 'failed') {
-      return
-    }
-
-    const marker = `${activeUpload.clientId}:${activeUpload.status}`
-    if (lastSettledUploadRef.current === marker) {
-      return
-    }
-    lastSettledUploadRef.current = marker
-    void reload()
-  }, [activeUpload, reload])
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    if (!params.has('pending')) {
-      return
-    }
-
-    if (activeUpload && (activeUpload.status === 'uploading' || activeUpload.status === 'processing')) {
-      return
-    }
-
-    window.history.replaceState({}, '', '/memories')
-  }, [activeUpload])
-
-  useEffect(() => {
-    const node = loadMoreSentinelRef.current
-    if (!node) {
-      return undefined
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        setNearListEnd(Boolean(entries[0]?.isIntersecting))
-      },
-      {
-        root: null,
-        rootMargin: '0px 0px 220px 0px',
-        threshold: 0,
-      },
-    )
-
-    observer.observe(node)
-    return () => observer.disconnect()
-  }, [groups.length, hasMore])
-
-  useEffect(() => {
-    if (!nearListEnd || !hasMore || loadingInitial || loadingMore || loadMoreError) {
-      return
-    }
-    void loadMore()
-  }, [hasMore, loadMore, loadMoreError, loadingInitial, loadingMore, nearListEnd])
-
-  useEffect(() => {
-    if (!nearListEnd || !hasMore || loadingInitial || loadingMore || hasShownLoadMoreHintRef.current) {
-      return
-    }
-    hasShownLoadMoreHintRef.current = true
-    setShowLoadMoreHint(true)
-    const timer = window.setTimeout(() => setShowLoadMoreHint(false), 2200)
-    return () => window.clearTimeout(timer)
-  }, [hasMore, loadingInitial, loadingMore, nearListEnd])
-
-  const onRetryProcessing = () => {
-    if (activeUpload?.status === 'failed' && retryActiveMemoryUpload()) {
-      return
-    }
-
-    if (activeUpload?.memoryId) {
-      startPolling(activeUpload.memoryId)
-    }
-    void reload()
-  }
-
-  const processingBanner = (() => {
-    if (!activeUpload) {
-      return null
-    }
-
-    if (activeUpload.status === 'uploading') {
-      return (
-        <StatusBanner
-          title="Saving your moment… It will appear here shortly."
-          detail="You can keep scrolling."
-        />
-      )
-    }
-
-    if (activeUpload.status === 'processing') {
-      if (processingStatus === 'TIMEOUT') {
-        return (
-          <StatusBanner
-            title="Still saving your moment."
-            detail="This is taking longer than usual. You can keep using the app."
-            actionLabel="Refresh"
-            onAction={onRetryProcessing}
-          />
-        )
-      }
-
-      return (
-        <StatusBanner
-          title="Saving your moment… It will appear here shortly."
-          detail={isProcessingPolling ? 'You can keep scrolling.' : undefined}
-        />
-      )
-    }
-
-    if (activeUpload.status === 'failed') {
-      return (
-        <StatusBanner
-          tone="error"
-          title="We couldn’t finish saving this moment."
-          detail={activeUpload.errorMessage || processingError || 'Please try again.'}
-          actionLabel="Try again"
-          onAction={onRetryProcessing}
-        />
-      )
-    }
-
-    return null
-  })()
+  const { loadMoreSentinelRef, showLoadMoreHint } = useMemoriesInfiniteScroll({
+    hasMore,
+    loading,
+    loadingMore,
+    loadMoreError,
+    loadMore,
+    groupsLength: groups.length,
+    selectedMonth: filters.selectedMonth,
+    selectedTags: filters.selectedTags,
+    highlightsOnly: filters.highlightsOnly,
+  })
 
   const headerBlock = (
-    <StickyHeader>
-      <HeadingRow>
-        <Heading>Memories</Heading>
-      </HeadingRow>
-      <FilterChipBar
-        monthLabel={selectedMonthLabel}
-        tagsLabel={tagsChipLabel}
-        hasActiveFilters={hasActiveFilters}
-        onOpenMonth={() => setMonthPickerOpen(true)}
-        onOpenTags={() => setTagPickerOpen(true)}
-        onClear={clearFilters}
-      />
-    </StickyHeader>
+    <MemoriesHeader
+      hasActiveFilters={filters.hasActiveFilters}
+      activeFilterCount={filters.activeFilterCount}
+      filterSummary={filterSummary}
+      onOpenFilters={filters.openFilters}
+    />
   )
 
-  if (loadingInitial) {
+  const processingBanner = (
+    <ProcessingBanner
+      activeUpload={activeUpload}
+      processingStatus={processingStatus}
+      processingError={processingError}
+      isProcessingPolling={isProcessingPolling}
+      onRetry={onRetryProcessing}
+    />
+  )
+
+  if (loading) {
     return (
       <PageContainer>
         <PageShell>
           <Section>
             {headerBlock}
-            {processingBanner}
-            <EmptyText>Loading your moments...</EmptyText>
-            <LoadingSkeleton />
-            <LoadingSkeleton />
-            <LoadingSkeleton />
-            <LoadingSkeleton />
-            <LoadingSkeleton />
+            <ContentStack>
+              {processingBanner}
+              <EmptyText>Loading your moments...</EmptyText>
+              <LoadingSkeleton />
+              <LoadingSkeleton />
+              <LoadingSkeleton />
+              <LoadingSkeleton />
+              <LoadingSkeleton />
+            </ContentStack>
           </Section>
-          <MonthPickerSheet
-            open={monthPickerOpen}
-            monthOptions={monthOptions}
-            selectedMonth={selectedMonth}
-            onSelect={setSelectedMonth}
-            onClose={() => setMonthPickerOpen(false)}
-          />
-          <TagPickerSheet
-            open={tagPickerOpen}
-            availableTags={MEMORY_TAG_OPTIONS}
-            selectedTags={selectedTags}
-            onDone={setSelectedTags}
-            onClose={() => setTagPickerOpen(false)}
-          />
         </PageShell>
       </PageContainer>
     )
@@ -486,26 +197,14 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
         <PageShell>
           <Section>
             {headerBlock}
-            {processingBanner}
-            <ErrorText>{error}</ErrorText>
-            <Button variant="primary" onClick={reload}>
-              Try again
-            </Button>
+            <ContentStack>
+              {processingBanner}
+              <ErrorText>{error}</ErrorText>
+              <Button variant="primary" onClick={reload}>
+                Try again
+              </Button>
+            </ContentStack>
           </Section>
-          <MonthPickerSheet
-            open={monthPickerOpen}
-            monthOptions={monthOptions}
-            selectedMonth={selectedMonth}
-            onSelect={setSelectedMonth}
-            onClose={() => setMonthPickerOpen(false)}
-          />
-          <TagPickerSheet
-            open={tagPickerOpen}
-            availableTags={MEMORY_TAG_OPTIONS}
-            selectedTags={selectedTags}
-            onDone={setSelectedTags}
-            onClose={() => setTagPickerOpen(false)}
-          />
         </PageShell>
       </PageContainer>
     )
@@ -516,74 +215,46 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
       <PageShell>
         <Section>
           {headerBlock}
-          {processingBanner}
+          <ContentStack>
+            {processingBanner}
+            {highlightError ? <ErrorText>{highlightError}</ErrorText> : null}
 
-          {groups.length === 0 ? (
-            <EmptyState>
-              <EmptyText>No moments match these filters.</EmptyText>
-              <Button variant="primary" onClick={() => navigate('/record')}>
-                Record moment
-              </Button>
-            </EmptyState>
-          ) : (
-            <>
-              <Groups>
-                {groups.map((group) => (
-                  <Group key={group.key}>
-                    <GroupTitle>{group.label}</GroupTitle>
-                    {group.items.map((item, index) => (
-                      <MemoryListItemCard
-                        key={item.id}
-                        item={item}
-                        isLastInGroup={index === group.items.length - 1}
-                        onOpen={(id) => {
-                          if (id.startsWith(PENDING_MEMORY_PREFIX)) {
-                            return
-                          }
-                          navigate(`/memories/${id}`)
-                        }}
-                      />
-                    ))}
-                  </Group>
-                ))}
-              </Groups>
-
-              <FooterArea aria-live="polite">
-                {showLoadMoreHint && hasMore && !loadingMore && !loadMoreError && (
-                  <FooterText>Scroll to load more</FooterText>
-                )}
-
-                {loadingMore && <FooterText>Loading more...</FooterText>}
-
-                {!loadingMore && loadMoreError && (
-                  <>
-                    <FooterText>{loadMoreError}</FooterText>
-                    <RetryLoadMoreButton type="button" onClick={retryLoadMore}>
-                      Retry
-                    </RetryLoadMoreButton>
-                  </>
-                )}
-
-                {!hasMore && !loadingMore && <FooterText>You&apos;re all caught up.</FooterText>}
-
-                <ScrollSentinel ref={loadMoreSentinelRef} aria-hidden />
-              </FooterArea>
-            </>
-          )}
+            {groups.length === 0 ? (
+              <MemoriesEmptyState highlightsOnly={filters.highlightsOnly} onRecordMoment={() => navigate(APP_ROUTES.record)} />
+            ) : (
+              <MemoriesTimeline
+                groups={groups}
+                pendingMemoryPrefix={PENDING_MEMORY_PREFIX}
+                highlightPendingById={highlightPendingById}
+                onOpenMemory={(id) => navigate(toMemoryDetailPath(id))}
+                onToggleHighlight={onToggleHighlight}
+                showLoadMoreHint={showLoadMoreHint}
+                hasMore={hasMore}
+                loadingMore={loadingMore}
+                loadMoreError={loadMoreError}
+                onRetryLoadMore={retryLoadMore}
+                loadMoreSentinelRef={loadMoreSentinelRef}
+              />
+            )}
+          </ContentStack>
         </Section>
-        <MonthPickerSheet
-          open={monthPickerOpen}
+
+        <MemoriesFilterSheet
+          filterSheetOpen={filters.filterSheetOpen}
+          monthPickerOpen={filters.monthPickerOpen}
           monthOptions={monthOptions}
-          selectedMonth={selectedMonth}
-          onSelect={setSelectedMonth}
-          onClose={() => setMonthPickerOpen(false)}
-        />
-        <TagPickerSheet
-          open={tagPickerOpen}
-          availableTags={MEMORY_TAG_OPTIONS}
-          selectedTags={selectedTags}
-          onDone={setSelectedTags}
-          onClose={() => setTagPickerOpen(false)}
+          draftMonth={filters.draftMonth}
+          draftMonthLabel={draftMonthLabel}
+          draftTags={filters.draftTags}
+          draftHighlightsOnly={filters.draftHighlightsOnly}
+          onCloseFilters={filters.closeFilters}
+          onClearFilters={filters.clearFilters}
+          onApplyFilters={filters.applyFilters}
+          onOpenMonthPicker={filters.openMonthPicker}
+          onCloseMonthPicker={filters.closeMonthPickerToFilters}
+          onSelectDraftMonth={filters.selectDraftMonth}
+          onToggleDraftTag={filters.toggleDraftTag}
+          onToggleDraftHighlightsOnly={filters.toggleDraftHighlightsOnly}
         />
       </PageShell>
     </PageContainer>

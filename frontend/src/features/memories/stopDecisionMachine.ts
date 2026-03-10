@@ -37,5 +37,9 @@ export function transitionStopDecision(
     return { state: 'hidden', shouldUpload: false, shouldDeleteLocalAudio: true }
   }
 
+  if (state === 'choice' && event === 'discard-confirmed') {
+    return { state: 'hidden', shouldUpload: false, shouldDeleteLocalAudio: true }
+  }
+
   return { state, shouldUpload: false, shouldDeleteLocalAudio: false }
 }

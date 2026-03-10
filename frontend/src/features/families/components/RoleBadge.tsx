@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import type { FamilyMemberRole } from '../api'
+import { toFamilyMemberRoleLabel, type FamilyMemberRole } from '../roles'
 
 interface RoleBadgeProps {
   role: FamilyMemberRole
@@ -20,6 +20,6 @@ const Badge = styled.span<{ $role: FamilyMemberRole }>`
 `
 
 export function RoleBadge({ role }: RoleBadgeProps) {
-  return <Badge $role={role}>{role === 'OWNER' ? 'Owner' : 'Member'}</Badge>
+  return <Badge $role={role}>{toFamilyMemberRoleLabel(role)}</Badge>
 }
 

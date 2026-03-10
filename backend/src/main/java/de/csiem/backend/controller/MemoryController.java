@@ -62,7 +62,8 @@ public class MemoryController {
         @RequestParam(value = "size", defaultValue = "20") int size,
         @RequestParam(value = "familyId", required = false) String familyId,
         @RequestParam(value = "month", required = false) String month,
-        @RequestParam(value = "tags", required = false) List<String> tags
+        @RequestParam(value = "tags", required = false) List<String> tags,
+        @RequestParam(value = "highlights", defaultValue = "false") boolean highlightsOnly
     ) {
         if (useSupabase()) {
             return supabaseMemoryService.getMemories(
@@ -71,10 +72,11 @@ public class MemoryController {
                 size,
                 familyId,
                 month,
-                tags
+                tags,
+                highlightsOnly
             );
         }
-        return memoryService.getMemories(page, size, month, tags);
+        return memoryService.getMemories(page, size, month, tags, highlightsOnly);
     }
 
     @GetMapping("/{id}")
