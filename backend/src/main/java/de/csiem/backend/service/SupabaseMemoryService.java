@@ -423,7 +423,14 @@ public class SupabaseMemoryService {
     }
 
     private String normalizeTranscript(String value) {
-        String normalized = value == null ? "" : value.trim().replaceAll("\\s+", " ");
+        String normalized = value == null ? "" : value
+            .replace("\\\\\"", "\"")
+            .replace("\\\\'", "'")
+            .replace("\\\"", "\"")
+            .replace("\\'", "'")
+            .replaceAll("\\\\+(?=[\"'])", "")
+            .trim()
+            .replaceAll("\\s+", " ");
         if (normalized.isBlank()) {
             throw new ResponseStatusException(BAD_REQUEST, "Transcript must not be empty");
         }
