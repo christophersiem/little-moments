@@ -53,7 +53,7 @@ describe('SettingsPage appearance selector', () => {
 
     renderWithProviders(<SettingsPage navigate={navigate} onLogout={vi.fn()} />)
 
-    fireEvent.click(screen.getByRole('button', { name: /account/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^account/i }))
     expect(navigate).toHaveBeenCalledWith(APP_ROUTES.settingsAccount)
   })
 })
