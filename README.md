@@ -26,3 +26,6 @@ cd frontend && npm install && npm run dev
 # backend
 cd backend && ./mvnw spring-boot:run
 ```
+
+## Demo Deployment (Railway)
+- Setup guide: `docs/deploy-railway.md`

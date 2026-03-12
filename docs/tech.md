@@ -48,6 +48,7 @@ Frontend:
 - `VITE_API_URL` (default `/api`)
 
 Backend:
+- `PORT` (platform-assigned runtime port, e.g. Railway)
 - `SERVER_PORT`
 - `SPRING_DATASOURCE_URL` / `DB_URL`
 - `SPRING_DATASOURCE_USERNAME` / `DB_USER`
@@ -64,6 +65,12 @@ Backend:
 - `MEMORY_SPLITTER_MIN_EXCERPT_CHARS`
 - `SUPABASE_URL` (or `VITE_SUPABASE_URL` fallback)
 - `SUPABASE_ANON_KEY` (or `VITE_SUPABASE_ANON_KEY` fallback)
+
+## Deployment (Railway Demo)
+- Deploy frontend and backend as two separate Railway services from this monorepo.
+- Frontend must set `VITE_API_URL` to the backend public URL (`https://<backend-domain>/api`).
+- Backend CORS must allow the frontend Railway domain via `CORS_ALLOWED_ORIGINS`.
+- Detailed setup steps: `docs/deploy-railway.md`.
 
 ## Security Model
 - JWT access token is passed from frontend to backend as Bearer token.
