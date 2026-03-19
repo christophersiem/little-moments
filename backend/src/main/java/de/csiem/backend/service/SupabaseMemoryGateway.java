@@ -68,6 +68,7 @@ class SupabaseMemoryGateway {
                 Map.of(
                     SupabaseFields.CHILD_ID, childId,
                     SupabaseFields.CREATED_BY, user.id(),
+                    SupabaseFields.USER_ID, user.id(),
                     SupabaseFields.RECORDED_AT, recordedAt.toString(),
                     SupabaseFields.STATUS, SupabaseStatuses.PROCESSING
                 ),
@@ -102,6 +103,7 @@ class SupabaseMemoryGateway {
                 Map.of(
                     SupabaseFields.CHILD_ID, childId,
                     SupabaseFields.CREATED_BY, user.id(),
+                    SupabaseFields.USER_ID, user.id(),
                     SupabaseFields.RECORDED_AT, recordedAt.toString(),
                     SupabaseFields.STATUS, SupabaseStatuses.READY,
                     SupabaseFields.TRANSCRIPT, transcript,
