@@ -1,18 +1,36 @@
-# AGENTS.md — Little Moments (Current MVP Guardrails)
+# AGENTS.md — Little Moments (Learning Project Guardrails)
 
 ## Goal
-Ship and stabilize the current MVP flow:
-record -> save -> processing -> list -> detail,
-with family sharing (owner/member roles) and invite links.
+Build and stabilize a strong full-stack learning project for professional training.
+
+Primary objective:
+- implement and refine the core product flow (`record -> save -> processing -> list -> detail`, plus family sharing/invites)
+- apply best practices in architecture, testing, security, and documentation
+
+Market readiness is nice to have, but not required for success.
 
 ## Scope Guardrails
-Build only what supports the current MVP directly.
+Build what supports learning outcomes and the current core product flow.
+
+In scope:
+- pragmatic refactors that improve readability, maintainability, and testability
+- improving developer experience, reliability, and error handling
+- documentation and architectural clarity
 
 Out of scope unless explicitly requested:
 - social/public sharing
 - analytics dashboards
 - medical/diagnostic interpretation
-- large architectural rewrites
+- large product pivots unrelated to current core flows
+- premature scale optimization and over-engineering
+
+## Quality Priorities
+When tradeoffs appear, prioritize in this order:
+1. Correctness and security
+2. Maintainability and clarity
+3. Automated test coverage for changed behavior
+4. UX reliability and clear failure states
+5. Delivery speed
 
 ## Current Runtime Architecture
 - Frontend: React + Vite + TypeScript
@@ -85,6 +103,14 @@ Out of scope unless explicitly requested:
 - Controllers do not access repositories directly.
 - Constructor injection only.
 
+## Best-Practice Expectations
+- Favor small, focused changes with explicit intent over broad rewrites.
+- Keep interfaces/contracts typed and validated at boundaries.
+- Handle errors explicitly (user-facing message + actionable logs where relevant).
+- Avoid hidden coupling; prefer clear module boundaries and dependency direction.
+- Add or update tests when behavior changes (unit first, integration where flow boundaries are crossed).
+- Prefer simple, robust solutions over clever abstractions.
+
 ## Data and Security Rules
 - Supabase SQL files in `docs/sql/*.sql` are schema/RLS/RPC source of truth.
 - RLS is authoritative for data access.
@@ -101,6 +127,7 @@ See `docs/README.md` for documentation ownership and source-of-truth mapping.
 
 ## Definition of Done
 - Frontend and backend compile.
+- Relevant tests pass for changed areas (or test gap is documented with rationale).
 - Happy path works end-to-end.
-- Failure states are handled with user-facing feedback.
+- Failure states are handled with user-facing feedback and clear diagnostics.
 - No undocumented behavior drift between code and docs.

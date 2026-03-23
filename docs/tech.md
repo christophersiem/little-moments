@@ -29,8 +29,10 @@ Memory create path:
 2. Backend inserts PROCESSING memory row.
 3. Backend transcribes audio via OpenAI.
 4. Backend enriches content (title/summary/tags, optional split handling).
-5. Backend persists READY/FAILED and returns response.
-6. Frontend polls memory status from `/api/memories/{id}` while needed.
+5. Backend persists READY/FAILED.
+6. Optional: backend triggers n8n webhook for created READY entries.
+7. Backend returns response.
+8. Frontend polls memory status from `/api/memories/{id}` while needed.
 
 Audio handling:
 - Audio is ephemeral in backend request flow; no storage bucket in default path.
@@ -65,6 +67,11 @@ Backend:
 - `MEMORY_SPLITTER_MIN_EXCERPT_CHARS`
 - `SUPABASE_URL` (or `VITE_SUPABASE_URL` fallback)
 - `SUPABASE_ANON_KEY` (or `VITE_SUPABASE_ANON_KEY` fallback)
+- `N8N_WEBHOOK_ENABLED` (default `false`)
+- `N8N_WEBHOOK_URL`
+- `N8N_WEBHOOK_API_KEY` (optional, sent as `X-API-Key`)
+- `N8N_WEBHOOK_DEFAULT_LANGUAGE` (default `en`)
+- `N8N_WEBHOOK_TIMEOUT_MS` (default `5000`)
 
 ## Deployment (Railway Demo)
 - Deploy frontend and backend as two separate Railway services from this monorepo.

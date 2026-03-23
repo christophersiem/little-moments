@@ -15,6 +15,7 @@ public class AppProperties {
     private final Insights insights = new Insights();
     private final Splitter splitter = new Splitter();
     private final Supabase supabase = new Supabase();
+    private final EnrichmentWebhook enrichmentWebhook = new EnrichmentWebhook();
 
     public UUID getDefaultUserId() {
         return defaultUserId;
@@ -46,6 +47,10 @@ public class AppProperties {
 
     public Supabase getSupabase() {
         return supabase;
+    }
+
+    public EnrichmentWebhook getEnrichmentWebhook() {
+        return enrichmentWebhook;
     }
 
     public List<String> getCorsOriginsAsList() {
@@ -199,6 +204,54 @@ public class AppProperties {
 
         public void setAnonKey(String anonKey) {
             this.anonKey = anonKey;
+        }
+    }
+
+    public static class EnrichmentWebhook {
+        private boolean enabled = false;
+        private String url;
+        private String apiKey;
+        private String defaultLanguage = "en";
+        private int timeoutMs = 5000;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getUrl() {
+            return url;
+        }
+
+        public void setUrl(String url) {
+            this.url = url;
+        }
+
+        public String getApiKey() {
+            return apiKey;
+        }
+
+        public void setApiKey(String apiKey) {
+            this.apiKey = apiKey;
+        }
+
+        public String getDefaultLanguage() {
+            return defaultLanguage;
+        }
+
+        public void setDefaultLanguage(String defaultLanguage) {
+            this.defaultLanguage = defaultLanguage;
+        }
+
+        public int getTimeoutMs() {
+            return timeoutMs;
+        }
+
+        public void setTimeoutMs(int timeoutMs) {
+            this.timeoutMs = timeoutMs;
         }
     }
 }
