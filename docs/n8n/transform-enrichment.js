@@ -2,6 +2,7 @@ const schema = require('./enrichment.schema.json');
 
 const CATEGORY_SET = new Set(schema.properties.category.enum);
 const EMOTION_SET = new Set(schema.properties.emotion.enum);
+const REQUIRED_FIELDS = new Set(schema.required);
 
 function clampImportance(value) {
   const numeric = Number.parseInt(value, 10);
@@ -49,6 +50,50 @@ function normalizeArray(input, maxItems) {
     .map((v) => String(v || '').trim())
     .filter(Boolean)
     .slice(0, maxItems);
+}
+
+function hasValue(input) {
+  if (input === null || input === undefined) {
+    return false;
+  }
+  if (typeof input === 'string') {
+    return input.trim().length > 0;
+  }
+  return true;
+}
+
+function validateRawParsed(parsed) {
+  const errors = [];
+
+  for (const field of REQUIRED_FIELDS) {
+    if (!hasValue(parsed[field])) {
+      errors.push(`${field} is required`);
+    }
+  }
+
+  if (hasValue(parsed.category)) {
+    const category = String(parsed.category).trim().toLowerCase();
+    if (!CATEGORY_SET.has(category)) {
+      errors.push('category must be one of milestone|funny|behavior|health|other');
+    }
+  }
+
+  if (hasValue(parsed.importance_score) && !Number.isFinite(Number(parsed.importance_score))) {
+    errors.push('importance_score must be numeric');
+  }
+
+  if (hasValue(parsed.confidence_score) && !Number.isFinite(Number(parsed.confidence_score))) {
+    errors.push('confidence_score must be numeric');
+  }
+
+  if (hasValue(parsed.processed_at) && Number.isNaN(new Date(parsed.processed_at).getTime())) {
+    errors.push('processed_at must be valid date-time');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors
+  };
 }
 
 function validateNormalized(enrichment) {
@@ -113,7 +158,13 @@ function normalizeEnrichment(parsed, defaults) {
     prompt_version: String(parsed.prompt_version || defaults.prompt_version || 'unknown-prompt').trim(),
     schema_version: String(parsed.schema_version || defaults.schema_version || '1.0.0').trim(),
     confidence_score: confidence,
-    model_cost_usd: parsed.model_cost_usd == null ? null : Number(parsed.model_cost_usd),
+    model_cost_usd: (() => {
+      if (parsed.model_cost_usd == null) {
+        return null;
+      }
+      const numeric = Number(parsed.model_cost_usd);
+      return Number.isFinite(numeric) ? numeric : null;
+    })(),
     processed_at: toIsoDate(parsed.processed_at, nowIso)
   };
 
@@ -133,8 +184,8 @@ function buildSuccessResult(context, normalized, rawResponse) {
       category: normalized.category,
       emotion: normalized.emotion,
       sentiment_score: normalized.sentiment_score,
-      keywords: JSON.stringify(normalized.keywords),
-      tags: JSON.stringify(normalized.tags),
+      keywords: normalized.keywords,
+      tags: normalized.tags,
       importance_score: normalized.importance_score,
       is_highlight: normalized.is_highlight,
       milestone_hint: normalized.milestone_hint,
@@ -145,7 +196,9 @@ function buildSuccessResult(context, normalized, rawResponse) {
       schema_version: normalized.schema_version,
       confidence_score: normalized.confidence_score,
       model_cost_usd: normalized.model_cost_usd,
-      raw_response: JSON.stringify(rawResponse),
+      raw_response: typeof rawResponse === 'object' && rawResponse !== null
+        ? rawResponse
+        : { raw_text: String(rawResponse || '') },
       processed_at: normalized.processed_at,
       run_status: 'SUCCESS'
     }
@@ -166,8 +219,8 @@ function buildRawSaveResult(context, rawResponse, errors) {
       category: 'other',
       emotion: 'neutral',
       sentiment_score: null,
-      keywords: JSON.stringify([]),
-      tags: JSON.stringify([]),
+      keywords: [],
+      tags: [],
       importance_score: 1,
       is_highlight: false,
       milestone_hint: null,
@@ -178,7 +231,9 @@ function buildRawSaveResult(context, rawResponse, errors) {
       schema_version: String(context.schema_version || '1.0.0'),
       confidence_score: 0,
       model_cost_usd: null,
-      raw_response: typeof rawResponse === 'string' ? rawResponse : JSON.stringify(rawResponse || {}),
+      raw_response: typeof rawResponse === 'object' && rawResponse !== null
+        ? rawResponse
+        : { raw_text: String(rawResponse || '') },
       processed_at: new Date().toISOString(),
       run_status: 'FAILED'
     }
@@ -191,6 +246,11 @@ function transformEnrichment({ rawOutput, memoryContext, defaults = {} }) {
     parsed = parseOutput(rawOutput);
   } catch (error) {
     return buildRawSaveResult(memoryContext, rawOutput, ['Invalid JSON output from LLM']);
+  }
+
+  const rawValidation = validateRawParsed(parsed);
+  if (!rawValidation.valid) {
+    return buildRawSaveResult(memoryContext, parsed, rawValidation.errors);
   }
 
   const normalized = normalizeEnrichment(parsed, defaults);
@@ -206,6 +266,7 @@ function transformEnrichment({ rawOutput, memoryContext, defaults = {} }) {
 module.exports = {
   transformEnrichment,
   clampImportance,
+  validateRawParsed,
   validateNormalized,
   normalizeEnrichment
 };

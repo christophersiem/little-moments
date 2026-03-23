@@ -38,7 +38,7 @@ create table if not exists public.memory_enrichments (
   id uuid primary key default gen_random_uuid(),
   memory_id uuid not null references public.memories(id) on delete cascade,
   owner_id uuid references auth.users(id),
-  child_id uuid references public.children(id),
+  child_id uuid,
   created_by_user_id uuid references auth.users(id),
 
   summary text not null,

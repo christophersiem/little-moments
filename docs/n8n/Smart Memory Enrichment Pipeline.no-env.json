@@ -19,7 +19,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $json.body ?? $json;\n\nconst memoryId = body.memory_id ?? body.entry_id ?? body.memory_entry_id ?? body.memory_entry?.id;\nconst childId = body.child_id ?? body.memory_entry?.child_id;\nconst transcription = body.transcription ?? body.transcript_text ?? body.memory_entry?.transcript_text;\nconst ownerId = body.owner_id ?? body.memory_entry?.owner_id ?? null;\nconst createdByUserId = body.created_by_user_id ?? body.memory_entry?.created_by_user_id ?? null;\nconst createdAt = body.created_at ?? body.event_created_at ?? new Date().toISOString();\nconst language = body.language ?? body.language_code ?? body.memory_entry?.language_code ?? 'en';\n\nif (!memoryId) throw new Error('Missing required field: entry_id/memory_id');\nif (!childId) throw new Error('Missing required field: child_id');\nif (!transcription || !String(transcription).trim()) throw new Error('Missing required field: transcription');\n\nreturn [{\n  json: {\n    memory_id: String(memoryId),\n    child_id: String(childId),\n    owner_id: ownerId ? String(ownerId) : null,\n    created_by_user_id: createdByUserId ? String(createdByUserId) : null,\n    transcription: String(transcription).trim(),\n    event_created_at: String(createdAt),\n    language_code: String(language),\n    transcript_version: Number(body.transcript_version ?? 1),\n    idempotency_key: String(body.idempotency_key ?? `${memoryId}:v${Number(body.transcript_version ?? 1)}`)\n  }\n}];"
+        "jsCode": "const body = $json.body ?? $json;\n\nconst memoryId = body.memory_id ?? body.entry_id ?? body.memory_entry_id ?? body.memory_entry?.id;\nconst childId = body.child_id ?? body.memory_entry?.child_id;\nconst transcription = body.transcription ?? body.transcript_text ?? body.memory_entry?.transcript_text;\nconst ownerId = body.owner_id ?? body.memory_entry?.owner_id ?? null;\nconst createdByUserId = body.created_by_user_id ?? body.memory_entry?.created_by_user_id ?? null;\nconst createdAt = body.created_at ?? body.event_created_at ?? new Date().toISOString();\nconst language = body.language ?? body.language_code ?? body.memory_entry?.language_code ?? 'en';\n\nif (!$vars.OPENAI_API_KEY) throw new Error('Missing workflow variable: OPENAI_API_KEY');\nif (!$vars.SUPABASE_URL) throw new Error('Missing workflow variable: SUPABASE_URL');\nif (!$vars.SUPABASE_SERVICE_ROLE_KEY) throw new Error('Missing workflow variable: SUPABASE_SERVICE_ROLE_KEY');\nif (!memoryId) throw new Error('Missing required field: entry_id/memory_id');\nif (!childId) throw new Error('Missing required field: child_id');\nif (!transcription || !String(transcription).trim()) throw new Error('Missing required field: transcription');\n\nreturn [{\n  json: {\n    memory_id: String(memoryId),\n    child_id: String(childId),\n    owner_id: ownerId ? String(ownerId) : null,\n    created_by_user_id: createdByUserId ? String(createdByUserId) : null,\n    transcription: String(transcription).trim(),\n    event_created_at: String(createdAt),\n    language_code: String(language),\n    transcript_version: Number(body.transcript_version ?? 1),\n    idempotency_key: String(body.idempotency_key ?? `${memoryId}:v${Number(body.transcript_version ?? 1)}`)\n  }\n}];"
       },
       "id": "f4f60b26-f163-4c43-a05d-487456d0c35f",
       "name": "Validate + Normalize",
@@ -52,7 +52,7 @@
           "parameters": [
             {
               "name": "Authorization",
-              "value": "=Bearer {{$vars.OPENAI_API_KEY || 'REPLACE_ME_OPENAI_API_KEY'}}"
+              "value": "=Bearer {{$vars.OPENAI_API_KEY}}"
             },
             {
               "name": "Content-Type",
@@ -107,17 +107,17 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{($vars.SUPABASE_URL || 'https://REPLACE_ME.supabase.co') + '/rest/v1/memory_enrichments?on_conflict=memory_id'}}",
+        "url": "={{$vars.SUPABASE_URL + '/rest/v1/memory_enrichments?on_conflict=memory_id'}}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{$vars.SUPABASE_SERVICE_ROLE_KEY || 'REPLACE_ME_SUPABASE_SERVICE_ROLE_KEY'}}"
+              "value": "={{$vars.SUPABASE_SERVICE_ROLE_KEY}}"
             },
             {
               "name": "Authorization",
-              "value": "=Bearer {{$vars.SUPABASE_SERVICE_ROLE_KEY || 'REPLACE_ME_SUPABASE_SERVICE_ROLE_KEY'}}"
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_ROLE_KEY}}"
             },
             {
               "name": "Content-Type",
@@ -148,17 +148,17 @@
     {
       "parameters": {
         "method": "PATCH",
-        "url": "={{($vars.SUPABASE_URL || 'https://REPLACE_ME.supabase.co') + '/rest/v1/memories?id=eq.' + $json.params.memory_id}}",
+        "url": "={{$vars.SUPABASE_URL + '/rest/v1/memories?id=eq.' + $json.params.memory_id}}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "={{$vars.SUPABASE_SERVICE_ROLE_KEY || 'REPLACE_ME_SUPABASE_SERVICE_ROLE_KEY'}}"
+              "value": "={{$vars.SUPABASE_SERVICE_ROLE_KEY}}"
             },
             {
               "name": "Authorization",
-              "value": "=Bearer {{$vars.SUPABASE_SERVICE_ROLE_KEY || 'REPLACE_ME_SUPABASE_SERVICE_ROLE_KEY'}}"
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_ROLE_KEY}}"
             },
             {
               "name": "Content-Type",

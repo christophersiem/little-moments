@@ -48,8 +48,56 @@ describe('transformEnrichment', () => {
 
     expect(result.route).toBe('raw_save');
     expect(result.enriched).toBe(false);
-    expect(result.params.raw_response).toContain('category');
+    expect(result.params.raw_response.category).toBe('milestone');
     expect(result.errors.length).toBeGreaterThan(0);
+  });
+
+  test('missing confidence_score -> routes to raw_save', () => {
+    const result = transformEnrichment({
+      rawOutput: {
+        summary: 'Factual summary.',
+        category: 'other',
+        importance_score: 5,
+        schema_version: '1.0.0',
+        processed_at: '2026-03-23T12:00:00Z'
+      },
+      memoryContext: baseContext
+    });
+
+    expect(result.route).toBe('raw_save');
+    expect(result.errors).toContain('confidence_score is required');
+  });
+
+  test('missing processed_at -> routes to raw_save', () => {
+    const result = transformEnrichment({
+      rawOutput: {
+        summary: 'Factual summary.',
+        category: 'other',
+        importance_score: 5,
+        schema_version: '1.0.0',
+        confidence_score: 0.6
+      },
+      memoryContext: baseContext
+    });
+
+    expect(result.route).toBe('raw_save');
+    expect(result.errors).toContain('processed_at is required');
+  });
+
+  test('missing category -> routes to raw_save', () => {
+    const result = transformEnrichment({
+      rawOutput: {
+        summary: 'Factual summary.',
+        importance_score: 5,
+        schema_version: '1.0.0',
+        processed_at: '2026-03-23T12:00:00Z',
+        confidence_score: 0.6
+      },
+      memoryContext: baseContext
+    });
+
+    expect(result.route).toBe('raw_save');
+    expect(result.errors).toContain('category is required');
   });
 
   test('out-of-range importance_score -> clamped to 1..10 and still valid', () => {

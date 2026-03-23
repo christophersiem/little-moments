@@ -55,7 +55,7 @@ Output JSON:
 ```
 
 ## 3) Transform / Function Node
-- Use code from [transform-enrichment.js](/Users/christopher/projects/little-moments/docs/n8n/transform-enrichment.js).
+- Use code from [transform-enrichment.js](./transform-enrichment.js).
 - Behavior:
 1. Parse LLM JSON.
 2. Validate against `enrichment.schema.json` rules.
@@ -159,7 +159,7 @@ where id = :memory_id;
 ```
 
 ## 6) Unit test stubs
-- See [transform-enrichment.test.js](/Users/christopher/projects/little-moments/docs/n8n/transform-enrichment.test.js).
+- See [transform-enrichment.test.js](./transform-enrichment.test.js).
 
 ## 7) Runbook notes
 - Log per enrichment call: `memory_id`, `model_name`, `model_version`, `prompt_version`, `schema_version`, `processed_at`, `model_cost_usd`, `run_status` and `raw_response` on failure.
