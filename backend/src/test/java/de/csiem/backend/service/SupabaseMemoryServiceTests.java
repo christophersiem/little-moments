@@ -30,6 +30,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -126,10 +127,12 @@ class SupabaseMemoryServiceTests {
             )
         );
         verify(memoryEnrichmentWebhookService).publishCreatedEntry(
-            memoryId,
-            "child-1",
-            transcript,
-            Instant.parse("2026-03-05T08:15:00Z")
+            eq(memoryId),
+            eq("child-1"),
+            eq(transcript),
+            eq(Instant.parse("2026-03-05T08:15:00Z")),
+            isNull(),
+            isNull()
         );
     }
 
@@ -199,18 +202,23 @@ class SupabaseMemoryServiceTests {
 
         assertEquals(2, response.count());
         assertEquals(List.of(firstId, secondId), response.ids());
-        verify(memoryEnrichmentWebhookService, times(2)).publishCreatedEntry(any(), eq("child-1"), anyString(), any());
+        verify(memoryEnrichmentWebhookService, times(2))
+            .publishCreatedEntry(any(), eq("child-1"), anyString(), any(), isNull(), isNull());
         verify(memoryEnrichmentWebhookService).publishCreatedEntry(
-            firstId,
-            "child-1",
-            "At breakfast he asked for more apples.",
-            recordedAt
+            eq(firstId),
+            eq("child-1"),
+            eq("At breakfast he asked for more apples."),
+            eq(recordedAt),
+            isNull(),
+            isNull()
         );
         verify(memoryEnrichmentWebhookService).publishCreatedEntry(
-            secondId,
-            "child-1",
-            "Later he climbed the ladder alone.",
-            splitTwoRecordedAt
+            eq(secondId),
+            eq("child-1"),
+            eq("Later he climbed the ladder alone."),
+            eq(splitTwoRecordedAt),
+            isNull(),
+            isNull()
         );
     }
 

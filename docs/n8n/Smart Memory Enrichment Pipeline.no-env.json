@@ -1,0 +1,287 @@
+{
+  "name": "Smart Memory Enrichment Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "smart-memory-enrichment",
+        "options": {}
+      },
+      "id": "ca980792-a9e3-44bd-a9b8-c650062ed93b",
+      "name": "Webhook - Memory Created",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        0
+      ],
+      "webhookId": "f0bc97d6-4648-47da-bcab-25f19f9d696e"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body ?? $json;\n\nconst memoryId = body.memory_id ?? body.entry_id ?? body.memory_entry_id ?? body.memory_entry?.id;\nconst childId = body.child_id ?? body.memory_entry?.child_id;\nconst transcription = body.transcription ?? body.transcript_text ?? body.memory_entry?.transcript_text;\nconst ownerId = body.owner_id ?? body.memory_entry?.owner_id ?? null;\nconst createdByUserId = body.created_by_user_id ?? body.memory_entry?.created_by_user_id ?? null;\nconst createdAt = body.created_at ?? body.event_created_at ?? new Date().toISOString();\nconst language = body.language ?? body.language_code ?? body.memory_entry?.language_code ?? 'en';\n\nif (!memoryId) throw new Error('Missing required field: entry_id/memory_id');\nif (!childId) throw new Error('Missing required field: child_id');\nif (!transcription || !String(transcription).trim()) throw new Error('Missing required field: transcription');\n\nreturn [{\n  json: {\n    memory_id: String(memoryId),\n    child_id: String(childId),\n    owner_id: ownerId ? String(ownerId) : null,\n    created_by_user_id: createdByUserId ? String(createdByUserId) : null,\n    transcription: String(transcription).trim(),\n    event_created_at: String(createdAt),\n    language_code: String(language),\n    transcript_version: Number(body.transcript_version ?? 1),\n    idempotency_key: String(body.idempotency_key ?? `${memoryId}:v${Number(body.transcript_version ?? 1)}`)\n  }\n}];"
+      },
+      "id": "f4f60b26-f163-4c43-a05d-487456d0c35f",
+      "name": "Validate + Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const systemPrompt = `You are a structured enrichment engine for parenting memory transcripts.\nReturn ONLY valid JSON, no markdown, no commentary, no extra keys.\nYour output MUST conform to enrichment.schema.json.\n\nRules:\n- Ground every field in the transcript.\n- Never mention transcript/recording/AI in summary.\n- summary must be factual and concise.\n- category must be one of: milestone, funny, behavior, health, other.\n- emotion must be one of: joy, neutral, sadness, surprise, anger, fear, other.\n- importance_score must be an integer 1..10.\n- confidence_score must be 0..1.\n- keywords max 6 short strings.\n- Always include schema_version.\n- Always include processed_at as ISO datetime.\n\nFew-shot example 1:\nInput transcript:\nYesterday at breakfast he asked for more bananas using a full sentence for the first time.\nOutput JSON:\n{\"summary\":\"At breakfast, the child asked for more bananas in a full sentence.\",\"category\":\"milestone\",\"emotion\":\"joy\",\"sentiment_score\":0.7,\"keywords\":[\"breakfast\",\"bananas\",\"full sentence\"],\"tags\":[\"language\",\"milestone\"],\"importance_score\":9,\"is_highlight\":true,\"milestone_hint\":\"first full sentence request\",\"embedding_id\":null,\"model_name\":\"gpt-4o-mini\",\"model_version\":\"2026-03\",\"prompt_version\":\"enrichment-v2\",\"schema_version\":\"1.0.0\",\"confidence_score\":0.88,\"model_cost_usd\":0.0015,\"processed_at\":\"2026-03-23T12:00:00Z\"}\n\nFew-shot example 2:\nInput transcript:\nHe laughed when the soap bubbles popped in the bath and asked for more.\nOutput JSON:\n{\"summary\":\"During bath time, the child laughed at popping soap bubbles and asked for more.\",\"category\":\"funny\",\"emotion\":\"joy\",\"sentiment_score\":0.6,\"keywords\":[\"bath\",\"bubbles\",\"laugh\"],\"tags\":[\"play\"],\"importance_score\":6,\"is_highlight\":false,\"milestone_hint\":null,\"embedding_id\":null,\"model_name\":\"gpt-4o-mini\",\"model_version\":\"2026-03\",\"prompt_version\":\"enrichment-v2\",\"schema_version\":\"1.0.0\",\"confidence_score\":0.81,\"model_cost_usd\":0.0012,\"processed_at\":\"2026-03-23T12:00:00Z\"}`;\n\nconst userPrompt = `Language: ${$json.language_code}\\nTranscript:\\n${$json.transcription}`;\n\nreturn [{ json: { ...$json, systemPrompt, userPrompt } }];"
+      },
+      "id": "68b804b6-ca7a-4229-94f2-43bcb1ca3a97",
+      "name": "Build LLM Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.OPENAI_API_KEY || 'REPLACE_ME_OPENAI_API_KEY'}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"model\": $vars.OPENAI_MODEL || 'gpt-4o-mini', \"temperature\": 0.2, \"messages\": [ { \"role\": \"system\", \"content\": $json.systemPrompt }, { \"role\": \"user\", \"content\": $json.userPrompt } ], \"response_format\": { \"type\": \"json_object\" } } }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "91f49e89-865a-4254-980a-133b36237449",
+      "name": "Call OpenAI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "5ac85560-8471-415b-b4d9-ab6ccb026dc9",
+      "name": "Merge Context + LLM",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const categories = new Set(['milestone', 'funny', 'behavior', 'health', 'other']);\nconst emotions = new Set(['joy', 'neutral', 'sadness', 'surprise', 'anger', 'fear', 'other']);\n\nconst parseModelOutput = (value) => {\n  if (value == null) return {};\n  if (typeof value === 'object') return value;\n  const text = String(value).trim();\n  if (!text) return {};\n  return JSON.parse(text);\n};\n\nconst clampImportance = (value) => {\n  const parsed = Number.parseInt(value, 10);\n  if (!Number.isFinite(parsed)) return 1;\n  return Math.max(1, Math.min(10, parsed));\n};\n\nconst clampConfidence = (value) => {\n  const parsed = Number.parseFloat(value);\n  if (!Number.isFinite(parsed)) return 0;\n  return Math.max(0, Math.min(1, parsed));\n};\n\nconst normalizeArray = (value, maxItems) => {\n  if (!Array.isArray(value)) return [];\n  return value.map((v) => String(v ?? '').trim()).filter(Boolean).slice(0, maxItems);\n};\n\nlet parsed;\nconst rawContent = $json.choices?.[0]?.message?.content ?? '';\n\ntry {\n  parsed = parseModelOutput(rawContent);\n} catch (error) {\n  return [{\n    json: {\n      route: 'raw_save',\n      enriched: false,\n      enrichment_status: 'FAILED',\n      params: {\n        memory_id: $json.memory_id,\n        owner_id: $json.owner_id,\n        child_id: $json.child_id,\n        created_by_user_id: $json.created_by_user_id,\n        summary: 'Enrichment failed validation.',\n        category: 'other',\n        emotion: 'neutral',\n        sentiment_score: null,\n        keywords: [],\n        tags: [],\n        importance_score: 1,\n        is_highlight: false,\n        milestone_hint: null,\n        embedding_id: null,\n        model_name: $vars.OPENAI_MODEL || 'gpt-4o-mini',\n        model_version: null,\n        prompt_version: 'enrichment-v2',\n        schema_version: '1.0.0',\n        confidence_score: 0,\n        model_cost_usd: null,\n        raw_response: { raw_text: String(rawContent) },\n        processed_at: new Date().toISOString(),\n        run_status: 'FAILED'\n      }\n    }\n  }];\n}\n\nconst categoryCandidate = String(parsed.category ?? '').trim().toLowerCase();\nconst emotionCandidate = String(parsed.emotion ?? 'neutral').trim().toLowerCase();\nconst importanceScore = clampImportance(parsed.importance_score);\nconst confidenceScore = clampConfidence(parsed.confidence_score);\nconst normalizedCategory = categories.has(categoryCandidate) ? categoryCandidate : 'other';\nconst normalizedEmotion = emotions.has(emotionCandidate) ? emotionCandidate : 'neutral';\nconst summary = String(parsed.summary ?? '').trim();\nconst schemaVersion = String(parsed.schema_version ?? '1.0.0').trim();\nconst processedAt = (() => {\n  const date = new Date(parsed.processed_at ?? Date.now());\n  return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();\n})();\nconst keywords = normalizeArray(parsed.keywords, 6);\nconst tags = normalizeArray(parsed.tags, 20);\nconst sentimentScore = typeof parsed.sentiment_score === 'number' ? parsed.sentiment_score : null;\nconst modelCostUsd = parsed.model_cost_usd == null ? null : Number(parsed.model_cost_usd);\nconst modelName = String(parsed.model_name ?? ($vars.OPENAI_MODEL || 'gpt-4o-mini')).trim();\nconst modelVersion = parsed.model_version == null ? null : String(parsed.model_version).trim();\nconst promptVersion = String(parsed.prompt_version ?? 'enrichment-v2').trim();\nconst milestoneHint = parsed.milestone_hint == null ? null : String(parsed.milestone_hint).trim();\nconst embeddingId = parsed.embedding_id == null ? null : String(parsed.embedding_id).trim();\nconst isHighlight = typeof parsed.is_highlight === 'boolean'\n  ? parsed.is_highlight\n  : (importanceScore >= 8 || normalizedCategory === 'milestone');\n\nconst requiredErrors = [];\nif (!summary) requiredErrors.push('summary is required');\nif (!schemaVersion) requiredErrors.push('schema_version is required');\nif (!Number.isFinite(confidenceScore)) requiredErrors.push('confidence_score is required');\n\nif (requiredErrors.length > 0) {\n  return [{\n    json: {\n      route: 'raw_save',\n      enriched: false,\n      enrichment_status: 'FAILED',\n      errors: requiredErrors,\n      params: {\n        memory_id: $json.memory_id,\n        owner_id: $json.owner_id,\n        child_id: $json.child_id,\n        created_by_user_id: $json.created_by_user_id,\n        summary: 'Enrichment failed validation.',\n        category: 'other',\n        emotion: 'neutral',\n        sentiment_score: null,\n        keywords: [],\n        tags: [],\n        importance_score: 1,\n        is_highlight: false,\n        milestone_hint: null,\n        embedding_id: null,\n        model_name: modelName || 'gpt-4o-mini',\n        model_version: modelVersion,\n        prompt_version: promptVersion || 'enrichment-v2',\n        schema_version: schemaVersion || '1.0.0',\n        confidence_score: 0,\n        model_cost_usd: null,\n        raw_response: { parsed },\n        processed_at: new Date().toISOString(),\n        run_status: 'FAILED'\n      }\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    route: 'valid_upsert',\n    enriched: true,\n    enrichment_status: 'SUCCESS',\n    params: {\n      memory_id: $json.memory_id,\n      owner_id: $json.owner_id,\n      child_id: $json.child_id,\n      created_by_user_id: $json.created_by_user_id,\n      summary,\n      category: normalizedCategory,\n      emotion: normalizedEmotion,\n      sentiment_score: sentimentScore,\n      keywords,\n      tags,\n      importance_score: importanceScore,\n      is_highlight: isHighlight,\n      milestone_hint: milestoneHint || null,\n      embedding_id: embeddingId || null,\n      model_name: modelName || 'gpt-4o-mini',\n      model_version: modelVersion,\n      prompt_version: promptVersion || 'enrichment-v2',\n      schema_version: schemaVersion || '1.0.0',\n      confidence_score: confidenceScore,\n      model_cost_usd: Number.isFinite(modelCostUsd) ? modelCostUsd : null,\n      raw_response: parsed,\n      processed_at: processedAt,\n      run_status: 'SUCCESS'\n    }\n  }\n}];"
+      },
+      "id": "31617a44-f588-481d-b0c1-ff63149211df",
+      "name": "Parse + Guardrails",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($vars.SUPABASE_URL || 'https://REPLACE_ME.supabase.co') + '/rest/v1/memory_enrichments?on_conflict=memory_id'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.SUPABASE_SERVICE_ROLE_KEY || 'REPLACE_ME_SUPABASE_SERVICE_ROLE_KEY'}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_ROLE_KEY || 'REPLACE_ME_SUPABASE_SERVICE_ROLE_KEY'}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json.params}}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "208d17d4-ac19-456f-b8c5-4d569f1bc9bc",
+      "name": "Upsert Enrichment (Supabase)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{($vars.SUPABASE_URL || 'https://REPLACE_ME.supabase.co') + '/rest/v1/memories?id=eq.' + $json.params.memory_id}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{$vars.SUPABASE_SERVICE_ROLE_KEY || 'REPLACE_ME_SUPABASE_SERVICE_ROLE_KEY'}}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$vars.SUPABASE_SERVICE_ROLE_KEY || 'REPLACE_ME_SUPABASE_SERVICE_ROLE_KEY'}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"enriched\": $json.enriched, \"enrichment_status\": $json.enrichment_status } }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "7f84d415-8708-4d91-ae9a-75e6e8b8fd46",
+      "name": "Update Memory Enrichment Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Memory Created": {
+      "main": [
+        [
+          {
+            "node": "Validate + Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate + Normalize": {
+      "main": [
+        [
+          {
+            "node": "Build LLM Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build LLM Prompt": {
+      "main": [
+        [
+          {
+            "node": "Call OpenAI",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Context + LLM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Merge Context + LLM",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Context + LLM": {
+      "main": [
+        [
+          {
+            "node": "Parse + Guardrails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse + Guardrails": {
+      "main": [
+        [
+          {
+            "node": "Upsert Enrichment (Supabase)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Enrichment (Supabase)": {
+      "main": [
+        [
+          {
+            "node": "Update Memory Enrichment Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "4f8f0b8c-1043-43bb-8fb8-ecb79e19a5d3",
+  "meta": {
+    "instanceId": "c7f14c6c684353f31426ad09db6ada02b89e9ecb5f18d0faba7cdf7b246e70c4"
+  },
+  "id": "xcv8tava0mBsBNit",
+  "tags": []
+}
