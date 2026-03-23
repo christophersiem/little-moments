@@ -41,19 +41,22 @@ public class SupabaseMemoryService {
     private final MemorySplittingService memorySplittingService;
     private final MemoryTaggingService memoryTaggingService;
     private final MemoryInsightsService memoryInsightsService;
+    private final MemoryEnrichmentWebhookService memoryEnrichmentWebhookService;
 
     public SupabaseMemoryService(
         SupabaseGatewayService supabaseGatewayService,
         TranscriptionService transcriptionService,
         MemorySplittingService memorySplittingService,
         MemoryTaggingService memoryTaggingService,
-        MemoryInsightsService memoryInsightsService
+        MemoryInsightsService memoryInsightsService,
+        MemoryEnrichmentWebhookService memoryEnrichmentWebhookService
     ) {
         this.supabaseGatewayService = supabaseGatewayService;
         this.transcriptionService = transcriptionService;
         this.memorySplittingService = memorySplittingService;
         this.memoryTaggingService = memoryTaggingService;
         this.memoryInsightsService = memoryInsightsService;
+        this.memoryEnrichmentWebhookService = memoryEnrichmentWebhookService;
     }
 
     public boolean isEnabled() {
@@ -89,7 +92,7 @@ public class SupabaseMemoryService {
                 SplitMemory splitMemory = splitMemories.isEmpty()
                     ? new SplitMemory(transcript, uploadTimestamp, 1.0)
                     : splitMemories.getFirst();
-                return persistSingleMemory(authorizationHeader, memoryId, splitMemory);
+                return persistSingleMemory(authorizationHeader, memoryId, request.childId().trim(), splitMemory);
             }
 
             return persistSplitMemories(authorizationHeader, memoryId, request.childId().trim(), splitMemories);
@@ -245,7 +248,12 @@ public class SupabaseMemoryService {
         supabaseGatewayService.deleteMemoryById(authorizationHeader, id.toString());
     }
 
-    private CreateMemoryResponse persistSingleMemory(String authorizationHeader, String memoryId, SplitMemory splitMemory) {
+    private CreateMemoryResponse persistSingleMemory(
+        String authorizationHeader,
+        String memoryId,
+        String childId,
+        SplitMemory splitMemory
+    ) {
         String excerpt = normalizeTranscript(splitMemory.excerpt());
         MemoryInsightsService.MemoryInsights insights = memoryInsightsService.generate(excerpt);
         Map<String, Object> patch = new java.util.LinkedHashMap<>();
@@ -264,6 +272,13 @@ public class SupabaseMemoryService {
         );
 
         UUID id = uuid(text(saved.get("id")));
+        memoryEnrichmentWebhookService.publishCreatedEntry(
+            id,
+            childId,
+            excerpt,
+            instant(saved.get("created_at"))
+        );
+
         return new CreateMemoryResponse(
             id,
             List.of(id),
@@ -320,7 +335,14 @@ public class SupabaseMemoryService {
                 );
             }
 
-            ids.add(uuid(text(saved.get("id"))));
+            UUID id = uuid(text(saved.get("id")));
+            ids.add(id);
+            memoryEnrichmentWebhookService.publishCreatedEntry(
+                id,
+                childId,
+                excerpt,
+                instant(saved.get("created_at"))
+            );
         }
 
         if (firstSaved == null) {

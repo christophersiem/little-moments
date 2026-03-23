@@ -51,6 +51,9 @@ class SupabaseMemoryServiceTests {
     @Mock
     private MemoryInsightsService memoryInsightsService;
 
+    @Mock
+    private MemoryEnrichmentWebhookService memoryEnrichmentWebhookService;
+
     private SupabaseMemoryService supabaseMemoryService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -61,7 +64,8 @@ class SupabaseMemoryServiceTests {
             transcriptionService,
             memorySplittingService,
             memoryTaggingService,
-            memoryInsightsService
+            memoryInsightsService,
+            memoryEnrichmentWebhookService
         );
     }
 
@@ -92,6 +96,7 @@ class SupabaseMemoryServiceTests {
             .thenReturn(json("""
                 {
                   "id": "%s",
+                  "created_at": "2026-03-05T08:15:00Z",
                   "status": "READY",
                   "error_message": null,
                   "transcript": "She asked for another bedtime story.",
@@ -115,6 +120,12 @@ class SupabaseMemoryServiceTests {
         verify(supabaseGatewayService).updateMemoryById(eq("Bearer token"), eq(memoryId.toString()), patchCaptor.capture());
         assertEquals("READY", patchCaptor.getValue().get("status"));
         assertEquals("A clear language leap.", patchCaptor.getValue().get("summary"));
+        verify(memoryEnrichmentWebhookService).publishCreatedEntry(
+            memoryId,
+            "child-1",
+            transcript,
+            Instant.parse("2026-03-05T08:15:00Z")
+        );
     }
 
     @Test
@@ -156,6 +167,7 @@ class SupabaseMemoryServiceTests {
         verify(supabaseGatewayService).updateMemoryById(eq("Bearer token"), eq(memoryId.toString()), patchCaptor.capture());
         assertEquals("FAILED", patchCaptor.getValue().get("status"));
         assertNull(patchCaptor.getValue().get("transcript"));
+        verifyNoInteractions(memoryEnrichmentWebhookService);
     }
 
     @Test
@@ -169,7 +181,12 @@ class SupabaseMemoryServiceTests {
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
         assertEquals("Audio file is required", exception.getReason());
-        verifyNoInteractions(supabaseGatewayService, transcriptionService, memorySplittingService);
+        verifyNoInteractions(
+            supabaseGatewayService,
+            transcriptionService,
+            memorySplittingService,
+            memoryEnrichmentWebhookService
+        );
     }
 
     @Test
@@ -187,7 +204,12 @@ class SupabaseMemoryServiceTests {
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
         assertEquals("childId is required", exception.getReason());
-        verifyNoInteractions(supabaseGatewayService, transcriptionService, memorySplittingService);
+        verifyNoInteractions(
+            supabaseGatewayService,
+            transcriptionService,
+            memorySplittingService,
+            memoryEnrichmentWebhookService
+        );
     }
 
     private JsonNode json(String payload) throws Exception {
