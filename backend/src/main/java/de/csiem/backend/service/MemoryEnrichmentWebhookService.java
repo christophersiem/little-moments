@@ -33,7 +33,14 @@ public class MemoryEnrichmentWebhookService {
         this.restClient = RestClient.builder().requestFactory(requestFactory).build();
     }
 
-    public void publishCreatedEntry(UUID entryId, String childId, String transcription, Instant createdAt) {
+    public void publishCreatedEntry(
+        UUID entryId,
+        String childId,
+        String transcription,
+        Instant createdAt,
+        String ownerId,
+        String createdByUserId
+    ) {
         AppProperties.EnrichmentWebhook config = appProperties.getEnrichmentWebhook();
         if (!config.isEnabled() || !StringUtils.hasText(config.getUrl())) {
             return;
@@ -49,6 +56,8 @@ public class MemoryEnrichmentWebhookService {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("entry_id", entryId.toString());
         payload.put("child_id", childId);
+        payload.put("owner_id", StringUtils.hasText(ownerId) ? ownerId : null);
+        payload.put("created_by_user_id", StringUtils.hasText(createdByUserId) ? createdByUserId : null);
         payload.put("transcription", transcription);
         payload.put("audio_url", null);
         payload.put("created_at", createdAt != null ? createdAt.toString() : Instant.now().toString());

@@ -31,8 +31,10 @@ Memory create path:
 4. Backend enriches content (title/summary/tags, optional split handling).
 5. Backend persists READY/FAILED.
 6. Optional: backend triggers n8n webhook for created READY entries.
-7. Backend returns response.
-8. Frontend polls memory status from `/api/memories/{id}` while needed.
+7. n8n validates structured enrichment output and upserts `public.memory_enrichments`.
+8. n8n updates `public.memories.enriched` + `public.memories.enrichment_status`.
+9. Backend returns response.
+10. Frontend polls memory status from `/api/memories/{id}` while needed.
 
 Audio handling:
 - Audio is ephemeral in backend request flow; no storage bucket in default path.

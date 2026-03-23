@@ -276,7 +276,9 @@ public class SupabaseMemoryService {
             id,
             childId,
             excerpt,
-            resolveCreatedAt(saved, splitMemory.recordedAt())
+            resolveCreatedAt(saved, splitMemory.recordedAt()),
+            nullableText(saved.get("owner_id")),
+            nullableText(saved.get("created_by"))
         );
 
         return new CreateMemoryResponse(
@@ -341,7 +343,9 @@ public class SupabaseMemoryService {
                 id,
                 childId,
                 excerpt,
-                resolveCreatedAt(saved, splitMemory.recordedAt())
+                resolveCreatedAt(saved, splitMemory.recordedAt()),
+                nullableText(saved.get("owner_id")),
+                nullableText(saved.get("created_by"))
             );
         }
 

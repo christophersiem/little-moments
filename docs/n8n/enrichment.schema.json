@@ -1,0 +1,131 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://little-moments.local/schemas/enrichment.schema.json",
+  "title": "Memory Enrichment Output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "summary",
+    "category",
+    "importance_score",
+    "schema_version",
+    "processed_at",
+    "confidence_score"
+  ],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "category": {
+      "type": "string",
+      "enum": ["milestone", "funny", "behavior", "health", "other"]
+    },
+    "emotion": {
+      "type": "string",
+      "enum": ["joy", "neutral", "sadness", "surprise", "anger", "fear", "other"],
+      "default": "neutral"
+    },
+    "sentiment_score": {
+      "type": "number",
+      "minimum": -1,
+      "maximum": 1
+    },
+    "keywords": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64
+      },
+      "maxItems": 6,
+      "default": []
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64
+      },
+      "default": []
+    },
+    "importance_score": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "is_highlight": {
+      "type": "boolean"
+    },
+    "milestone_hint": {
+      "type": ["string", "null"],
+      "maxLength": 255
+    },
+    "embedding_id": {
+      "type": ["string", "null"],
+      "maxLength": 255
+    },
+    "model_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "model_version": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "prompt_version": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "schema_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32
+    },
+    "confidence_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "model_cost_usd": {
+      "type": "number",
+      "minimum": 0
+    },
+    "processed_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "examples": [
+    {
+      "summary": "At breakfast, the child asked for more bananas using a full sentence for the first time.",
+      "category": "milestone",
+      "emotion": "joy",
+      "sentiment_score": 0.72,
+      "keywords": ["breakfast", "bananas", "full sentence"],
+      "tags": ["language", "milestone"],
+      "importance_score": 9,
+      "is_highlight": true,
+      "milestone_hint": "first full sentence request",
+      "embedding_id": null,
+      "model_name": "gpt-4o-mini",
+      "model_version": "2026-03",
+      "prompt_version": "enrichment-v2",
+      "schema_version": "1.0.0",
+      "confidence_score": 0.88,
+      "model_cost_usd": 0.0017,
+      "processed_at": "2026-03-23T12:00:00Z"
+    }
+  ],
+  "x-invalid-examples": [
+    {
+      "summary": "Missing required fields",
+      "category": "milestone",
+      "importance_score": 12,
+      "keywords": ["a", "b", "c", "d", "e", "f", "g"]
+    }
+  ]
+}
