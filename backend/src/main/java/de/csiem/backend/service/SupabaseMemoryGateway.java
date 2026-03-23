@@ -8,6 +8,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -15,6 +16,8 @@ import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 class SupabaseMemoryGateway {
+
+    private static final String LEGACY_USER_UPSERT_PREFER_HEADER = "resolution=ignore-duplicates,return=minimal";
 
     private final SupabaseHttpClient supabaseHttpClient;
 
@@ -56,6 +59,7 @@ class SupabaseMemoryGateway {
 
     JsonNode createProcessingMemory(String authorizationHeader, String childId, Instant recordedAt) {
         SupabaseHttpClient.SupabaseUser user = supabaseHttpClient.getCurrentUser(authorizationHeader);
+        ensureLegacyUserExists(authorizationHeader, user);
         String uri = UriComponentsBuilder
             .fromPath("/rest/v1/memories")
             .queryParam("select", memorySelect())
@@ -91,6 +95,7 @@ class SupabaseMemoryGateway {
         List<String> tags
     ) {
         SupabaseHttpClient.SupabaseUser user = supabaseHttpClient.getCurrentUser(authorizationHeader);
+        ensureLegacyUserExists(authorizationHeader, user);
         String uri = UriComponentsBuilder
             .fromPath("/rest/v1/memories")
             .queryParam("select", memorySelect())
@@ -364,6 +369,38 @@ class SupabaseMemoryGateway {
             }
         }
         return childIds;
+    }
+
+    private void ensureLegacyUserExists(String authorizationHeader, SupabaseHttpClient.SupabaseUser user) {
+        if (!StringUtils.hasText(user.id())) {
+            return;
+        }
+
+        String uri = UriComponentsBuilder
+            .fromPath("/rest/v1/users")
+            .queryParam("on_conflict", SupabaseFields.ID)
+            .build(true)
+            .toUriString();
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put(SupabaseFields.ID, user.id());
+        if (StringUtils.hasText(user.email())) {
+            payload.put("email", user.email());
+        }
+
+        try {
+            supabaseHttpClient.post(
+                uri,
+                payload,
+                authorizationHeader,
+                LEGACY_USER_UPSERT_PREFER_HEADER,
+                SupabaseHttpClient.REQUEST_FAILED_MESSAGE
+            );
+        } catch (ResponseStatusException ex) {
+            if (ex.getStatusCode().value() != NOT_FOUND.value()) {
+                throw ex;
+            }
+        }
     }
 
     private String memorySelect() {
