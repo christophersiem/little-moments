@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class MemoryEnrichmentWebhookService {
@@ -21,9 +22,15 @@ public class MemoryEnrichmentWebhookService {
     private static final Logger log = LoggerFactory.getLogger(MemoryEnrichmentWebhookService.class);
 
     private final AppProperties appProperties;
+    private final RestClient restClient;
 
     public MemoryEnrichmentWebhookService(AppProperties appProperties) {
         this.appProperties = appProperties;
+        int timeoutMs = Math.max(appProperties.getEnrichmentWebhook().getTimeoutMs(), 1000);
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(timeoutMs);
+        requestFactory.setReadTimeout(timeoutMs);
+        this.restClient = RestClient.builder().requestFactory(requestFactory).build();
     }
 
     public void publishCreatedEntry(UUID entryId, String childId, String transcription, Instant createdAt) {
@@ -44,29 +51,23 @@ public class MemoryEnrichmentWebhookService {
         payload.put("child_id", childId);
         payload.put("transcription", transcription);
         payload.put("audio_url", null);
-        payload.put("created_at", createdAt.toString());
+        payload.put("created_at", createdAt != null ? createdAt.toString() : Instant.now().toString());
         payload.put("language", language);
 
-        try {
-            RestClient.Builder builder = RestClient.builder();
-            int timeoutMs = Math.max(config.getTimeoutMs(), 1000);
-            SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-            requestFactory.setConnectTimeout(timeoutMs);
-            requestFactory.setReadTimeout(timeoutMs);
-            builder.requestFactory(requestFactory);
-
-            builder.build()
-                .post()
-                .uri(config.getUrl().trim())
-                .contentType(MediaType.APPLICATION_JSON)
-                .headers(headers -> applyHeaders(headers, config))
-                .body(payload)
-                .retrieve()
-                .toBodilessEntity();
-        } catch (Exception ex) {
-            // Webhook enrichment is optional and must never block record/save UX.
-            log.warn("Could not send n8n enrichment webhook for memory {}: {}", entryId, ex.getMessage());
-        }
+        CompletableFuture.runAsync(() -> {
+            try {
+                restClient.post()
+                    .uri(config.getUrl().trim())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .headers(headers -> applyHeaders(headers, config))
+                    .body(payload)
+                    .retrieve()
+                    .toBodilessEntity();
+            } catch (Exception ex) {
+                // Webhook enrichment is optional and must never block record/save UX.
+                log.warn("Could not send n8n enrichment webhook for memory {}", entryId, ex);
+            }
+        });
     }
 
     private void applyHeaders(HttpHeaders headers, AppProperties.EnrichmentWebhook config) {

@@ -276,7 +276,7 @@ public class SupabaseMemoryService {
             id,
             childId,
             excerpt,
-            instant(saved.get("created_at"))
+            resolveCreatedAt(saved, splitMemory.recordedAt())
         );
 
         return new CreateMemoryResponse(
@@ -341,7 +341,7 @@ public class SupabaseMemoryService {
                 id,
                 childId,
                 excerpt,
-                instant(saved.get("created_at"))
+                resolveCreatedAt(saved, splitMemory.recordedAt())
             );
         }
 
@@ -411,6 +411,21 @@ public class SupabaseMemoryService {
             return message;
         }
         return message.substring(0, MAX_ERROR_LENGTH);
+    }
+
+    private Instant resolveCreatedAt(JsonNode row, Instant fallback) {
+        String createdAtText = nullableText(row.get("created_at"));
+        if (StringUtils.hasText(createdAtText)) {
+            try {
+                return Instant.parse(createdAtText);
+            } catch (DateTimeParseException ignored) {
+                // Fallback handled below.
+            }
+        }
+        if (fallback != null) {
+            return fallback;
+        }
+        return Instant.now();
     }
 
     private List<String> resolveTagLabels(List<String> tags) {
