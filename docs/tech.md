@@ -31,8 +31,11 @@ Memory create path:
 4. Backend enriches content (title/summary/tags, optional split handling).
 5. Backend persists READY/FAILED.
 6. Optional: backend triggers n8n webhook for created READY entries.
-7. Backend returns response.
-8. Frontend polls memory status from `/api/memories/{id}` while needed.
+7. n8n writes/updates `public.memory_enrichments` rows.
+8. Embedding worker claims `pending` enrichment rows (`FOR UPDATE SKIP LOCKED`) and writes vectors to `public.embeddings`.
+9. Embedding worker marks enrichment rows `ready`/`failed` and writes DLQ entries for triage.
+10. Backend returns response.
+11. Frontend polls memory status from `/api/memories/{id}` while needed.
 
 Audio handling:
 - Audio is ephemeral in backend request flow; no storage bucket in default path.
@@ -72,6 +75,17 @@ Backend:
 - `N8N_WEBHOOK_API_KEY` (optional, sent as `X-API-Key`)
 - `N8N_WEBHOOK_DEFAULT_LANGUAGE` (default `en`)
 - `N8N_WEBHOOK_TIMEOUT_MS` (default `5000`)
+
+Embedding worker:
+- `DATABASE_URL`
+- `EMBEDDING_API_KEY`
+- `EMBEDDING_MODEL`
+- `EMBEDDING_MODEL_VERSION`
+- `EMBEDDING_DIM`
+- `BATCH_SIZE`
+- `MAX_RETRIES`
+- `EMBEDDING_API_URL` (optional, defaults to OpenAI embeddings endpoint)
+- `EMBEDDING_COST_PER_TOKEN` (for `model_cost_usd` estimation)
 
 ## Deployment (Railway Demo)
 - Deploy frontend and backend as two separate Railway services from this monorepo.

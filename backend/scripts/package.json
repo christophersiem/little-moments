@@ -1,0 +1,16 @@
+{
+  "name": "little-moments-embedding-worker",
+  "private": true,
+  "version": "1.0.0",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node embedding-worker.js",
+    "test": "jest embedding-worker.test.js"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "jest": "^30.1.0"
+  }
+}
