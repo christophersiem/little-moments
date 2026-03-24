@@ -30,12 +30,13 @@ Memory create path:
 3. Backend transcribes audio via OpenAI.
 4. Backend enriches content (title/summary/tags, optional split handling).
 5. Backend persists READY/FAILED.
-6. Optional: backend triggers n8n webhook for created READY entries.
-7. n8n writes/updates `public.memory_enrichments` rows.
-8. Embedding worker claims `pending` enrichment rows (`FOR UPDATE SKIP LOCKED`) and writes vectors to `public.embeddings`.
-9. Embedding worker marks enrichment rows `ready`/`failed` and writes DLQ entries for triage.
-10. Backend returns response.
-11. Frontend polls memory status from `/api/memories/{id}` while needed.
+6. Backend returns response.
+7. Optional async step: backend triggers n8n webhook for created READY entries.
+8. n8n validates structured enrichment output and upserts `public.memory_enrichments`.
+9. n8n updates `public.memories.enriched` + `public.memories.enrichment_status`.
+10. Embedding worker claims `pending` enrichment rows (`FOR UPDATE SKIP LOCKED`) and writes vectors to `public.embeddings`.
+11. Embedding worker marks enrichment rows `ready`/`failed` and writes DLQ entries for triage.
+12. Frontend polls memory status from `/api/memories/{id}` while needed.
 
 Audio handling:
 - Audio is ephemeral in backend request flow; no storage bucket in default path.
