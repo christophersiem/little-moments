@@ -316,17 +316,18 @@ public class EmbeddingRunnerService {
         body.put("model", appProperties.getEmbeddingRunner().getModel());
         body.put("input", input);
 
-        JsonNode response = restClient.post()
+        String responseBody = restClient.post()
             .uri(resolveEmbeddingsUrl())
             .contentType(MediaType.APPLICATION_JSON)
             .headers(headers -> headers.setBearerAuth(apiKey.trim()))
             .body(body)
             .retrieve()
-            .body(JsonNode.class);
+            .body(String.class);
 
-        if (response == null) {
+        if (!StringUtils.hasText(responseBody)) {
             throw new IllegalStateException("Embedding API response was empty");
         }
+        JsonNode response = objectMapper.readTree(responseBody);
 
         JsonNode embeddingNode = response.path("data").path(0).path("embedding");
         if (!embeddingNode.isArray()) {
