@@ -1,5 +1,6 @@
 # Embedding Worker Runbook
 
+- Preferred trigger in current MVP: n8n calls `POST /api/internal/embeddings/run` after enrichment upsert; backend then runs a one-shot embedding pass.
 - Monitor queue backlog (`memory_enrichments.embedding_status='pending'`), average embedding latency, failed jobs (`embedding_status='failed'`), and daily `sum(model_cost_usd)`.
 - Tune `ivfflat` `lists` based on corpus growth (start near `sqrt(row_count)`), then benchmark recall vs latency; rebuild index (`REINDEX INDEX idx_embeddings_embedding_ivfflat`) after major data growth.
 - DLQ triage: inspect newest `embedding_dlq` rows, fix root cause, run requeue SQL from `backend/scripts/embedding-worker.sql`, then rerun worker.

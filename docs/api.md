@@ -176,6 +176,20 @@ Request:
 ```
 Response: `204 No Content`.
 
+## Internal
+
+### POST `/internal/embeddings/run`
+Triggers one asynchronous embedding run for pending enrichment rows.
+
+Headers:
+- `X-Internal-Api-Key: <EMBEDDING_TRIGGER_API_KEY>`
+
+Response:
+- `202 Accepted` when run starts
+- `200 OK` when a run is already active
+- `403 Forbidden` when internal key is invalid
+- `404 Not Found` when embedding runner is disabled
+
 ### GET `/profiles/me`
 Response:
 ```json

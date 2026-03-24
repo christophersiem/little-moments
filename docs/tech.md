@@ -34,9 +34,10 @@ Memory create path:
 7. Optional async step: backend triggers n8n webhook for created READY entries.
 8. n8n validates structured enrichment output and upserts `public.memory_enrichments`.
 9. n8n updates `public.memories.enriched` + `public.memories.enrichment_status`.
-10. Embedding worker claims `pending` enrichment rows (`FOR UPDATE SKIP LOCKED`) and writes vectors to `public.embeddings`.
-11. Embedding worker marks enrichment rows `ready`/`failed` and writes DLQ entries for triage.
-12. Frontend polls memory status from `/api/memories/{id}` while needed.
+10. n8n triggers backend internal endpoint `POST /api/internal/embeddings/run`.
+11. Backend embedding runner processes `pending` enrichment rows and writes vectors to `public.embeddings`.
+12. Backend embedding runner marks enrichment rows `ready`/`failed` and writes DLQ entries for triage.
+13. Frontend polls memory status from `/api/memories/{id}` while needed.
 
 Audio handling:
 - Audio is ephemeral in backend request flow; no storage bucket in default path.
@@ -76,6 +77,16 @@ Backend:
 - `N8N_WEBHOOK_API_KEY` (optional, sent as `X-API-Key`)
 - `N8N_WEBHOOK_DEFAULT_LANGUAGE` (default `en`)
 - `N8N_WEBHOOK_TIMEOUT_MS` (default `5000`)
+- `EMBEDDING_RUNNER_ENABLED` (default `false`)
+- `EMBEDDING_TRIGGER_API_KEY` (required for `/api/internal/embeddings/run`)
+- `EMBEDDING_API_KEY` (fallback to OpenAI key chain)
+- `EMBEDDING_MODEL` (default `text-embedding-3-small`)
+- `EMBEDDING_MODEL_VERSION` (optional, defaults to current date)
+- `EMBEDDING_DIM` (default `1536`)
+- `EMBEDDING_BATCH_SIZE` (default `25`)
+- `EMBEDDING_MAX_RETRIES` (default `3`)
+- `EMBEDDING_TIMEOUT_MS` (default `30000`)
+- `EMBEDDING_COST_PER_TOKEN` (default `0.00000002`)
 
 Embedding worker:
 - `DATABASE_URL`
