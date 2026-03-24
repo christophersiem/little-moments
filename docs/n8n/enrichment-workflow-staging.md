@@ -162,10 +162,21 @@ set enriched = false,
 where id = :memory_id;
 ```
 
-## 6) Unit test stubs
+## 6) Trigger backend embedding run (new HTTP node)
+- Method: `POST`
+- URL: `https://<backend-domain>/api/internal/embeddings/run`
+- Headers:
+  - `X-Internal-Api-Key: <EMBEDDING_TRIGGER_API_KEY>`
+  - `Content-Type: application/json`
+- Body: none
+- Expected response:
+  - `202` started
+  - `200` already running
+
+## 7) Unit test stubs
 - See [transform-enrichment.test.js](./transform-enrichment.test.js).
 
-## 7) Runbook notes
+## 8) Runbook notes
 - Log per enrichment call: `memory_id`, `model_name`, `model_version`, `prompt_version`, `schema_version`, `processed_at`, `model_cost_usd`, `run_status` and `raw_response` on failure.
 - Keep GIN indexes on `keywords`, `tags`, and `raw_response` for search/RAG support.
 - Retention: keep `raw_response` for 90 days, then redact/archive.

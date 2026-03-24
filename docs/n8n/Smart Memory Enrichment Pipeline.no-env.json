@@ -185,6 +185,36 @@
         1440,
         0
       ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR_BACKEND_DOMAIN/api/internal/embeddings/run",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Api-Key",
+              "value": "YOUR_EMBEDDING_TRIGGER_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "bcf4724d-8a96-4d84-aeb4-f7913ab9f0cd",
+      "name": "Trigger Embedding Runner",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        0
+      ]
     }
   ],
   "pinData": {},
@@ -265,6 +295,17 @@
         [
           {
             "node": "Update Memory Enrichment Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Memory Enrichment Status": {
+      "main": [
+        [
+          {
+            "node": "Trigger Embedding Runner",
             "type": "main",
             "index": 0
           }
