@@ -12,6 +12,9 @@
   "owner_id": "uuid",
   "created_by_user_id": "uuid",
   "transcription": "text",
+  "summary": "Backend-generated factual summary",
+  "title": "Backend-generated title",
+  "summary_source": "backend",
   "audio_url": "https://...|null",
   "created_at": "2026-03-22T08:15:00Z",
   "language": "en"
@@ -32,7 +35,7 @@ Your output MUST conform to enrichment.schema.json.
 Rules:
 - Ground every field in the transcript.
 - Never mention transcript/recording/AI in summary.
-- summary must be factual and concise.
+- If `summary_source=backend` and `summary` is provided, reuse that exact summary text in `summary`.
 - category must be one of: milestone, funny, behavior, health, other.
 - emotion must be one of: joy, neutral, sadness, surprise, anger, fear, other.
 - importance_score must be an integer 1..10.
@@ -63,7 +66,8 @@ Output JSON:
 4. Clamp `importance_score` to `1..10`.
 5. Compute deterministic highlight if missing:
    - `is_highlight = (importance_score >= 8) || (category === 'milestone')`
-6. Route:
+6. Use backend summary as source of truth when provided in webhook payload.
+7. Route:
    - `valid_upsert`
    - `raw_save` (invalid JSON/schema failure)
 

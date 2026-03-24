@@ -34,6 +34,28 @@ describe('transformEnrichment', () => {
     expect(result.params.is_highlight).toBe(true);
   });
 
+  test('uses backend summary as source of truth when present', () => {
+    const result = transformEnrichment({
+      rawOutput: {
+        summary: 'LLM summary that should be ignored.',
+        category: 'milestone',
+        emotion: 'joy',
+        keywords: ['breakfast'],
+        importance_score: 8,
+        schema_version: '1.0.0',
+        processed_at: '2026-03-23T12:00:00Z',
+        confidence_score: 0.9
+      },
+      memoryContext: {
+        ...baseContext,
+        backend_summary: 'At breakfast, he asked for more bananas in a full sentence.'
+      }
+    });
+
+    expect(result.route).toBe('valid_upsert');
+    expect(result.params.summary).toBe('At breakfast, he asked for more bananas in a full sentence.');
+  });
+
   test('missing required field -> routes to raw_save, sets enriched=false, keeps raw_response', () => {
     const result = transformEnrichment({
       rawOutput: JSON.stringify({

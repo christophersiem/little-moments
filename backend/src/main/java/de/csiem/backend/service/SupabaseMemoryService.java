@@ -276,6 +276,8 @@ public class SupabaseMemoryService {
             id,
             childId,
             excerpt,
+            nullableText(saved.get("summary")),
+            nullableText(saved.get("title")),
             resolveCreatedAt(saved, splitMemory.recordedAt()),
             nullableText(saved.get("owner_id")),
             nullableText(saved.get("created_by"))
@@ -343,6 +345,8 @@ public class SupabaseMemoryService {
                 id,
                 childId,
                 excerpt,
+                nullableText(saved.get("summary")),
+                nullableText(saved.get("title")),
                 resolveCreatedAt(saved, splitMemory.recordedAt()),
                 nullableText(saved.get("owner_id")),
                 nullableText(saved.get("created_by"))

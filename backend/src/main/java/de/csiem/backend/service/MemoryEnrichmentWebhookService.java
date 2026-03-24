@@ -37,6 +37,8 @@ public class MemoryEnrichmentWebhookService {
         UUID entryId,
         String childId,
         String transcription,
+        String summary,
+        String title,
         Instant createdAt,
         String ownerId,
         String createdByUserId
@@ -45,7 +47,7 @@ public class MemoryEnrichmentWebhookService {
         if (!config.isEnabled() || !StringUtils.hasText(config.getUrl())) {
             return;
         }
-        if (!StringUtils.hasText(childId) || !StringUtils.hasText(transcription)) {
+        if (!StringUtils.hasText(childId) || (!StringUtils.hasText(transcription) && !StringUtils.hasText(summary))) {
             return;
         }
 
@@ -59,6 +61,9 @@ public class MemoryEnrichmentWebhookService {
         payload.put("owner_id", StringUtils.hasText(ownerId) ? ownerId : null);
         payload.put("created_by_user_id", StringUtils.hasText(createdByUserId) ? createdByUserId : null);
         payload.put("transcription", transcription);
+        payload.put("summary", StringUtils.hasText(summary) ? summary : null);
+        payload.put("title", StringUtils.hasText(title) ? title : null);
+        payload.put("summary_source", "backend");
         payload.put("audio_url", null);
         payload.put("created_at", createdAt != null ? createdAt.toString() : Instant.now().toString());
         payload.put("language", language);

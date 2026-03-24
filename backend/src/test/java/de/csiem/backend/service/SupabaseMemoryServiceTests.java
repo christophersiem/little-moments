@@ -130,6 +130,8 @@ class SupabaseMemoryServiceTests {
             eq(memoryId),
             eq("child-1"),
             eq(transcript),
+            eq("A clear language leap."),
+            eq("Asked for bedtime story"),
             eq(Instant.parse("2026-03-05T08:15:00Z")),
             isNull(),
             isNull()
@@ -203,11 +205,13 @@ class SupabaseMemoryServiceTests {
         assertEquals(2, response.count());
         assertEquals(List.of(firstId, secondId), response.ids());
         verify(memoryEnrichmentWebhookService, times(2))
-            .publishCreatedEntry(any(), eq("child-1"), anyString(), any(), isNull(), isNull());
+            .publishCreatedEntry(any(), eq("child-1"), anyString(), anyString(), anyString(), any(), isNull(), isNull());
         verify(memoryEnrichmentWebhookService).publishCreatedEntry(
             eq(firstId),
             eq("child-1"),
             eq("At breakfast he asked for more apples."),
+            eq("Breakfast language leap."),
+            eq("Asked for more apples"),
             eq(recordedAt),
             isNull(),
             isNull()
@@ -216,6 +220,8 @@ class SupabaseMemoryServiceTests {
             eq(secondId),
             eq("child-1"),
             eq("Later he climbed the ladder alone."),
+            eq("Strong independent climbing."),
+            eq("Climbed ladder alone"),
             eq(splitTwoRecordedAt),
             isNull(),
             isNull()

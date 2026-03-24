@@ -96,8 +96,31 @@ Optional split-tracking fields may also exist in some environments:
 - `raw_response jsonb` (nullable)
 - `processed_at timestamptz`
 - `run_status text` (`SUCCESS` | `FAILED`)
+- `embedding_status enum` (`pending` | `ready` | `failed`)
+- `embedding_model_version text` (nullable)
+- `embedding_error text` (nullable)
 - `created_at timestamptz`
 - `updated_at timestamptz`
+
+### `public.embeddings`
+- `id uuid` (PK)
+- `memory_id uuid` (FK -> `memories.id`, cascade delete)
+- `enrichment_id uuid` (FK -> `memory_enrichments.id`, set null on delete)
+- `embedding vector(1536)`
+- `model_name text`
+- `model_version text`
+- `metadata jsonb`
+- `created_at timestamptz`
+
+### `public.embedding_dlq`
+- `id uuid` (PK)
+- `enrichment_id uuid` (FK -> `memory_enrichments.id`)
+- `memory_id uuid` (FK -> `memories.id`)
+- `error_text text`
+- `attempts int`
+- `last_attempted_at timestamptz`
+- `payload jsonb`
+- `created_at timestamptz`
 
 ## Key Indexes
 - `family_members(user_id)`
@@ -114,6 +137,15 @@ Optional split-tracking fields may also exist in some environments:
 - `memory_enrichments.keywords` GIN (`jsonb`)
 - `memory_enrichments.tags` GIN (`jsonb`)
 - `memory_enrichments.raw_response` GIN (`jsonb_path_ops`)
+- `embeddings(memory_id, model_name, model_version)` unique
+- `embeddings(memory_id)`
+- `embeddings(enrichment_id)`
+- `embeddings(created_at desc)`
+- `embeddings(embedding)` ivfflat (`vector_cosine_ops`, lists=100)
+- `embedding_dlq(enrichment_id)` unique
+- `embedding_dlq(memory_id)`
+- `embedding_dlq(last_attempted_at desc)`
+- `embedding_dlq(created_at desc)`
 
 ## Status Values
 - `PROCESSING`

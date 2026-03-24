@@ -62,10 +62,13 @@ function hasValue(input) {
   return true;
 }
 
-function validateRawParsed(parsed) {
+function validateRawParsed(parsed, memoryContext = {}) {
   const errors = [];
 
   for (const field of REQUIRED_FIELDS) {
+    if (field === 'summary' && hasValue(memoryContext.backend_summary)) {
+      continue;
+    }
     if (!hasValue(parsed[field])) {
       errors.push(`${field} is required`);
     }
@@ -139,9 +142,12 @@ function normalizeEnrichment(parsed, defaults) {
   const emotion = String(parsed.emotion || 'neutral').trim().toLowerCase();
   const importance = clampImportance(parsed.importance_score);
   const confidence = clampConfidence(parsed.confidence_score);
+  const backendSummary = hasValue(defaults.backend_summary)
+    ? String(defaults.backend_summary).trim()
+    : '';
 
   const normalized = {
-    summary: String(parsed.summary || '').trim(),
+    summary: backendSummary || String(parsed.summary || '').trim(),
     category: CATEGORY_SET.has(category) ? category : 'other',
     emotion: EMOTION_SET.has(emotion) ? emotion : 'neutral',
     sentiment_score: typeof parsed.sentiment_score === 'number' ? parsed.sentiment_score : null,
@@ -206,6 +212,9 @@ function buildSuccessResult(context, normalized, rawResponse) {
 }
 
 function buildRawSaveResult(context, rawResponse, errors) {
+  const fallbackSummary = hasValue(context.backend_summary)
+    ? String(context.backend_summary).trim()
+    : 'Enrichment failed validation.';
   return {
     route: 'raw_save',
     enriched: false,
@@ -215,7 +224,7 @@ function buildRawSaveResult(context, rawResponse, errors) {
       owner_id: context.owner_id || null,
       child_id: context.child_id || null,
       created_by_user_id: context.created_by_user_id || null,
-      summary: 'Enrichment failed validation.',
+      summary: fallbackSummary,
       category: 'other',
       emotion: 'neutral',
       sentiment_score: null,
@@ -248,12 +257,15 @@ function transformEnrichment({ rawOutput, memoryContext, defaults = {} }) {
     return buildRawSaveResult(memoryContext, rawOutput, ['Invalid JSON output from LLM']);
   }
 
-  const rawValidation = validateRawParsed(parsed);
+  const rawValidation = validateRawParsed(parsed, memoryContext);
   if (!rawValidation.valid) {
     return buildRawSaveResult(memoryContext, parsed, rawValidation.errors);
   }
 
-  const normalized = normalizeEnrichment(parsed, defaults);
+  const normalized = normalizeEnrichment(parsed, {
+    ...defaults,
+    backend_summary: memoryContext.backend_summary
+  });
   const validation = validateNormalized(normalized);
 
   if (!validation.valid) {
