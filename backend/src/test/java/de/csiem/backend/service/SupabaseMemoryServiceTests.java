@@ -57,6 +57,9 @@ class SupabaseMemoryServiceTests {
     @Mock
     private MemoryEnrichmentWebhookService memoryEnrichmentWebhookService;
 
+    @Mock
+    private MemoryChatService memoryChatService;
+
     private SupabaseMemoryService supabaseMemoryService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -68,7 +71,8 @@ class SupabaseMemoryServiceTests {
             memorySplittingService,
             memoryTaggingService,
             memoryInsightsService,
-            memoryEnrichmentWebhookService
+            memoryEnrichmentWebhookService,
+            memoryChatService
         );
     }
 

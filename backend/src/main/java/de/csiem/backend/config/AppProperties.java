@@ -17,6 +17,7 @@ public class AppProperties {
     private final Supabase supabase = new Supabase();
     private final EnrichmentWebhook enrichmentWebhook = new EnrichmentWebhook();
     private final EmbeddingRunner embeddingRunner = new EmbeddingRunner();
+    private final MemoryChat memoryChat = new MemoryChat();
 
     public UUID getDefaultUserId() {
         return defaultUserId;
@@ -56,6 +57,10 @@ public class AppProperties {
 
     public EmbeddingRunner getEmbeddingRunner() {
         return embeddingRunner;
+    }
+
+    public MemoryChat getMemoryChat() {
+        return memoryChat;
     }
 
     public List<String> getCorsOriginsAsList() {
@@ -359,6 +364,81 @@ public class AppProperties {
 
         public void setCostPerToken(double costPerToken) {
             this.costPerToken = costPerToken;
+        }
+    }
+
+    public static class MemoryChat {
+        private boolean enabled = true;
+        private String openaiBaseUrl = "https://api.openai.com";
+        private String openaiApiKey;
+        private String chatModel = "gpt-4o-mini";
+        private String embeddingModel = "text-embedding-3-small";
+        private int retrievalLimit = 12;
+        private int contextLimit = 8;
+        private double minSimilarity = 0.18d;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getOpenaiBaseUrl() {
+            return openaiBaseUrl;
+        }
+
+        public void setOpenaiBaseUrl(String openaiBaseUrl) {
+            this.openaiBaseUrl = openaiBaseUrl;
+        }
+
+        public String getOpenaiApiKey() {
+            return openaiApiKey;
+        }
+
+        public void setOpenaiApiKey(String openaiApiKey) {
+            this.openaiApiKey = openaiApiKey;
+        }
+
+        public String getChatModel() {
+            return chatModel;
+        }
+
+        public void setChatModel(String chatModel) {
+            this.chatModel = chatModel;
+        }
+
+        public String getEmbeddingModel() {
+            return embeddingModel;
+        }
+
+        public void setEmbeddingModel(String embeddingModel) {
+            this.embeddingModel = embeddingModel;
+        }
+
+        public int getRetrievalLimit() {
+            return retrievalLimit;
+        }
+
+        public void setRetrievalLimit(int retrievalLimit) {
+            this.retrievalLimit = retrievalLimit;
+        }
+
+        public int getContextLimit() {
+            return contextLimit;
+        }
+
+        public void setContextLimit(int contextLimit) {
+            this.contextLimit = contextLimit;
+        }
+
+        public double getMinSimilarity() {
+            return minSimilarity;
+        }
+
+        public void setMinSimilarity(double minSimilarity) {
+            this.minSimilarity = minSimilarity;
         }
     }
 }

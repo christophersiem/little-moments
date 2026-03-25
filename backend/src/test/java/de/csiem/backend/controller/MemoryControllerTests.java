@@ -2,6 +2,7 @@ package de.csiem.backend.controller;
 
 import de.csiem.backend.dto.CreateMemoryRequest;
 import de.csiem.backend.dto.CreateMemoryResponse;
+import de.csiem.backend.dto.MemoryChatResponse;
 import de.csiem.backend.dto.MemoryListItemResponse;
 import de.csiem.backend.dto.MemoryListResponse;
 import de.csiem.backend.dto.MemoryResponse;
@@ -31,6 +32,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -195,5 +197,50 @@ class MemoryControllerTests {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.id").value(id.toString()))
             .andExpect(jsonPath("$.status").value("READY"));
+    }
+
+    @Test
+    void chatReturnsUnauthorizedWhenAuthHeaderMissing() throws Exception {
+        when(supabaseMemoryService.isEnabled()).thenReturn(true);
+
+        mockMvc.perform(
+                post("/api/memories/chat")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {"question":"When did he say mama?"}
+                        """)
+            )
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.message").value("Missing or invalid Authorization header"));
+    }
+
+    @Test
+    void chatDelegatesToSupabaseServiceWhenEnabled() throws Exception {
+        UUID sourceId = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        when(supabaseMemoryService.isEnabled()).thenReturn(true);
+        when(supabaseMemoryService.chatWithMemories(eq("Bearer token"), any()))
+            .thenReturn(
+                new MemoryChatResponse(
+                    "The earliest matching memory was in March 2026.",
+                    "medium",
+                    "success",
+                    null,
+                    List.of(sourceId),
+                    List.of()
+                )
+            );
+
+        mockMvc.perform(
+                post("/api/memories/chat")
+                    .header("Authorization", "Bearer token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {"question":"When were his first steps?","familyId":"family-1"}
+                        """)
+            )
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("success"))
+            .andExpect(jsonPath("$.answer").value("The earliest matching memory was in March 2026."))
+            .andExpect(jsonPath("$.sourceMemoryIds[0]").value(sourceId.toString()));
     }
 }
