@@ -21,6 +21,7 @@ SECURITY INVOKER
 SET search_path = public
 AS $$
 DECLARE
+    -- Keep this aligned with the embeddings table dimension and memory-chat embedding model.
     v_query vector(1536);
     v_limit integer;
 BEGIN

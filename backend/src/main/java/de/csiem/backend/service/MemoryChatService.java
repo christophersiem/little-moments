@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 import static org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE;
 
@@ -35,6 +36,7 @@ public class MemoryChatService {
     private static final int MAX_SOURCE_COUNT = 5;
     private static final int MIN_FALLBACK_LIMIT = 8;
     private static final int MAX_SNIPPET_LENGTH = 220;
+    private static final int CHAT_EMBEDDING_DIM = 1536;
     private static final Set<String> STOP_WORDS = Set.of(
         "a", "an", "the", "and", "or", "for", "to", "of", "in", "on", "with", "is", "are", "was", "were", "did", "does",
         "do", "when", "what", "where", "how", "his", "her", "our", "my", "he", "she", "we", "they", "it", "that", "this"
@@ -225,6 +227,7 @@ public class MemoryChatService {
 
         try {
             List<Double> embedding = memoryChatAiClient.createEmbedding(question);
+            ensureEmbeddingDimension(embedding);
             String vectorLiteral = toVectorLiteral(embedding);
             JsonNode rows = supabaseGatewayService.searchMemoriesForChat(
                 authorizationHeader,
@@ -238,17 +241,21 @@ public class MemoryChatService {
         }
 
         if (candidates.isEmpty()) {
-            JsonNode fallbackRows = supabaseGatewayService.listMemories(
-                authorizationHeader,
-                0,
-                Math.max(retrievalLimit, MIN_FALLBACK_LIMIT),
-                familyId,
-                null,
-                null,
-                null,
-                false
-            );
-            candidates = rankFallbackCandidates(question, mapFallbackCandidates(fallbackRows));
+            try {
+                JsonNode fallbackRows = supabaseGatewayService.listMemories(
+                    authorizationHeader,
+                    0,
+                    Math.max(retrievalLimit, MIN_FALLBACK_LIMIT),
+                    familyId,
+                    null,
+                    null,
+                    null,
+                    false
+                );
+                candidates = rankFallbackCandidates(question, mapFallbackCandidates(fallbackRows));
+            } catch (Exception ex) {
+                log.warn("memory_chat retrieval_fallback_failure: {}", ex.getMessage());
+            }
         }
 
         double minSimilarity = Math.max(0d, chatConfig.getMinSimilarity());
@@ -373,7 +380,7 @@ public class MemoryChatService {
                     .comparingInt((ChatMemoryCandidate candidate) -> candidate.importanceScore() != null ? candidate.importanceScore() : 0)
                     .reversed()
                     .thenComparing(ChatMemoryCandidate::recordedAt, Comparator.nullsLast(Comparator.reverseOrder()))
-                    .thenComparingDouble(ChatMemoryCandidate::similarity).reversed()
+                    .thenComparing(Comparator.comparingDouble(ChatMemoryCandidate::similarity).reversed())
             );
             return working;
         }
@@ -382,7 +389,7 @@ public class MemoryChatService {
             working.sort(
                 Comparator
                     .comparing(ChatMemoryCandidate::recordedAt, Comparator.nullsLast(Comparator.naturalOrder()))
-                    .thenComparingDouble(ChatMemoryCandidate::similarity).reversed()
+                    .thenComparing(Comparator.comparingDouble(ChatMemoryCandidate::similarity).reversed())
             );
             return working;
         }
@@ -391,7 +398,7 @@ public class MemoryChatService {
             working.sort(
                 Comparator
                     .comparing(ChatMemoryCandidate::recordedAt, Comparator.nullsLast(Comparator.reverseOrder()))
-                    .thenComparingDouble(ChatMemoryCandidate::similarity).reversed()
+                    .thenComparing(Comparator.comparingDouble(ChatMemoryCandidate::similarity).reversed())
             );
             return working;
         }
@@ -543,7 +550,19 @@ public class MemoryChatService {
         if (!StringUtils.hasText(familyId)) {
             return null;
         }
-        return familyId.trim();
+        String normalized = familyId.trim();
+        try {
+            UUID.fromString(normalized);
+            return normalized;
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(BAD_REQUEST, "familyId must be a valid UUID");
+        }
+    }
+
+    private void ensureEmbeddingDimension(List<Double> embedding) {
+        if (embedding == null || embedding.size() != CHAT_EMBEDDING_DIM) {
+            throw new IllegalStateException("Unexpected embedding dimension for memory chat retrieval.");
+        }
     }
 
     private QueryIntent classifyIntent(String question) {

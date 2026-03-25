@@ -603,7 +603,7 @@ public class SupabaseGatewayService {
         payload.put("p_match_count", Math.max(limit, 1));
         payload.put("p_family_id", StringUtils.hasText(familyId) ? familyId.trim() : null);
         JsonNode rows = callRpc("rpc_memory_chat_search", payload, authorizationHeader);
-        return rows.isArray() ? rows : null;
+        return rows.isArray() ? rows : objectMapper.createArrayNode();
     }
 
     public void deleteMemoryById(String authorizationHeader, String memoryId) {

@@ -9,12 +9,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.DoubleStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -84,7 +87,7 @@ class MemoryChatServiceTests {
 
     @Test
     void returnsInsufficientEvidenceWhenNoCandidatesFound() {
-        when(memoryChatAiClient.createEmbedding(anyString())).thenReturn(List.of(0.1, 0.2, 0.3));
+        when(memoryChatAiClient.createEmbedding(anyString())).thenReturn(validEmbedding());
         when(supabaseGatewayService.searchMemoriesForChat(anyString(), any(), anyString(), anyInt()))
             .thenReturn(objectMapper.createArrayNode());
         when(supabaseGatewayService.listMemories(anyString(), eq(0), anyInt(), any(), any(), any(), any(), eq(false)))
@@ -92,7 +95,7 @@ class MemoryChatServiceTests {
 
         MemoryChatResponse response = memoryChatService.ask(
             "Bearer token",
-            new MemoryChatRequest("When did he first climb alone?", "family-1")
+            new MemoryChatRequest("When did he first climb alone?", "11111111-1111-1111-1111-111111111111")
         );
 
         assertEquals("insufficient_evidence", response.status());
@@ -104,7 +107,7 @@ class MemoryChatServiceTests {
         UUID knownId = UUID.fromString("11111111-1111-1111-1111-111111111111");
         UUID unknownId = UUID.fromString("22222222-2222-2222-2222-222222222222");
 
-        when(memoryChatAiClient.createEmbedding(anyString())).thenReturn(List.of(0.1, 0.2, 0.3));
+        when(memoryChatAiClient.createEmbedding(anyString())).thenReturn(validEmbedding());
         when(supabaseGatewayService.searchMemoriesForChat(anyString(), any(), anyString(), anyInt()))
             .thenReturn(objectMapper.readTree("""
                 [
@@ -148,7 +151,7 @@ class MemoryChatServiceTests {
 
     @Test
     void fallsBackWhenModelOutputIsInvalidJson() throws Exception {
-        when(memoryChatAiClient.createEmbedding(anyString())).thenReturn(List.of(0.1, 0.2, 0.3));
+        when(memoryChatAiClient.createEmbedding(anyString())).thenReturn(validEmbedding());
         when(supabaseGatewayService.searchMemoriesForChat(anyString(), any(), anyString(), anyInt()))
             .thenReturn(objectMapper.readTree("""
                 [
@@ -180,7 +183,7 @@ class MemoryChatServiceTests {
 
     @Test
     void rewritesTechnicalInsufficientEvidenceAnswerToFriendlyCopy() throws Exception {
-        when(memoryChatAiClient.createEmbedding(anyString())).thenReturn(List.of(0.1, 0.2, 0.3));
+        when(memoryChatAiClient.createEmbedding(anyString())).thenReturn(validEmbedding());
         when(supabaseGatewayService.searchMemoriesForChat(anyString(), any(), anyString(), anyInt()))
             .thenReturn(objectMapper.readTree("""
                 [
@@ -219,5 +222,170 @@ class MemoryChatServiceTests {
             "I couldn't find a clear answer in your saved moments yet. Try a broader question or another wording.",
             response.answer()
         );
+    }
+
+    @Test
+    void rejectsInvalidFamilyIdWithBadRequest() {
+        ResponseStatusException exception = assertThrows(
+            ResponseStatusException.class,
+            () -> memoryChatService.ask("Bearer token", new MemoryChatRequest("When did this happen?", "not-a-uuid"))
+        );
+
+        assertEquals(400, exception.getStatusCode().value());
+        assertEquals("familyId must be a valid UUID", exception.getReason());
+        verifyNoInteractions(supabaseGatewayService, memoryChatAiClient);
+    }
+
+    @Test
+    void returnsInsufficientEvidenceWhenFallbackQueryFails() {
+        when(memoryChatAiClient.createEmbedding(anyString())).thenReturn(validEmbedding());
+        when(supabaseGatewayService.searchMemoriesForChat(anyString(), any(), anyString(), anyInt()))
+            .thenReturn(objectMapper.createArrayNode());
+        when(supabaseGatewayService.listMemories(anyString(), eq(0), anyInt(), any(), any(), any(), any(), eq(false)))
+            .thenThrow(new RuntimeException("supabase down"));
+
+        MemoryChatResponse response = memoryChatService.ask(
+            "Bearer token",
+            new MemoryChatRequest("When did he first climb alone?", null)
+        );
+
+        assertEquals("insufficient_evidence", response.status());
+        assertTrue(response.sources().isEmpty());
+    }
+
+    @Test
+    void summaryIntentRanksByImportanceBeforeSimilarity() throws Exception {
+        when(memoryChatAiClient.createEmbedding(anyString())).thenReturn(validEmbedding());
+        when(supabaseGatewayService.searchMemoriesForChat(anyString(), any(), anyString(), anyInt()))
+            .thenReturn(objectMapper.readTree("""
+                [
+                  {
+                    "memory_id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                    "recorded_at":"2026-03-01T10:00:00Z",
+                    "title":"High importance",
+                    "summary":"Important milestone",
+                    "transcript":"Important milestone happened.",
+                    "tags":["Milestone"],
+                    "is_highlight":true,
+                    "importance_score":9,
+                    "enrichment_summary":"Important milestone",
+                    "similarity":0.20
+                  },
+                  {
+                    "memory_id":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    "recorded_at":"2026-03-02T10:00:00Z",
+                    "title":"Lower importance",
+                    "summary":"Less important memory",
+                    "transcript":"Less important memory happened.",
+                    "tags":["Family"],
+                    "is_highlight":false,
+                    "importance_score":6,
+                    "enrichment_summary":"Less important memory",
+                    "similarity":0.95
+                  }
+                ]
+                """));
+        when(memoryChatAiClient.completeJson(anyString(), anyString())).thenReturn("not-json");
+
+        MemoryChatResponse response = memoryChatService.ask(
+            "Bearer token",
+            new MemoryChatRequest("Can you summarize this month's highlights?", null)
+        );
+
+        assertEquals("insufficient_evidence", response.status());
+        assertFalse(response.sources().isEmpty());
+        assertEquals(UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), response.sources().getFirst().id());
+    }
+
+    @Test
+    void earliestIntentRanksByOldestRecordedAtFirst() throws Exception {
+        when(memoryChatAiClient.createEmbedding(anyString())).thenReturn(validEmbedding());
+        when(supabaseGatewayService.searchMemoriesForChat(anyString(), any(), anyString(), anyInt()))
+            .thenReturn(objectMapper.readTree("""
+                [
+                  {
+                    "memory_id":"11111111-1111-1111-1111-111111111111",
+                    "recorded_at":"2026-03-10T10:00:00Z",
+                    "title":"Later",
+                    "summary":"Later memory",
+                    "transcript":"Later memory happened.",
+                    "tags":["Family"],
+                    "is_highlight":false,
+                    "importance_score":5,
+                    "enrichment_summary":"Later memory",
+                    "similarity":0.90
+                  },
+                  {
+                    "memory_id":"22222222-2222-2222-2222-222222222222",
+                    "recorded_at":"2026-03-01T10:00:00Z",
+                    "title":"Earlier",
+                    "summary":"Earlier memory",
+                    "transcript":"Earlier memory happened.",
+                    "tags":["Family"],
+                    "is_highlight":false,
+                    "importance_score":5,
+                    "enrichment_summary":"Earlier memory",
+                    "similarity":0.30
+                  }
+                ]
+                """));
+        when(memoryChatAiClient.completeJson(anyString(), anyString())).thenReturn("not-json");
+
+        MemoryChatResponse response = memoryChatService.ask(
+            "Bearer token",
+            new MemoryChatRequest("When was the first time this happened?", null)
+        );
+
+        assertEquals("insufficient_evidence", response.status());
+        assertFalse(response.sources().isEmpty());
+        assertEquals(UUID.fromString("22222222-2222-2222-2222-222222222222"), response.sources().getFirst().id());
+    }
+
+    @Test
+    void latestIntentRanksByNewestRecordedAtFirst() throws Exception {
+        when(memoryChatAiClient.createEmbedding(anyString())).thenReturn(validEmbedding());
+        when(supabaseGatewayService.searchMemoriesForChat(anyString(), any(), anyString(), anyInt()))
+            .thenReturn(objectMapper.readTree("""
+                [
+                  {
+                    "memory_id":"33333333-3333-3333-3333-333333333333",
+                    "recorded_at":"2026-03-01T10:00:00Z",
+                    "title":"Older",
+                    "summary":"Older memory",
+                    "transcript":"Older memory happened.",
+                    "tags":["Family"],
+                    "is_highlight":false,
+                    "importance_score":5,
+                    "enrichment_summary":"Older memory",
+                    "similarity":0.90
+                  },
+                  {
+                    "memory_id":"44444444-4444-4444-4444-444444444444",
+                    "recorded_at":"2026-03-10T10:00:00Z",
+                    "title":"Newest",
+                    "summary":"Newest memory",
+                    "transcript":"Newest memory happened.",
+                    "tags":["Family"],
+                    "is_highlight":false,
+                    "importance_score":5,
+                    "enrichment_summary":"Newest memory",
+                    "similarity":0.30
+                  }
+                ]
+                """));
+        when(memoryChatAiClient.completeJson(anyString(), anyString())).thenReturn("not-json");
+
+        MemoryChatResponse response = memoryChatService.ask(
+            "Bearer token",
+            new MemoryChatRequest("What is the latest memory?", null)
+        );
+
+        assertEquals("insufficient_evidence", response.status());
+        assertFalse(response.sources().isEmpty());
+        assertEquals(UUID.fromString("44444444-4444-4444-4444-444444444444"), response.sources().getFirst().id());
+    }
+
+    private List<Double> validEmbedding() {
+        return DoubleStream.generate(() -> 0.01d).limit(1536).boxed().toList();
     }
 }
