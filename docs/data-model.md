@@ -147,6 +147,11 @@ Optional split-tracking fields may also exist in some environments:
 - `embedding_dlq(last_attempted_at desc)`
 - `embedding_dlq(created_at desc)`
 
+## RLS Notes
+- `users`, `memory_tags`, `memory_enrichments`, `embeddings`, and `embedding_dlq` are RLS-protected.
+- Direct writes from `authenticated` users are denied on enrichment/embedding tables; writes are expected via trusted backend/service paths.
+- `flyway_schema_history` remains migration-internal and is intentionally not part of app-level RLS policy hardening.
+
 ## Status Values
 - `PROCESSING`
 - `READY`
