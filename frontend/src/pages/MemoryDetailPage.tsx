@@ -175,7 +175,10 @@ const TagRow = styled.div`
   gap: ${({ theme }) => theme.space.x2};
 `
 
-const TagChip = styled.button<{ $active?: boolean; $interactive?: boolean }>`
+const TagChip = styled.span<{ $active?: boolean; $interactive?: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid ${({ theme, $active }) => ($active ? theme.colors.accentStrong : theme.colors.border)};
   border-radius: ${({ theme }) => theme.radii.pill};
   background: ${({ theme, $active }) => ($active ? theme.colors.accent : theme.colors.surfaceStrong)};
@@ -646,7 +649,12 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
 
         <TitleRow>
           {editingTitle ? (
-            <TitleInput value={titleDraft} onChange={(event) => setTitleDraft(event.target.value)} />
+            <TitleInput
+              value={titleDraft}
+              onChange={(event) => setTitleDraft(event.target.value)}
+              aria-label="Memory title"
+              autoFocus
+            />
           ) : (
             <Title>{currentMemory.title || 'Untitled Memory'}</Title>
           )}
@@ -733,6 +741,7 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
           <TagRow>
             {MEMORY_TAG_OPTIONS.map((tag) => (
               <TagChip
+                as="button"
                 key={`option-${tag}`}
                 type="button"
                 $interactive
@@ -785,7 +794,11 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
         </CardHeader>
 
         {canManageMemory && editingTranscript ? (
-          <TranscriptArea value={transcriptDraft} onChange={(event) => setTranscriptDraft(event.target.value)} />
+          <TranscriptArea
+            value={transcriptDraft}
+            onChange={(event) => setTranscriptDraft(event.target.value)}
+            aria-label="Memory transcript"
+          />
         ) : (
           <TranscriptText>{currentMemory.transcript || 'Transcription still processing.'}</TranscriptText>
         )}

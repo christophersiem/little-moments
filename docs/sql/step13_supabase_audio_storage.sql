@@ -1,4 +1,4 @@
--- Step 12: Optional keep-audio support for memories.
+-- Step 13: Optional keep-audio support for memories.
 -- Adds audio metadata columns to memories and ensures a private storage bucket exists.
 -- Audio object access is signed server-side with SUPABASE_SERVICE_ROLE_KEY.
 
