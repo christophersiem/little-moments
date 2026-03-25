@@ -44,6 +44,7 @@ public class SupabaseMemoryService {
     private final MemoryTaggingService memoryTaggingService;
     private final MemoryInsightsService memoryInsightsService;
     private final AppProperties appProperties;
+    private final MemoryEnrichmentWebhookService memoryEnrichmentWebhookService;
 
     public SupabaseMemoryService(
         SupabaseGatewayService supabaseGatewayService,
@@ -51,7 +52,8 @@ public class SupabaseMemoryService {
         MemorySplittingService memorySplittingService,
         MemoryTaggingService memoryTaggingService,
         MemoryInsightsService memoryInsightsService,
-        AppProperties appProperties
+        AppProperties appProperties,
+        MemoryEnrichmentWebhookService memoryEnrichmentWebhookService
     ) {
         this.supabaseGatewayService = supabaseGatewayService;
         this.transcriptionService = transcriptionService;
@@ -59,6 +61,7 @@ public class SupabaseMemoryService {
         this.memoryTaggingService = memoryTaggingService;
         this.memoryInsightsService = memoryInsightsService;
         this.appProperties = appProperties;
+        this.memoryEnrichmentWebhookService = memoryEnrichmentWebhookService;
     }
 
     public boolean isEnabled() {
@@ -121,7 +124,7 @@ public class SupabaseMemoryService {
                 SplitMemory splitMemory = splitMemories.isEmpty()
                     ? new SplitMemory(transcript, uploadTimestamp, 1.0)
                     : splitMemories.getFirst();
-                return persistSingleMemory(authorizationHeader, memoryId, splitMemory, audioMetadata);
+                return persistSingleMemory(authorizationHeader, memoryId, request.childId().trim(), splitMemory, audioMetadata);
             }
 
             return persistSplitMemories(authorizationHeader, memoryId, childId, splitMemories, audioMetadata);
@@ -298,6 +301,7 @@ public class SupabaseMemoryService {
     private CreateMemoryResponse persistSingleMemory(
         String authorizationHeader,
         String memoryId,
+        String childId,
         SplitMemory splitMemory,
         AudioMetadata audioMetadata
     ) {
@@ -322,6 +326,17 @@ public class SupabaseMemoryService {
         );
 
         UUID id = uuid(text(saved.get("id")));
+        memoryEnrichmentWebhookService.publishCreatedEntry(
+            id,
+            childId,
+            excerpt,
+            nullableText(saved.get("summary")),
+            nullableText(saved.get("title")),
+            resolveCreatedAt(saved, splitMemory.recordedAt()),
+            nullableText(saved.get("owner_id")),
+            nullableText(saved.get("created_by"))
+        );
+
         return new CreateMemoryResponse(
             id,
             List.of(id),
@@ -386,7 +401,18 @@ public class SupabaseMemoryService {
                 );
             }
 
-            ids.add(uuid(text(saved.get("id"))));
+            UUID id = uuid(text(saved.get("id")));
+            ids.add(id);
+            memoryEnrichmentWebhookService.publishCreatedEntry(
+                id,
+                childId,
+                excerpt,
+                nullableText(saved.get("summary")),
+                nullableText(saved.get("title")),
+                resolveCreatedAt(saved, splitMemory.recordedAt()),
+                nullableText(saved.get("owner_id")),
+                nullableText(saved.get("created_by"))
+            );
         }
 
         if (firstSaved == null) {
@@ -505,6 +531,21 @@ public class SupabaseMemoryService {
         return message.substring(0, MAX_ERROR_LENGTH);
     }
 
+    private Instant resolveCreatedAt(JsonNode row, Instant fallback) {
+        String createdAtText = nullableText(row.get("created_at"));
+        if (StringUtils.hasText(createdAtText)) {
+            try {
+                return Instant.parse(createdAtText);
+            } catch (DateTimeParseException ignored) {
+                // Fallback handled below.
+            }
+        }
+        if (fallback != null) {
+            return fallback;
+        }
+        return Instant.now();
+    }
+
     private List<String> resolveTagLabels(List<String> tags) {
         if (tags == null || tags.isEmpty()) {
             return List.of();
@@ -537,7 +578,14 @@ public class SupabaseMemoryService {
     }
 
     private String normalizeTranscript(String value) {
-        String normalized = value == null ? "" : value.trim().replaceAll("\\s+", " ");
+        String normalized = value == null ? "" : value
+            .replace("\\\\\"", "\"")
+            .replace("\\\\'", "'")
+            .replace("\\\"", "\"")
+            .replace("\\'", "'")
+            .replaceAll("\\\\+(?=[\"'])", "")
+            .trim()
+            .replaceAll("\\s+", " ");
         if (normalized.isBlank()) {
             throw new ResponseStatusException(BAD_REQUEST, "Transcript must not be empty");
         }

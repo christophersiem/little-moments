@@ -54,9 +54,12 @@ SQL source of truth is `docs/sql/*.sql`.
 - `id uuid` (PK)
 - `child_id uuid` (FK -> `children.id`)
 - `created_by uuid` (FK -> `auth.users.id`)
+- `owner_id uuid` (nullable, RBAC-ready owner scope)
 - `created_at timestamptz`
 - `recorded_at timestamptz`
 - `status text` (`PROCESSING` | `READY` | `FAILED`)
+- `enriched boolean` (default `false`)
+- `enrichment_status text` (`PENDING` | `SUCCESS` | `FAILED`)
 - `title text` (nullable)
 - `summary text` (nullable)
 - `transcript text` (nullable)
@@ -68,6 +71,57 @@ Optional split-tracking fields may also exist in some environments:
 - `source_transcript text`
 - `is_parent boolean`
 
+### `public.memory_enrichments`
+- `id uuid` (PK)
+- `memory_id uuid` (FK -> `memories.id`, unique: one enrichment row per memory)
+- `owner_id uuid` (RBAC-ready ownership scope)
+- `child_id uuid` (FK -> `children.id`, nullable)
+- `created_by_user_id uuid` (audit actor scope)
+- `summary text`
+- `category enum` (`milestone` | `funny` | `behavior` | `health` | `other`)
+- `emotion enum` (`joy` | `neutral` | `sadness` | `surprise` | `anger` | `fear` | `other`)
+- `sentiment_score numeric` (optional)
+- `keywords jsonb` (array, max 6 in validation layer)
+- `tags jsonb` (optional array)
+- `importance_score smallint` (1..10)
+- `is_highlight boolean`
+- `milestone_hint text` (nullable)
+- `embedding_id text` (nullable, vector DB reference)
+- `model_name text`
+- `model_version text` (nullable)
+- `prompt_version text`
+- `schema_version text`
+- `confidence_score numeric` (0..1)
+- `model_cost_usd numeric` (nullable)
+- `raw_response jsonb` (nullable)
+- `processed_at timestamptz`
+- `run_status text` (`SUCCESS` | `FAILED`)
+- `embedding_status enum` (`pending` | `ready` | `failed`)
+- `embedding_model_version text` (nullable)
+- `embedding_error text` (nullable)
+- `created_at timestamptz`
+- `updated_at timestamptz`
+
+### `public.embeddings`
+- `id uuid` (PK)
+- `memory_id uuid` (FK -> `memories.id`, cascade delete)
+- `enrichment_id uuid` (FK -> `memory_enrichments.id`, set null on delete)
+- `embedding vector(1536)`
+- `model_name text`
+- `model_version text`
+- `metadata jsonb`
+- `created_at timestamptz`
+
+### `public.embedding_dlq`
+- `id uuid` (PK)
+- `enrichment_id uuid` (FK -> `memory_enrichments.id`)
+- `memory_id uuid` (FK -> `memories.id`)
+- `error_text text`
+- `attempts int`
+- `last_attempted_at timestamptz`
+- `payload jsonb`
+- `created_at timestamptz`
+
 ## Key Indexes
 - `family_members(user_id)`
 - `family_members(family_id)`
@@ -75,6 +129,28 @@ Optional split-tracking fields may also exist in some environments:
 - `children(family_id)`
 - `memories(child_id, created_at desc)`
 - `memories(recorded_at desc, created_at desc)`
+- `memories(enriched, enrichment_status, created_at desc)`
+- `memory_enrichments(memory_id)` unique
+- `memory_enrichments(owner_id)`
+- `memory_enrichments(child_id)`
+- `memory_enrichments(is_highlight, importance_score desc, processed_at desc)`
+- `memory_enrichments.keywords` GIN (`jsonb`)
+- `memory_enrichments.tags` GIN (`jsonb`)
+- `memory_enrichments.raw_response` GIN (`jsonb_path_ops`)
+- `embeddings(memory_id, model_name, model_version)` unique
+- `embeddings(memory_id)`
+- `embeddings(enrichment_id)`
+- `embeddings(created_at desc)`
+- `embeddings(embedding)` ivfflat (`vector_cosine_ops`, lists=100)
+- `embedding_dlq(enrichment_id)` unique
+- `embedding_dlq(memory_id)`
+- `embedding_dlq(last_attempted_at desc)`
+- `embedding_dlq(created_at desc)`
+
+## RLS Notes
+- `users`, `memory_tags`, `memory_enrichments`, `embeddings`, and `embedding_dlq` are RLS-protected.
+- Direct writes from `authenticated` users are denied on enrichment/embedding tables; writes are expected via trusted backend/service paths.
+- `flyway_schema_history` remains migration-internal and is intentionally not part of app-level RLS policy hardening.
 
 ## Status Values
 - `PROCESSING`

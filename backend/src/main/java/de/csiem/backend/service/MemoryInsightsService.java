@@ -31,6 +31,9 @@ public class MemoryInsightsService {
     private static final Pattern MILESTONE_TITLE_PATTERN = Pattern.compile(
         "(?i)(?:\\bfirst\\b|\\berst(?:e|er|es)?(?:mal)?\\b|\\berstmals?\\b|\\bsentences?\\b|\\bsatz\\b|\\bsätze\\b|\\bwithout prompting\\b|\\bohne aufforderung\\b|\\bmilestone\\b)"
     );
+    private static final Pattern QUOTE_FOCUSED_TITLE_PATTERN = Pattern.compile(
+        "(?i)(?:^first\\s+time\\s+saying\\b|^erstes\\s+mal\\s+sagen\\b|.*['\"“”].+['\"“”].*)"
+    );
 
     // Title/Summary generation rules for Reduced MVP:
     // - title: specific, timeline-friendly, max 10 words, avoid generic filler terms
@@ -57,6 +60,7 @@ public class MemoryInsightsService {
           - Describe the concrete moment (what happened), not just a quote.
           - Prioritize milestones/first-time events over objects or catchphrases.
           - If transcript mentions first-time or full-sentence behavior, reflect that in the title.
+          - If both an action milestone and a quote exist, prefer the action milestone.
           - Avoid generic words like "moment", "memory", "today".
           - The title value must be plain text only: no surrounding quotes, no backslashes, no JSON snippets.
         - Summary: exactly 1 sentence, max 22 words, factual and literal.
@@ -83,7 +87,7 @@ public class MemoryInsightsService {
     private static final String SPECIFIC_TITLE_RETRY_NOTE =
         "Your title is too generic. Make it concrete and timeline-friendly. Avoid words like moment, memory, today, nice, sweet, or a day.";
     private static final String MILESTONE_TITLE_RETRY_NOTE =
-        "Your title misses the main milestone. Prioritize the first-time/full-sentence development in plain, concise words.";
+        "Your title misses the main milestone. Prioritize the first-time/full-sentence development in plain, concise words and avoid quote-focused wording like \"First Time Saying ...\" when an action milestone exists.";
     private static final Set<String> TITLE_GENERIC_PATTERNS = Set.of(
         "moment", "memory", "today", "a day", "nice", "sweet"
     );
@@ -91,6 +95,14 @@ public class MemoryInsightsService {
         "a", "an", "the", "my", "our", "little", "special", "beautiful", "nice", "sweet", "joyful",
         "meaningful", "proud", "happy", "lovely", "wonderful", "moment", "memory", "today",
         "ein", "eine", "der", "die", "das", "besonderer", "besondere", "schoener", "suesser"
+    );
+    private static final Set<String> NON_SPEECH_MILESTONE_MARKERS = Set.of(
+        "climb", "climbed", "walk", "walked", "run", "ran", "jump", "jumped", "draw", "drew",
+        "build", "built", "crawl", "crawled", "stand", "stood", "ride", "rode", "swim", "swam"
+    );
+    private static final Set<String> LEADING_CONTEXT_WORDS = Set.of(
+        "today", "yesterday", "playground", "breakfast", "morning", "afternoon", "evening", "night",
+        "park", "home", "school"
     );
     private static final Set<String> LOW_INFORMATION_MARKERS = Set.of(
         "test", "testing", "mic", "microphone", "check", "eins", "zwei", "drei", "one", "two", "three"
@@ -279,7 +291,8 @@ public class MemoryInsightsService {
         }
 
         boolean genericTitle = isGenericTitle(title);
-        boolean missingMilestoneFocus = transcriptSignalsMilestone(transcript) && !titleCapturesMilestone(title);
+        boolean missingMilestoneFocus = transcriptSignalsMilestone(transcript)
+            && (!titleCapturesMilestone(title) || (transcriptHasNonSpeechMilestone(transcript) && isQuoteFocusedTitle(title)));
         return new ProcessedInsights(new MemoryInsights(title, summary), true, genericTitle, missingMilestoneFocus);
     }
 
@@ -312,7 +325,14 @@ public class MemoryInsightsService {
         if (transcript == null) {
             return "";
         }
-        return transcript.trim().replaceAll("\\s+", " ");
+        return transcript
+            .replace("\\\\\"", "\"")
+            .replace("\\\\'", "'")
+            .replace("\\\"", "\"")
+            .replace("\\'", "'")
+            .replaceAll("\\\\+(?=[\"'])", "")
+            .trim()
+            .replaceAll("\\s+", " ");
     }
 
     private List<String> tokenize(String text) {
@@ -329,7 +349,12 @@ public class MemoryInsightsService {
     }
 
     private String buildFallbackTitle(String transcript, List<String> words, DetectedLanguage language) {
-        String quoted = tryQuotedPhraseTitle(transcript, language);
+        String milestoneTitle = buildMilestoneFallbackTitle(transcript, language);
+        if (!milestoneTitle.isBlank()) {
+            return milestoneTitle;
+        }
+
+        String quoted = tryQuotedPhraseTitle(transcript);
         if (!quoted.isBlank()) {
             return quoted;
         }
@@ -345,6 +370,10 @@ public class MemoryInsightsService {
             }
         }
 
+        if (selected.size() >= 2 && LEADING_CONTEXT_WORDS.contains(selected.getFirst())) {
+            selected.removeFirst();
+        }
+
         if (selected.isEmpty()) {
             return defaultTitle(language);
         }
@@ -356,7 +385,10 @@ public class MemoryInsightsService {
         return title;
     }
 
-    private String tryQuotedPhraseTitle(String transcript, DetectedLanguage language) {
+    private String tryQuotedPhraseTitle(String transcript) {
+        if (transcriptHasNonSpeechMilestone(transcript)) {
+            return "";
+        }
         Matcher matcher = QUOTED_TEXT_PATTERN.matcher(transcript);
         if (!matcher.find()) {
             return "";
@@ -373,13 +405,53 @@ public class MemoryInsightsService {
         }
 
         String normalized = toTitleCase(phrase);
-        if (language == DetectedLanguage.GERMAN && transcript.toLowerCase(Locale.ROOT).contains("erste")) {
-            return "Erstes Mal: '" + normalized + "'";
-        }
-        if (language != DetectedLanguage.GERMAN && transcript.toLowerCase(Locale.ROOT).contains("first")) {
-            return "First Time Saying '" + normalized + "'";
-        }
         return normalized;
+    }
+
+    private String buildMilestoneFallbackTitle(String transcript, DetectedLanguage language) {
+        String normalizedTranscript = normalize(transcript).toLowerCase(Locale.ROOT);
+        if (normalizedTranscript.isBlank()) {
+            return "";
+        }
+
+        if (normalizedTranscript.contains("full sentence") || normalizedTranscript.contains("full sentences")) {
+            return language == DetectedLanguage.GERMAN ? "Erster ganzer Satz" : "First full sentence";
+        }
+        if (normalizedTranscript.contains("ganzen satz") || normalizedTranscript.contains("ganze sätze")) {
+            return "Erster ganzer Satz";
+        }
+
+        if (!transcriptHasNonSpeechMilestone(normalizedTranscript) || !transcriptSignalsMilestone(normalizedTranscript)) {
+            return "";
+        }
+
+        List<String> words = tokenize(keepFirstSentence(normalizedTranscript));
+        Set<String> stopWords = language == DetectedLanguage.GERMAN ? STOP_WORDS_DE : STOP_WORDS_EN;
+        List<String> phrase = new ArrayList<>();
+        boolean collecting = false;
+
+        for (String word : words) {
+            if (!collecting && NON_SPEECH_MILESTONE_MARKERS.contains(word)) {
+                collecting = true;
+            }
+            if (!collecting || stopWords.contains(word)) {
+                continue;
+            }
+            phrase.add(word);
+            if (phrase.size() == 3) {
+                break;
+            }
+        }
+
+        if (phrase.isEmpty()) {
+            return "";
+        }
+
+        String title = toTitleCase(String.join(" ", phrase));
+        if (containsIndependenceMarker(normalizedTranscript) && splitWords(title).size() < 4) {
+            title = title + (language == DetectedLanguage.GERMAN ? " allein" : " alone");
+        }
+        return title;
     }
 
     private String buildFallbackSummary(String transcript, DetectedLanguage language, boolean lowInformation) {
@@ -416,6 +488,7 @@ public class MemoryInsightsService {
         title = title
             .replace("\\\"", "\"")
             .replace("\\'", "'")
+            .replace("\\", "")
             .replaceAll("\\\\+$", "")
             .trim();
         title = stripSurroundingQuotes(title);
@@ -584,6 +657,39 @@ public class MemoryInsightsService {
             return false;
         }
         return MILESTONE_TITLE_PATTERN.matcher(normalizedTitle).find();
+    }
+
+    private boolean transcriptHasNonSpeechMilestone(String transcript) {
+        String normalizedTranscript = normalize(transcript).toLowerCase(Locale.ROOT);
+        for (String marker : NON_SPEECH_MILESTONE_MARKERS) {
+            if (normalizedTranscript.contains(marker)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean containsIndependenceMarker(String transcript) {
+        String normalizedTranscript = normalize(transcript).toLowerCase(Locale.ROOT);
+        return normalizedTranscript.contains("all by himself")
+            || normalizedTranscript.contains("all by herself")
+            || normalizedTranscript.contains("on his own")
+            || normalizedTranscript.contains("on her own")
+            || normalizedTranscript.contains("without help")
+            || normalizedTranscript.contains("ganz allein")
+            || normalizedTranscript.contains("allein")
+            || normalizedTranscript.contains("selbstständig");
+    }
+
+    private boolean isQuoteFocusedTitle(String title) {
+        String normalizedTitle = normalize(title).toLowerCase(Locale.ROOT);
+        if (normalizedTitle.isBlank()) {
+            return false;
+        }
+        if (normalizedTitle.startsWith("first time saying") || normalizedTitle.startsWith("erstes mal sagen")) {
+            return true;
+        }
+        return QUOTE_FOCUSED_TITLE_PATTERN.matcher(normalizedTitle).find();
     }
 
     private List<String> splitWords(String text) {

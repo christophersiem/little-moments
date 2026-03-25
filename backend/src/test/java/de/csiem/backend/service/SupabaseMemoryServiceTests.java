@@ -11,7 +11,6 @@ import de.csiem.backend.service.transcription.TranscriptionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -29,7 +28,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -52,6 +55,9 @@ class SupabaseMemoryServiceTests {
     @Mock
     private MemoryInsightsService memoryInsightsService;
 
+    @Mock
+    private MemoryEnrichmentWebhookService memoryEnrichmentWebhookService;
+
     private SupabaseMemoryService supabaseMemoryService;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private AppProperties appProperties;
@@ -65,7 +71,8 @@ class SupabaseMemoryServiceTests {
             memorySplittingService,
             memoryTaggingService,
             memoryInsightsService,
-            appProperties
+            appProperties,
+            memoryEnrichmentWebhookService
         );
     }
 
@@ -98,6 +105,7 @@ class SupabaseMemoryServiceTests {
             .thenReturn(json("""
                 {
                   "id": "%s",
+                  "created_at": "2026-03-05T08:15:00Z",
                   "status": "READY",
                   "error_message": null,
                   "transcript": "She asked for another bedtime story.",
@@ -116,11 +124,120 @@ class SupabaseMemoryServiceTests {
         assertTrue(response.tags().contains("Language"));
 
         verify(supabaseGatewayService).assertOwnerCanCreateMemory("Bearer token", "child-1");
+        verify(supabaseGatewayService).updateMemoryById(
+            eq("Bearer token"),
+            eq(memoryId.toString()),
+            argThat(patch ->
+                "READY".equals(patch.get("status"))
+                    && "A clear language leap.".equals(patch.get("summary"))
+            )
+        );
+        verify(memoryEnrichmentWebhookService).publishCreatedEntry(
+            eq(memoryId),
+            eq("child-1"),
+            eq(transcript),
+            eq("A clear language leap."),
+            eq("Asked for bedtime story"),
+            eq(Instant.parse("2026-03-05T08:15:00Z")),
+            isNull(),
+            isNull()
+        );
+    }
 
-        ArgumentCaptor<Map<String, ?>> patchCaptor = ArgumentCaptor.forClass(Map.class);
-        verify(supabaseGatewayService).updateMemoryById(eq("Bearer token"), eq(memoryId.toString()), patchCaptor.capture());
-        assertEquals("READY", patchCaptor.getValue().get("status"));
-        assertEquals("A clear language leap.", patchCaptor.getValue().get("summary"));
+    @Test
+    void createMemoryPublishesWebhookForEachSplitEntry() throws Exception {
+        UUID firstId = UUID.fromString("77777777-7777-7777-7777-777777777777");
+        UUID secondId = UUID.fromString("88888888-8888-8888-8888-888888888888");
+        Instant recordedAt = Instant.parse("2026-03-05T08:15:00Z");
+        Instant splitTwoRecordedAt = Instant.parse("2026-03-05T09:00:00Z");
+        String transcript = "At breakfast he asked for more apples. Later he climbed the ladder alone.";
+        SplitMemory splitOne = new SplitMemory("At breakfast he asked for more apples.", recordedAt, 0.9);
+        SplitMemory splitTwo = new SplitMemory("Later he climbed the ladder alone.", splitTwoRecordedAt, 0.85);
+        CreateMemoryRequest request = new CreateMemoryRequest(
+            new MockMultipartFile("audio", "moment.webm", "audio/webm", "audio-data".getBytes()),
+            recordedAt,
+            "child-1",
+            false,
+            8
+        );
+
+        when(supabaseGatewayService.createProcessingMemory("Bearer token", "child-1", recordedAt))
+            .thenReturn(json("""
+                {
+                  "id": "%s"
+                }
+                """.formatted(firstId)));
+        when(transcriptionService.transcribe(any(), any(), any())).thenReturn(transcript);
+        when(memorySplittingService.split(transcript, recordedAt)).thenReturn(List.of(splitOne, splitTwo));
+        when(memoryInsightsService.generate(anyString()))
+            .thenReturn(
+                new MemoryInsightsService.MemoryInsights("Asked for more apples", "Breakfast language leap."),
+                new MemoryInsightsService.MemoryInsights("Climbed ladder alone", "Strong independent climbing.")
+            );
+        when(memoryTaggingService.detectTags(anyString())).thenReturn(Set.of(MemoryTag.LANGUAGE));
+        when(supabaseGatewayService.updateMemoryById(eq("Bearer token"), eq(firstId.toString()), any(Map.class)))
+            .thenReturn(json("""
+                {
+                  "id": "%s",
+                  "status": "READY",
+                  "error_message": null,
+                  "transcript": "At breakfast he asked for more apples.",
+                  "title": "Asked for more apples",
+                  "summary": "Breakfast language leap.",
+                  "tags": ["Language"]
+                }
+                """.formatted(firstId)));
+        when(supabaseGatewayService.insertReadyMemory(
+            eq("Bearer token"),
+            eq("child-1"),
+            eq(splitTwoRecordedAt),
+            eq("Later he climbed the ladder alone."),
+            eq("Climbed ladder alone"),
+            eq("Strong independent climbing."),
+            org.mockito.ArgumentMatchers.<List<String>>any(),
+            isNull(),
+            isNull(),
+            isNull(),
+            isNull()
+        )).thenReturn(json("""
+                {
+                  "id": "%s",
+                  "created_at": "2026-03-05T09:00:00Z",
+                  "status": "READY",
+                  "error_message": null,
+                  "transcript": "Later he climbed the ladder alone.",
+                  "title": "Climbed ladder alone",
+                  "summary": "Strong independent climbing.",
+                  "tags": ["Language"]
+                }
+                """.formatted(secondId)));
+
+        CreateMemoryResponse response = supabaseMemoryService.createMemory("Bearer token", request);
+
+        assertEquals(2, response.count());
+        assertEquals(List.of(firstId, secondId), response.ids());
+        verify(memoryEnrichmentWebhookService, times(2))
+            .publishCreatedEntry(any(), eq("child-1"), anyString(), anyString(), anyString(), any(), isNull(), isNull());
+        verify(memoryEnrichmentWebhookService).publishCreatedEntry(
+            eq(firstId),
+            eq("child-1"),
+            eq("At breakfast he asked for more apples."),
+            eq("Breakfast language leap."),
+            eq("Asked for more apples"),
+            eq(recordedAt),
+            isNull(),
+            isNull()
+        );
+        verify(memoryEnrichmentWebhookService).publishCreatedEntry(
+            eq(secondId),
+            eq("child-1"),
+            eq("Later he climbed the ladder alone."),
+            eq("Strong independent climbing."),
+            eq("Climbed ladder alone"),
+            eq(splitTwoRecordedAt),
+            isNull(),
+            isNull()
+        );
     }
 
     @Test
@@ -159,11 +276,15 @@ class SupabaseMemoryServiceTests {
         assertTrue(response.ids().isEmpty());
         assertEquals("Provider unavailable", response.errorMessage());
         assertNull(response.transcriptPreview());
-
-        ArgumentCaptor<Map<String, ?>> patchCaptor = ArgumentCaptor.forClass(Map.class);
-        verify(supabaseGatewayService).updateMemoryById(eq("Bearer token"), eq(memoryId.toString()), patchCaptor.capture());
-        assertEquals("FAILED", patchCaptor.getValue().get("status"));
-        assertNull(patchCaptor.getValue().get("transcript"));
+        verify(supabaseGatewayService).updateMemoryById(
+            eq("Bearer token"),
+            eq(memoryId.toString()),
+            argThat(patch ->
+                "FAILED".equals(patch.get("status"))
+                    && patch.get("transcript") == null
+            )
+        );
+        verifyNoInteractions(memoryEnrichmentWebhookService);
     }
 
     @Test
@@ -183,7 +304,12 @@ class SupabaseMemoryServiceTests {
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
         assertEquals("Audio file is required", exception.getReason());
-        verifyNoInteractions(supabaseGatewayService, transcriptionService, memorySplittingService);
+        verifyNoInteractions(
+            supabaseGatewayService,
+            transcriptionService,
+            memorySplittingService,
+            memoryEnrichmentWebhookService
+        );
     }
 
     @Test
@@ -203,7 +329,12 @@ class SupabaseMemoryServiceTests {
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
         assertEquals("childId is required", exception.getReason());
-        verifyNoInteractions(supabaseGatewayService, transcriptionService, memorySplittingService);
+        verifyNoInteractions(
+            supabaseGatewayService,
+            transcriptionService,
+            memorySplittingService,
+            memoryEnrichmentWebhookService
+        );
     }
 
     private JsonNode json(String payload) throws Exception {

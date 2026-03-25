@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
+import { APP_ROUTES } from '../app/routes'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
 import { RecordButton } from '../components/RecordButton'
@@ -28,19 +29,18 @@ interface RecordingPayload {
 }
 
 const NOOP = () => undefined
-const MIN_RECORDING_SECONDS = 2
+const MIN_RECORDING_SECONDS = 3
 const MIN_RECORDING_BYTES = 10000
 const SHORT_HINT_DISPLAY_MS = 5200
 const MAX_DURATION_HINT = `Max ${MAX_RECORDING_SECONDS}s`
-
 const RECORDER_MIME_PREFERENCES = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus']
-
 function pickRecorderMimeType(): string | undefined {
   if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
     return undefined
   }
   return RECORDER_MIME_PREFERENCES.find((value) => MediaRecorder.isTypeSupported(value))
 }
+const RECORDING_HINT_FADE_DELAY_MS = 3400
 
 function isLikelyTooShort(blob: Blob, elapsedSeconds: number): boolean {
   return elapsedSeconds < MIN_RECORDING_SECONDS || blob.size < MIN_RECORDING_BYTES
@@ -84,7 +84,7 @@ const RecordAnchor = styled.div`
 
 const RecordingMeta = styled.div`
   position: absolute;
-  top: calc(100% + ${({ theme }) => theme.space.x4});
+  top: calc(100% + ${({ theme }) => theme.space.x5});
   left: 50%;
   transform: translateX(-50%);
   width: min(320px, calc(100vw - 48px));
@@ -95,15 +95,17 @@ const RecordingMeta = styled.div`
 `
 
 const Timer = styled.div`
-  font-size: ${({ theme }) => theme.typography.timerSize};
+  font-size: calc(${({ theme }) => theme.typography.timerSize} - 1.2rem);
   letter-spacing: 0.08em;
-  color: ${({ theme }) => theme.colors.text};
+  color: ${({ theme }) => `color-mix(in srgb, ${theme.colors.text} 88%, ${theme.colors.textMuted})`};
 `
 
-const BodyText = styled.p`
+const BodyText = styled.p<{ $dimmed?: boolean; $reducedMotion?: boolean }>`
   max-width: 280px;
   color: ${({ theme }) => theme.colors.textMuted};
   font-size: ${({ theme }) => theme.typography.bodySize};
+  opacity: ${({ $dimmed }) => ($dimmed ? 0.35 : 1)};
+  transition: ${({ $reducedMotion }) => ($reducedMotion ? 'none' : 'opacity 760ms ease-in-out')};
 `
 
 const HelperText = styled.p`
@@ -218,6 +220,19 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
   const [errorMessage, setErrorMessage] = useState('')
   const [recordingNotice, setRecordingNotice] = useState('')
   const [keepAudio, setKeepAudio] = useState(false)
+  const [viewportWidth, setViewportWidth] = useState(
+    typeof window === 'undefined' ? 390 : window.innerWidth,
+  )
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return false
+    }
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  })
+  const [recordingHintDimmed, setRecordingHintDimmed] = useState(false)
+
+  const largeButtonDiameter = viewportWidth < 390 ? 176 : 196
+  const stoppedButtonDiameter = viewportWidth < 390 ? 90 : 98
 
   const cleanupStream = () => {
     if (streamRef.current) {
@@ -241,6 +256,30 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
   }, [])
 
   useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return
+    }
+
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const onChange = () => setPrefersReducedMotion(mediaQuery.matches)
+    setPrefersReducedMotion(mediaQuery.matches)
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', onChange)
+      return () => mediaQuery.removeEventListener('change', onChange)
+    }
+
+    mediaQuery.addListener(onChange)
+    return () => mediaQuery.removeListener(onChange)
+  }, [])
+  
+  useEffect(() => {
     if (phase !== 'idle' || !errorMessage) {
       return
     }
@@ -263,6 +302,22 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
   useEffect(() => {
     elapsedRef.current = elapsedSeconds
   }, [elapsedSeconds])
+
+  useEffect(() => {
+    if (phase !== 'recording') {
+      setRecordingHintDimmed(false)
+      return
+    }
+
+    if (prefersReducedMotion) {
+      setRecordingHintDimmed(true)
+      return
+    }
+
+    setRecordingHintDimmed(false)
+    const fadeTimer = window.setTimeout(() => setRecordingHintDimmed(true), RECORDING_HINT_FADE_DELAY_MS)
+    return () => window.clearTimeout(fadeTimer)
+  }, [phase, prefersReducedMotion])
 
   useEffect(() => {
     if (phase !== 'stopped' || stopDecisionState === 'hidden') {
@@ -397,8 +452,12 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
       setStopDecisionState('hidden')
       setPhase('idle')
       setElapsedSeconds(0)
-      navigate('/memories')
-      window.history.replaceState({}, '', `/memories?pending=${encodeURIComponent(session.clientId)}`)
+      navigate(APP_ROUTES.memories)
+      window.history.replaceState(
+        {},
+        '',
+        `${APP_ROUTES.memories}?pending=${encodeURIComponent(session.clientId)}`,
+      )
     }
   }
 
@@ -422,6 +481,8 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
   }
 
   if (phase === 'recording') {
+    const dimHelperText = prefersReducedMotion || recordingHintDimmed
+
     return (
       <CenterStage>
         <CenterHero>
@@ -432,11 +493,13 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
               maxDurationSec={MAX_RECORDING_SECONDS}
               onStart={NOOP}
               onStop={stopRecording}
-              diameter={188}
+              diameter={largeButtonDiameter}
             />
             <RecordingMeta>
               <Timer>{formatDuration(elapsedSeconds)}</Timer>
-              <BodyText>Speak naturally. We will structure this moment for you.</BodyText>
+              <BodyText $dimmed={dimHelperText} $reducedMotion={prefersReducedMotion}>
+                Speak naturally. We&apos;ll take care of the rest.
+              </BodyText>
               <HelperText>{MAX_DURATION_HINT}</HelperText>
             </RecordingMeta>
           </RecordAnchor>
@@ -456,7 +519,7 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
               maxDurationSec={MAX_RECORDING_SECONDS}
               onStart={NOOP}
               onStop={NOOP}
-              diameter={96}
+              diameter={stoppedButtonDiameter}
             />
             <BodyText>Your recording is ready to save.</BodyText>
             {recordingNotice && <InlineNotice role="status">{recordingNotice}</InlineNotice>}
@@ -527,7 +590,7 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
           maxDurationSec={MAX_RECORDING_SECONDS}
           onStart={() => void startRecording()}
           onStop={NOOP}
-          diameter={188}
+          diameter={largeButtonDiameter}
         />
         <PreferenceRow
           checked={keepAudio}

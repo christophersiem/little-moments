@@ -289,11 +289,11 @@ public class OpenAiMemorySplittingService implements MemorySplittingService {
 
     private String unescapeJsonString(String value) {
         return value
-            .replace("\\\\n", "\n")
-            .replace("\\\\r", "\r")
-            .replace("\\\\t", "\t")
-            .replace("\\\\\"", "\"")
-            .replace("\\\\\\\\", "\\");
+            .replace("\\n", "\n")
+            .replace("\\r", "\r")
+            .replace("\\t", "\t")
+            .replace("\\\"", "\"")
+            .replace("\\\\", "\\");
     }
 
     private boolean sameText(String left, String right) {

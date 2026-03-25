@@ -16,6 +16,8 @@ public class AppProperties {
     private final Insights insights = new Insights();
     private final Splitter splitter = new Splitter();
     private final Supabase supabase = new Supabase();
+    private final EnrichmentWebhook enrichmentWebhook = new EnrichmentWebhook();
+    private final EmbeddingRunner embeddingRunner = new EmbeddingRunner();
 
     public UUID getDefaultUserId() {
         return defaultUserId;
@@ -51,6 +53,14 @@ public class AppProperties {
 
     public Supabase getSupabase() {
         return supabase;
+    }
+
+    public EnrichmentWebhook getEnrichmentWebhook() {
+        return enrichmentWebhook;
+    }
+
+    public EmbeddingRunner getEmbeddingRunner() {
+        return embeddingRunner;
     }
 
     public List<String> getCorsOriginsAsList() {
@@ -243,6 +253,156 @@ public class AppProperties {
 
         public void setAudioSignedUrlTtlSeconds(int audioSignedUrlTtlSeconds) {
             this.audioSignedUrlTtlSeconds = audioSignedUrlTtlSeconds;
+        }
+    }
+
+    public static class EnrichmentWebhook {
+        private boolean enabled = false;
+        private String url;
+        private String apiKey;
+        private String defaultLanguage = "en";
+        private int timeoutMs = 5000;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getUrl() {
+            return url;
+        }
+
+        public void setUrl(String url) {
+            this.url = url;
+        }
+
+        public String getApiKey() {
+            return apiKey;
+        }
+
+        public void setApiKey(String apiKey) {
+            this.apiKey = apiKey;
+        }
+
+        public String getDefaultLanguage() {
+            return defaultLanguage;
+        }
+
+        public void setDefaultLanguage(String defaultLanguage) {
+            this.defaultLanguage = defaultLanguage;
+        }
+
+        public int getTimeoutMs() {
+            return timeoutMs;
+        }
+
+        public void setTimeoutMs(int timeoutMs) {
+            this.timeoutMs = timeoutMs;
+        }
+    }
+
+    public static class EmbeddingRunner {
+        private boolean enabled = false;
+        private String triggerApiKey;
+        private String openaiBaseUrl = "https://api.openai.com";
+        private String openaiApiKey;
+        private String model = "text-embedding-3-small";
+        private String modelVersion = "";
+        private int dim = 1536;
+        private int batchSize = 25;
+        private int maxRetries = 3;
+        private int timeoutMs = 30000;
+        private double costPerToken = 0.00000002d;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getTriggerApiKey() {
+            return triggerApiKey;
+        }
+
+        public void setTriggerApiKey(String triggerApiKey) {
+            this.triggerApiKey = triggerApiKey;
+        }
+
+        public String getOpenaiBaseUrl() {
+            return openaiBaseUrl;
+        }
+
+        public void setOpenaiBaseUrl(String openaiBaseUrl) {
+            this.openaiBaseUrl = openaiBaseUrl;
+        }
+
+        public String getOpenaiApiKey() {
+            return openaiApiKey;
+        }
+
+        public void setOpenaiApiKey(String openaiApiKey) {
+            this.openaiApiKey = openaiApiKey;
+        }
+
+        public String getModel() {
+            return model;
+        }
+
+        public void setModel(String model) {
+            this.model = model;
+        }
+
+        public String getModelVersion() {
+            return modelVersion;
+        }
+
+        public void setModelVersion(String modelVersion) {
+            this.modelVersion = modelVersion;
+        }
+
+        public int getDim() {
+            return dim;
+        }
+
+        public void setDim(int dim) {
+            this.dim = dim;
+        }
+
+        public int getBatchSize() {
+            return batchSize;
+        }
+
+        public void setBatchSize(int batchSize) {
+            this.batchSize = batchSize;
+        }
+
+        public int getMaxRetries() {
+            return maxRetries;
+        }
+
+        public void setMaxRetries(int maxRetries) {
+            this.maxRetries = maxRetries;
+        }
+
+        public int getTimeoutMs() {
+            return timeoutMs;
+        }
+
+        public void setTimeoutMs(int timeoutMs) {
+            this.timeoutMs = timeoutMs;
+        }
+
+        public double getCostPerToken() {
+            return costPerToken;
+        }
+
+        public void setCostPerToken(double costPerToken) {
+            this.costPerToken = costPerToken;
         }
     }
 }

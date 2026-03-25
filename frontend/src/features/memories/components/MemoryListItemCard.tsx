@@ -117,13 +117,13 @@ const Tags = styled.div`
 `
 
 const TagChip = styled.span`
-  padding: 0 ${({ theme }) => theme.space.x1};
+  padding: 2px ${({ theme }) => theme.space.x2};
   border-radius: ${({ theme }) => theme.radii.pill};
   background: ${({ theme }) => theme.colors.surface};
   color: ${({ theme }) => theme.colors.textMuted};
   border: 1px solid color-mix(in srgb, ${({ theme }) => theme.colors.border} 52%, transparent);
-  font-size: calc(${({ theme }) => theme.typography.secondarySize} - 3px);
-  line-height: 1.2;
+  font-size: calc(${({ theme }) => theme.typography.secondarySize} - 1px);
+  line-height: 1.25;
   opacity: 0.9;
 `
 

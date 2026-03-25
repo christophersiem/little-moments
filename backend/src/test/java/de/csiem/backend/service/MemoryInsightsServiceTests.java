@@ -139,6 +139,19 @@ class MemoryInsightsServiceTests {
     }
 
     @Test
+    void flagsQuoteFocusedTitleWhenTranscriptHasActionMilestone() {
+        String transcript =
+            "At the playground, he climbed the small ladder all by himself for the first time and shouted, \"I did it!\"";
+        MemoryInsightsService.ProcessedInsights processed = parsingService().postProcessModelOutputForTest(
+            "{\"title\":\"First Time Saying 'I Did It!'\",\"summary\":\"At the playground, he climbed the small ladder by himself for the first time.\"}",
+            transcript
+        );
+
+        assertTrue(processed.valid());
+        assertTrue(processed.missingMilestoneFocus());
+    }
+
+    @Test
     void stripsTranscriptSaysLeadInFromModelSummary() {
         MemoryInsightsService.ProcessedInsights processed = parsingService().postProcessModelOutputForTest(
             "{\"title\":\"Asked for more apples\",\"summary\":\"Transcript says: At breakfast, he was asking for more apples using full sentences.\"}",
@@ -213,6 +226,17 @@ class MemoryInsightsServiceTests {
     }
 
     @Test
+    void stripsEmbeddedEscapeArtifactsFromGeneratedTitle() {
+        MemoryInsightsService.ProcessedInsights processed = parsingService().postProcessModelOutputForTest(
+            "{\"title\":\"First Time Saying 'I Did It!\\\\'\",\"summary\":\"At the playground, he climbed the small ladder by himself for the first time.\"}",
+            "At the playground, he climbed the small ladder by himself for the first time and shouted, \"I did it!\""
+        );
+
+        assertTrue(processed.valid());
+        assertFalse(processed.insights().title().contains("\\"));
+    }
+
+    @Test
     void extractsTitleWhenModelReturnsJsonSnippetAsTitleValue() {
         MemoryInsightsService.ProcessedInsights processed = parsingService().postProcessModelOutputForTest(
             "{\"title\":\"{\\\"title\\\":\\\"More Apples, Please.\\\"}\",\"summary\":\"" + GROUNDED_BREAKFAST_SUMMARY + "\"}",
@@ -221,5 +245,16 @@ class MemoryInsightsServiceTests {
 
         assertTrue(processed.valid());
         assertEquals("More Apples, Please.", processed.insights().title());
+    }
+
+    @Test
+    void fallbackPrefersActionMilestoneOverQuotedCatchphrase() {
+        String transcript =
+            "And today at the playground, he climbed the small ladder on the play structure all by himself for the first time and shouted, \\\"I did it!\\\"";
+        MemoryInsightsService.MemoryInsights insights = fallbackOnlyService().generate(transcript);
+
+        assertFalse(insights.title().contains("\\"));
+        assertFalse(insights.title().toLowerCase().contains("saying"));
+        assertTrue(insights.title().toLowerCase().contains("climb"));
     }
 }
