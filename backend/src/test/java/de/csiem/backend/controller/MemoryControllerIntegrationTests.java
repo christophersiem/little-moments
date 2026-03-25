@@ -78,6 +78,7 @@ class MemoryControllerIntegrationTests {
                 multipart("/api/memories")
                     .file(audioFile)
                     .param("recordedAt", "2026-02-26T14:35:00Z")
+                    .param("durationSeconds", "10")
                     .contentType(MediaType.MULTIPART_FORM_DATA)
             )
             .andExpect(status().isCreated())
@@ -128,7 +129,11 @@ class MemoryControllerIntegrationTests {
             "fake-audio".getBytes()
         );
 
-        MvcResult createResult = mockMvc.perform(multipart("/api/memories").file(audioFile))
+        MvcResult createResult = mockMvc.perform(
+                multipart("/api/memories")
+                    .file(audioFile)
+                    .param("durationSeconds", "10")
+            )
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.status").value("FAILED"))
             .andExpect(jsonPath("$.errorMessage").value("Provider unavailable"))
@@ -175,6 +180,7 @@ class MemoryControllerIntegrationTests {
         MvcResult febCreateResult = mockMvc.perform(
                 multipart("/api/memories")
                     .file(febAudio)
+                    .param("durationSeconds", "10")
                     .param("recordedAt", "2026-02-20T10:00:00Z")
                     .contentType(MediaType.MULTIPART_FORM_DATA)
             )
@@ -194,6 +200,7 @@ class MemoryControllerIntegrationTests {
         MvcResult janCreateResult = mockMvc.perform(
                 multipart("/api/memories")
                     .file(janAudio)
+                    .param("durationSeconds", "10")
                     .param("recordedAt", "2026-01-10T10:00:00Z")
                     .contentType(MediaType.MULTIPART_FORM_DATA)
             )
@@ -232,6 +239,7 @@ class MemoryControllerIntegrationTests {
         MvcResult oldestCreateResult = mockMvc.perform(
                 multipart("/api/memories")
                     .file(audioFile)
+                    .param("durationSeconds", "10")
                     .param("recordedAt", "2024-04-01T08:00:00Z")
                     .contentType(MediaType.MULTIPART_FORM_DATA)
             )
@@ -243,6 +251,7 @@ class MemoryControllerIntegrationTests {
         MvcResult middleCreateResult = mockMvc.perform(
                 multipart("/api/memories")
                     .file(audioFile)
+                    .param("durationSeconds", "10")
                     .param("recordedAt", "2024-04-11T08:00:00Z")
                     .contentType(MediaType.MULTIPART_FORM_DATA)
             )
@@ -254,6 +263,7 @@ class MemoryControllerIntegrationTests {
         MvcResult newestCreateResult = mockMvc.perform(
                 multipart("/api/memories")
                     .file(audioFile)
+                    .param("durationSeconds", "10")
                     .param("recordedAt", "2024-04-20T08:00:00Z")
                     .contentType(MediaType.MULTIPART_FORM_DATA)
             )
@@ -311,6 +321,7 @@ class MemoryControllerIntegrationTests {
         MvcResult createResult = mockMvc.perform(
                 multipart("/api/memories")
                     .file(audioFile)
+                    .param("durationSeconds", "10")
                     .param("recordedAt", uploadTimestamp.toString())
                     .contentType(MediaType.MULTIPART_FORM_DATA)
             )
@@ -360,6 +371,7 @@ class MemoryControllerIntegrationTests {
         MvcResult createResult = mockMvc.perform(
                 multipart("/api/memories")
                     .file(audioFile)
+                    .param("durationSeconds", "10")
                     .param("recordedAt", "2030-01-10T18:00:00Z")
                     .contentType(MediaType.MULTIPART_FORM_DATA)
             )
@@ -403,6 +415,7 @@ class MemoryControllerIntegrationTests {
         MvcResult createResult = mockMvc.perform(
                 multipart("/api/memories")
                     .file(audioFile)
+                    .param("durationSeconds", "10")
                     .param("recordedAt", "2026-01-30T10:00:00Z")
                     .contentType(MediaType.MULTIPART_FORM_DATA)
             )
@@ -447,6 +460,7 @@ class MemoryControllerIntegrationTests {
         MvcResult createResult = mockMvc.perform(
                 multipart("/api/memories")
                     .file(audioFile)
+                    .param("durationSeconds", "10")
                     .param("recordedAt", "2026-01-30T10:00:00Z")
                     .contentType(MediaType.MULTIPART_FORM_DATA)
             )
@@ -510,6 +524,7 @@ class MemoryControllerIntegrationTests {
         MvcResult firstCreateResult = mockMvc.perform(
                 multipart("/api/memories")
                     .file(audioFile)
+                    .param("durationSeconds", "10")
                     .param("recordedAt", "2044-02-26T18:20:00Z")
                     .contentType(MediaType.MULTIPART_FORM_DATA)
             )
@@ -521,6 +536,7 @@ class MemoryControllerIntegrationTests {
         mockMvc.perform(
                 multipart("/api/memories")
                     .file(audioFile)
+                    .param("durationSeconds", "10")
                     .param("recordedAt", "2044-02-27T18:20:00Z")
                     .contentType(MediaType.MULTIPART_FORM_DATA)
             )
@@ -568,6 +584,7 @@ class MemoryControllerIntegrationTests {
         MvcResult createResult = mockMvc.perform(
                 multipart("/api/memories")
                     .file(audioFile)
+                    .param("durationSeconds", "10")
                     .param("recordedAt", "2026-02-26T18:20:00Z")
                     .contentType(MediaType.MULTIPART_FORM_DATA)
             )

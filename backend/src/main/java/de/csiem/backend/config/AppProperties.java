@@ -11,6 +11,7 @@ public class AppProperties {
 
     private UUID defaultUserId = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private String corsAllowedOrigins = "http://localhost:5173,http://127.0.0.1:5173,https://*.ngrok-free.app";
+    private final Recording recording = new Recording();
     private final Transcription transcription = new Transcription();
     private final Insights insights = new Insights();
     private final Splitter splitter = new Splitter();
@@ -32,6 +33,10 @@ public class AppProperties {
 
     public void setCorsAllowedOrigins(String corsAllowedOrigins) {
         this.corsAllowedOrigins = corsAllowedOrigins;
+    }
+
+    public Recording getRecording() {
+        return recording;
     }
 
     public Transcription getTranscription() {
@@ -63,6 +68,18 @@ public class AppProperties {
             .map(String::trim)
             .filter(value -> !value.isEmpty())
             .toList();
+    }
+
+    public static class Recording {
+        private int maxSeconds = 60;
+
+        public int getMaxSeconds() {
+            return maxSeconds;
+        }
+
+        public void setMaxSeconds(int maxSeconds) {
+            this.maxSeconds = maxSeconds;
+        }
     }
 
     public static class Transcription {
@@ -194,6 +211,9 @@ public class AppProperties {
     public static class Supabase {
         private String url;
         private String anonKey;
+        private String serviceRoleKey;
+        private String audioBucket = "memory-audio";
+        private int audioSignedUrlTtlSeconds = 60;
 
         public String getUrl() {
             return url;
@@ -209,6 +229,30 @@ public class AppProperties {
 
         public void setAnonKey(String anonKey) {
             this.anonKey = anonKey;
+        }
+
+        public String getServiceRoleKey() {
+            return serviceRoleKey;
+        }
+
+        public void setServiceRoleKey(String serviceRoleKey) {
+            this.serviceRoleKey = serviceRoleKey;
+        }
+
+        public String getAudioBucket() {
+            return audioBucket;
+        }
+
+        public void setAudioBucket(String audioBucket) {
+            this.audioBucket = audioBucket;
+        }
+
+        public int getAudioSignedUrlTtlSeconds() {
+            return audioSignedUrlTtlSeconds;
+        }
+
+        public void setAudioSignedUrlTtlSeconds(int audioSignedUrlTtlSeconds) {
+            this.audioSignedUrlTtlSeconds = audioSignedUrlTtlSeconds;
         }
     }
 

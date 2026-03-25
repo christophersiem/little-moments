@@ -187,7 +187,8 @@ class MemoryControllerTests {
                 "Summary",
                 "Transcript",
                 null,
-                List.of("Language")
+                List.of("Language"),
+                false
             )
         );
 

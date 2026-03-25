@@ -1,6 +1,7 @@
 package de.csiem.backend.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import de.csiem.backend.config.AppProperties;
 import de.csiem.backend.dto.CreateMemoryRequest;
 import de.csiem.backend.dto.CreateMemoryResponse;
 import de.csiem.backend.dto.MemoryListItemResponse;
@@ -29,6 +30,7 @@ import java.util.UUID;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
+import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Service
 public class SupabaseMemoryService {
@@ -41,6 +43,7 @@ public class SupabaseMemoryService {
     private final MemorySplittingService memorySplittingService;
     private final MemoryTaggingService memoryTaggingService;
     private final MemoryInsightsService memoryInsightsService;
+    private final AppProperties appProperties;
     private final MemoryEnrichmentWebhookService memoryEnrichmentWebhookService;
 
     public SupabaseMemoryService(
@@ -49,6 +52,7 @@ public class SupabaseMemoryService {
         MemorySplittingService memorySplittingService,
         MemoryTaggingService memoryTaggingService,
         MemoryInsightsService memoryInsightsService,
+        AppProperties appProperties,
         MemoryEnrichmentWebhookService memoryEnrichmentWebhookService
     ) {
         this.supabaseGatewayService = supabaseGatewayService;
@@ -56,6 +60,7 @@ public class SupabaseMemoryService {
         this.memorySplittingService = memorySplittingService;
         this.memoryTaggingService = memoryTaggingService;
         this.memoryInsightsService = memoryInsightsService;
+        this.appProperties = appProperties;
         this.memoryEnrichmentWebhookService = memoryEnrichmentWebhookService;
     }
 
@@ -70,21 +75,48 @@ public class SupabaseMemoryService {
         if (!StringUtils.hasText(request.childId())) {
             throw new ResponseStatusException(BAD_REQUEST, "childId is required");
         }
-        supabaseGatewayService.assertOwnerCanCreateMemory(authorizationHeader, request.childId().trim());
+
+        int maxRecordingSeconds = Math.max(appProperties.getRecording().getMaxSeconds(), 1);
+        int durationSeconds = request.durationSeconds() != null ? request.durationSeconds() : -1;
+        if (durationSeconds < 1) {
+            throw new ResponseStatusException(BAD_REQUEST, "durationSeconds is required");
+        }
+        if (durationSeconds > maxRecordingSeconds) {
+            throw new ResponseStatusException(
+                BAD_REQUEST,
+                "Recording exceeds max duration of %d seconds".formatted(maxRecordingSeconds)
+            );
+        }
+
+        String childId = request.childId().trim();
+        supabaseGatewayService.assertOwnerCanCreateMemory(authorizationHeader, childId);
+        String familyId = supabaseGatewayService.resolveFamilyIdForChild(authorizationHeader, childId);
 
         Instant uploadTimestamp = request.recordedAt() != null ? request.recordedAt() : Instant.now();
         JsonNode processingRow = supabaseGatewayService.createProcessingMemory(
             authorizationHeader,
-            request.childId().trim(),
+            childId,
             uploadTimestamp
         );
         String memoryId = text(processingRow.get("id"));
 
         try {
+            String fileName = Optional.ofNullable(request.audio().getOriginalFilename()).orElse("recording.webm");
+            String mimeType = Optional.ofNullable(request.audio().getContentType()).orElse(MediaType.APPLICATION_OCTET_STREAM_VALUE);
+            byte[] audioBytes = request.audio().getBytes();
+            AudioMetadata audioMetadata = null;
+
+            if (Boolean.TRUE.equals(request.keepAudio())) {
+                String objectPath = buildAudioObjectPath(familyId, childId, memoryId, fileName, mimeType);
+                supabaseGatewayService.uploadMemoryAudio(objectPath, audioBytes, mimeType);
+                audioMetadata = new AudioMetadata(objectPath, mimeType, (long) audioBytes.length, durationSeconds);
+                supabaseGatewayService.updateMemoryById(authorizationHeader, memoryId, audioPatch(audioMetadata));
+            }
+
             String transcript = transcriptionService.transcribe(
-                request.audio().getBytes(),
-                Optional.ofNullable(request.audio().getOriginalFilename()).orElse("recording.webm"),
-                Optional.ofNullable(request.audio().getContentType()).orElse(MediaType.APPLICATION_OCTET_STREAM_VALUE)
+                audioBytes,
+                fileName,
+                mimeType
             );
 
             List<SplitMemory> splitMemories = memorySplittingService.split(transcript, uploadTimestamp);
@@ -92,10 +124,10 @@ public class SupabaseMemoryService {
                 SplitMemory splitMemory = splitMemories.isEmpty()
                     ? new SplitMemory(transcript, uploadTimestamp, 1.0)
                     : splitMemories.getFirst();
-                return persistSingleMemory(authorizationHeader, memoryId, request.childId().trim(), splitMemory);
+                return persistSingleMemory(authorizationHeader, memoryId, request.childId().trim(), splitMemory, audioMetadata);
             }
 
-            return persistSplitMemories(authorizationHeader, memoryId, request.childId().trim(), splitMemories);
+            return persistSplitMemories(authorizationHeader, memoryId, childId, splitMemories, audioMetadata);
         } catch (Exception ex) {
             Map<String, Object> failedPatch = new java.util.LinkedHashMap<>();
             failedPatch.put("status", "FAILED");
@@ -199,6 +231,16 @@ public class SupabaseMemoryService {
         return toMemoryResponse(row);
     }
 
+    public String getMemoryAudioUrl(String authorizationHeader, UUID id) {
+        JsonNode row = supabaseGatewayService.getMemoryById(authorizationHeader, id.toString());
+        String audioPath = nullableText(row.get("audio_path"));
+        if (!StringUtils.hasText(audioPath)) {
+            throw new ResponseStatusException(NOT_FOUND, "Audio is not available for this memory.");
+        }
+        int ttlSeconds = Math.max(appProperties.getSupabase().getAudioSignedUrlTtlSeconds(), 1);
+        return supabaseGatewayService.createSignedAudioUrl(audioPath, ttlSeconds);
+    }
+
     public MemoryResponse updateMemory(String authorizationHeader, UUID id, UpdateMemoryRequest request) {
         supabaseGatewayService.assertOwnerCanManageMemory(authorizationHeader, id.toString());
         JsonNode current = supabaseGatewayService.getMemoryById(authorizationHeader, id.toString());
@@ -227,7 +269,10 @@ public class SupabaseMemoryService {
             patch.put("summary", insights.summary());
 
             if (request.title() == null || request.title().isBlank()) {
-                patch.put("title", insights.title());
+                String currentTitle = nullableText(current.get("title"));
+                if (currentTitle == null || currentTitle.isBlank()) {
+                    patch.put("title", insights.title());
+                }
             }
 
             if (request.tags() == null) {
@@ -245,6 +290,11 @@ public class SupabaseMemoryService {
 
     public void deleteMemory(String authorizationHeader, UUID id) {
         supabaseGatewayService.assertOwnerCanManageMemory(authorizationHeader, id.toString());
+        JsonNode current = supabaseGatewayService.getMemoryById(authorizationHeader, id.toString());
+        String audioPath = nullableText(current.get("audio_path"));
+        if (StringUtils.hasText(audioPath)) {
+            supabaseGatewayService.deleteMemoryAudio(audioPath);
+        }
         supabaseGatewayService.deleteMemoryById(authorizationHeader, id.toString());
     }
 
@@ -252,7 +302,8 @@ public class SupabaseMemoryService {
         String authorizationHeader,
         String memoryId,
         String childId,
-        SplitMemory splitMemory
+        SplitMemory splitMemory,
+        AudioMetadata audioMetadata
     ) {
         String excerpt = normalizeTranscript(splitMemory.excerpt());
         MemoryInsightsService.MemoryInsights insights = memoryInsightsService.generate(excerpt);
@@ -264,6 +315,9 @@ public class SupabaseMemoryService {
         patch.put("summary", insights.summary());
         patch.put("tags", toTagLabels(memoryTaggingService.detectTags(excerpt)));
         patch.put("error_message", null);
+        if (audioMetadata != null) {
+            patch.putAll(audioPatch(audioMetadata));
+        }
 
         JsonNode saved = supabaseGatewayService.updateMemoryById(
             authorizationHeader,
@@ -300,7 +354,8 @@ public class SupabaseMemoryService {
         String authorizationHeader,
         String firstMemoryId,
         String childId,
-        List<SplitMemory> splitMemories
+        List<SplitMemory> splitMemories,
+        AudioMetadata audioMetadata
     ) {
         List<UUID> ids = new ArrayList<>();
         JsonNode firstSaved = null;
@@ -321,6 +376,9 @@ public class SupabaseMemoryService {
                 patch.put("summary", insights.summary());
                 patch.put("tags", tags);
                 patch.put("error_message", null);
+                if (audioMetadata != null) {
+                    patch.putAll(audioPatch(audioMetadata));
+                }
                 saved = supabaseGatewayService.updateMemoryById(
                     authorizationHeader,
                     firstMemoryId,
@@ -335,7 +393,11 @@ public class SupabaseMemoryService {
                     excerpt,
                     insights.title(),
                     insights.summary(),
-                    tags
+                    tags,
+                    audioMetadata != null ? audioMetadata.path() : null,
+                    audioMetadata != null ? audioMetadata.mimeType() : null,
+                    audioMetadata != null ? audioMetadata.sizeBytes() : null,
+                    audioMetadata != null ? audioMetadata.durationSeconds() : null
                 );
             }
 
@@ -371,6 +433,7 @@ public class SupabaseMemoryService {
     }
 
     private MemoryResponse toMemoryResponse(JsonNode row) {
+        String audioPath = nullableText(row.get("audio_path"));
         return new MemoryResponse(
             uuid(text(row.get("id"))),
             instant(row.get("created_at")),
@@ -381,8 +444,55 @@ public class SupabaseMemoryService {
             nullableText(row.get("summary")),
             nullableText(row.get("transcript")),
             nullableText(row.get("error_message")),
-            readTags(row.get("tags"))
+            readTags(row.get("tags")),
+            StringUtils.hasText(audioPath)
         );
+    }
+
+    private Map<String, Object> audioPatch(AudioMetadata audioMetadata) {
+        Map<String, Object> patch = new java.util.LinkedHashMap<>();
+        patch.put("audio_path", audioMetadata.path());
+        patch.put("audio_mime_type", audioMetadata.mimeType());
+        patch.put("audio_size_bytes", audioMetadata.sizeBytes());
+        patch.put("audio_duration_seconds", audioMetadata.durationSeconds());
+        return patch;
+    }
+
+    private String buildAudioObjectPath(String familyId, String childId, String memoryId, String fileName, String mimeType) {
+        return familyId + "/" + childId + "/" + memoryId + "." + extensionFor(fileName, mimeType);
+    }
+
+    private String extensionFor(String fileName, String mimeType) {
+        if (mimeType != null) {
+            String normalizedMime = mimeType.toLowerCase();
+            if (normalizedMime.contains("audio/mp4")) {
+                return "mp4";
+            }
+            if (normalizedMime.contains("audio/m4a")) {
+                return "m4a";
+            }
+            if (normalizedMime.contains("audio/ogg") || normalizedMime.contains("audio/opus")) {
+                return "ogg";
+            }
+            if (normalizedMime.contains("audio/wav") || normalizedMime.contains("audio/x-wav")) {
+                return "wav";
+            }
+            if (normalizedMime.contains("audio/webm")) {
+                return "webm";
+            }
+        }
+
+        if (StringUtils.hasText(fileName)) {
+            int dotIndex = fileName.lastIndexOf('.');
+            if (dotIndex > -1 && dotIndex < fileName.length() - 1) {
+                String fromName = fileName.substring(dotIndex + 1).toLowerCase();
+                if (fromName.matches("[a-z0-9]{2,6}")) {
+                    return fromName;
+                }
+            }
+        }
+
+        return "webm";
     }
 
     private boolean asBoolean(JsonNode value) {
@@ -522,5 +632,13 @@ public class SupabaseMemoryService {
             }
         }
         return tags;
+    }
+
+    private record AudioMetadata(
+        String path,
+        String mimeType,
+        long sizeBytes,
+        int durationSeconds
+    ) {
     }
 }

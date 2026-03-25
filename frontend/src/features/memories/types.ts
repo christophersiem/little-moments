@@ -66,6 +66,7 @@ export interface Memory {
   transcript: string | null
   errorMessage: string | null
   tags: MemoryTag[]
+  audioAvailable: boolean
 }
 
 export interface UpdateMemoryRequest {
