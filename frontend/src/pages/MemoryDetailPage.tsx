@@ -59,15 +59,72 @@ const BackButton = styled.button`
   }
 `
 
-const AudioButton = styled.button`
+const AudioIconButton = styled.button<{ $active?: boolean }>`
   min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  min-width: ${({ theme }) => theme.layout.minTouchTarget};
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: ${({ theme }) => theme.radii.pill};
-  background: ${({ theme }) => theme.colors.surfaceStrong};
+  background: ${({ theme, $active }) => ($active ? theme.colors.surfaceStrong : 'transparent')};
   color: ${({ theme }) => theme.colors.text};
-  padding: 0 ${({ theme }) => theme.space.x3};
-  font-size: ${({ theme }) => theme.typography.secondarySize};
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  opacity: 0.72;
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
+    outline-offset: 2px;
+  }
+
+  &:hover {
+    opacity: 0.95;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+`
+
+const AudioPlaybackPanel = styled.div`
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.md};
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3}`};
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.x2};
+`
+
+const AudioPlaybackRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.space.x2};
+`
+
+const AudioPlaybackLabel = styled.div`
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+`
+
+const AudioPlaybackButton = styled.button`
+  min-height: 36px;
+  min-width: 36px;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.pill};
+  background: ${({ theme }) => theme.colors.surface};
+  color: ${({ theme }) => theme.colors.text};
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
 
   &:focus-visible {
     outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
@@ -78,6 +135,28 @@ const AudioButton = styled.button`
     opacity: 0.6;
     cursor: default;
   }
+`
+
+const AudioTimelineRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.x2};
+`
+
+const AudioProgress = styled.input`
+  flex: 1;
+  accent-color: ${({ theme }) => theme.colors.accentStrong};
+`
+
+const AudioTime = styled.span`
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: 0.72rem;
+  min-width: 44px;
+`
+
+const AudioControlIcon = styled.svg`
+  width: 18px;
+  height: 18px;
 `
 
 const TitleRow = styled.div`
@@ -281,6 +360,36 @@ function CancelIcon() {
   )
 }
 
+function AudioNoteIcon() {
+  return (
+    <AudioControlIcon viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M13 4V15.2C12.46 14.78 11.78 14.5 11 14.5C9.07 14.5 7.5 16.07 7.5 18C7.5 19.93 9.07 21.5 11 21.5C12.93 21.5 14.5 19.93 14.5 18V8H19V4H13Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </AudioControlIcon>
+  )
+}
+
+function PlayIcon() {
+  return (
+    <AudioControlIcon viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M8 6L18 12L8 18V6Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    </AudioControlIcon>
+  )
+}
+
+function PauseIcon() {
+  return (
+    <AudioControlIcon viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M8.5 6V18M15.5 6V18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </AudioControlIcon>
+  )
+}
+
 function toDateTimeLocalValue(isoValue: string): string {
   const date = new Date(isoValue)
   if (Number.isNaN(date.getTime())) {
@@ -304,6 +413,16 @@ function toIsoFromLocalDateTime(value: string): string | null {
     return null
   }
   return parsed.toISOString()
+}
+
+function formatAudioClock(totalSeconds: number): string {
+  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
+    return '00:00'
+  }
+  const rounded = Math.floor(totalSeconds)
+  const minutes = Math.floor(rounded / 60)
+  const seconds = rounded % 60
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
 export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }: MemoryDetailPageProps) {
@@ -334,6 +453,9 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
   const [audioLoading, setAudioLoading] = useState(false)
   const [audioPlaying, setAudioPlaying] = useState(false)
   const [audioError, setAudioError] = useState('')
+  const [audioPanelOpen, setAudioPanelOpen] = useState(false)
+  const [audioDurationSeconds, setAudioDurationSeconds] = useState(0)
+  const [audioCurrentSeconds, setAudioCurrentSeconds] = useState(0)
 
   useEffect(() => {
     if (!memory) {
@@ -348,6 +470,10 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
     setAudioUrl('')
     setAudioError('')
     setAudioPlaying(false)
+    setAudioLoading(false)
+    setAudioPanelOpen(false)
+    setAudioDurationSeconds(0)
+    setAudioCurrentSeconds(0)
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current.src = ''
@@ -524,10 +650,29 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
       return
     }
 
-    if (audioPlaying && audioRef.current) {
+    if (!audioRef.current) {
+      setAudioError('Audio player is not available.')
+      return
+    }
+
+    if (audioPlaying) {
       audioRef.current.pause()
       setAudioPlaying(false)
       return
+    }
+
+    if (audioRef.current.src) {
+      if (audioRef.current.duration > 0 && audioRef.current.currentTime >= audioRef.current.duration - 0.15) {
+        audioRef.current.currentTime = 0
+        setAudioCurrentSeconds(0)
+      }
+      try {
+        await audioRef.current.play()
+        setAudioPlaying(true)
+        return
+      } catch {
+        audioRef.current.src = ''
+      }
     }
 
     setAudioLoading(true)
@@ -542,6 +687,23 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
     } finally {
       setAudioLoading(false)
     }
+  }
+
+  const onSeekAudio = (value: string) => {
+    if (!audioRef.current || audioDurationSeconds <= 0) {
+      return
+    }
+    const nextSecond = Number.parseFloat(value)
+    if (!Number.isFinite(nextSecond)) {
+      return
+    }
+    audioRef.current.currentTime = nextSecond
+    setAudioCurrentSeconds(nextSecond)
+  }
+
+  const onAudioIconClick = async () => {
+    setAudioPanelOpen(true)
+    await onToggleAudio()
   }
 
   const menuActions: OverflowMenuAction[] = canManageMemory
@@ -632,20 +794,51 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
           </BackButton>
           <TopBarActions>
             {currentMemory.audioAvailable && (
-              <AudioButton
+              <AudioIconButton
                 type="button"
-                onClick={() => void onToggleAudio()}
+                onClick={() => void onAudioIconClick()}
                 disabled={audioLoading}
+                $active={audioPanelOpen}
                 aria-label={audioPlaying ? 'Pause audio' : 'Play audio'}
+                title={audioPlaying ? 'Pause audio' : 'Play audio'}
               >
-                {audioLoading ? 'Loading...' : audioPlaying ? 'Pause' : 'Play'}
-              </AudioButton>
+                <AudioNoteIcon />
+              </AudioIconButton>
             )}
             {canManageMemory && (
               <OverflowMenu actions={menuActions} ariaLabel="More actions" disabled={saving || deleting || audioLoading} />
             )}
           </TopBarActions>
         </TopBar>
+        {currentMemory.audioAvailable && audioPanelOpen && (
+          <AudioPlaybackPanel>
+            <AudioPlaybackRow>
+              <AudioPlaybackLabel>Audio playback</AudioPlaybackLabel>
+              <AudioPlaybackButton
+                type="button"
+                onClick={() => void onToggleAudio()}
+                disabled={audioLoading}
+                aria-label={audioPlaying ? 'Pause audio' : 'Play audio'}
+              >
+                {audioPlaying ? <PauseIcon /> : <PlayIcon />}
+              </AudioPlaybackButton>
+            </AudioPlaybackRow>
+            <AudioTimelineRow>
+              <AudioTime>{formatAudioClock(audioCurrentSeconds)}</AudioTime>
+              <AudioProgress
+                type="range"
+                min={0}
+                max={Math.max(audioDurationSeconds, 1)}
+                step={0.1}
+                value={Math.min(audioCurrentSeconds, Math.max(audioDurationSeconds, 1))}
+                disabled={audioLoading || audioDurationSeconds <= 0}
+                onChange={(event) => onSeekAudio(event.target.value)}
+                aria-label="Audio playback position"
+              />
+              <AudioTime>{formatAudioClock(audioDurationSeconds)}</AudioTime>
+            </AudioTimelineRow>
+          </AudioPlaybackPanel>
+        )}
 
         <TitleRow>
           {editingTitle ? (
@@ -808,7 +1001,30 @@ export function MemoryDetailPage({ memoryId, navigate, canManageMemory = false }
       {saveError && <ErrorText>{saveError}</ErrorText>}
       {saveNotice && <SuccessText>{saveNotice}</SuccessText>}
       {audioError && <ErrorText>{audioError}</ErrorText>}
-      <HiddenAudio ref={audioRef} preload="none" onPause={() => setAudioPlaying(false)} onEnded={() => setAudioPlaying(false)} />
+      <HiddenAudio
+        ref={audioRef}
+        preload="none"
+        onPlay={() => setAudioPlaying(true)}
+        onPause={() => setAudioPlaying(false)}
+        onEnded={() => {
+          setAudioPlaying(false)
+          setAudioCurrentSeconds(audioDurationSeconds)
+        }}
+        onLoadedMetadata={() => {
+          if (!audioRef.current) {
+            return
+          }
+          const duration = Number.isFinite(audioRef.current.duration) ? audioRef.current.duration : 0
+          setAudioDurationSeconds(duration)
+          setAudioCurrentSeconds(audioRef.current.currentTime || 0)
+        }}
+        onTimeUpdate={() => {
+          if (!audioRef.current) {
+            return
+          }
+          setAudioCurrentSeconds(audioRef.current.currentTime || 0)
+        }}
+      />
 
       {deleteError && <ErrorText>{deleteError}</ErrorText>}
       <ConfirmDialog
