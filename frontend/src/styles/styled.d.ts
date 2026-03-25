@@ -37,6 +37,7 @@ declare module 'styled-components' {
       surface: string
       surfaceStrong: string
       border: string
+      borderSoft: string
       text: string
       textMuted: string
       accent: string

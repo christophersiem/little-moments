@@ -47,6 +47,7 @@
   --color-surface: var(--bg-secondary);
   --color-surface-strong: var(--card-bg);
   --color-border: var(--border-color);
+  --color-border-soft: color-mix(in srgb, var(--border-color) 55%, transparent);
   --color-text: var(--text-primary);
   --color-text-muted: var(--text-secondary);
   --color-accent: var(--accent);
@@ -90,6 +91,7 @@ html[data-theme='dark'] {
   --shadow-rgb: 8, 6, 5;
   --highlight-rgb: 243, 237, 230;
   --color-on-accent: #1f1b18;
+  --color-border-soft: color-mix(in srgb, var(--border-color) 62%, transparent);
 
   color-scheme: dark;
 }

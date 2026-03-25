@@ -84,7 +84,7 @@ class MemoryServiceTests {
             "audio/webm",
             "audio-data".getBytes()
         );
-        CreateMemoryRequest request = new CreateMemoryRequest(audio, recordedAt, "child-1");
+        CreateMemoryRequest request = new CreateMemoryRequest(audio, recordedAt, "child-1", false, 8);
 
         List<MemoryStatus> statuses = new ArrayList<>();
         when(memoryRepository.save(any(MemoryEntity.class))).thenAnswer(invocation -> {
@@ -121,7 +121,7 @@ class MemoryServiceTests {
             "audio/webm",
             "audio-data".getBytes()
         );
-        CreateMemoryRequest request = new CreateMemoryRequest(audio, recordedAt, "child-1");
+        CreateMemoryRequest request = new CreateMemoryRequest(audio, recordedAt, "child-1", false, 8);
 
         List<MemoryStatus> statuses = new ArrayList<>();
         when(memoryRepository.save(any(MemoryEntity.class))).thenAnswer(invocation -> {
@@ -148,7 +148,13 @@ class MemoryServiceTests {
             "audio/webm",
             new byte[0]
         );
-        CreateMemoryRequest request = new CreateMemoryRequest(emptyAudio, Instant.parse("2026-02-20T10:15:00Z"), "child-1");
+        CreateMemoryRequest request = new CreateMemoryRequest(
+            emptyAudio,
+            Instant.parse("2026-02-20T10:15:00Z"),
+            "child-1",
+            false,
+            8
+        );
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> memoryService.createMemory(request));
 

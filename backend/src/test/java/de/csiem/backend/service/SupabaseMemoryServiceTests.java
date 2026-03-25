@@ -2,6 +2,7 @@ package de.csiem.backend.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.csiem.backend.config.AppProperties;
 import de.csiem.backend.dto.CreateMemoryRequest;
 import de.csiem.backend.dto.CreateMemoryResponse;
 import de.csiem.backend.model.MemoryStatus;
@@ -62,15 +63,18 @@ class SupabaseMemoryServiceTests {
 
     private SupabaseMemoryService supabaseMemoryService;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private AppProperties appProperties;
 
     @BeforeEach
     void setUp() {
+        appProperties = new AppProperties();
         supabaseMemoryService = new SupabaseMemoryService(
             supabaseGatewayService,
             transcriptionService,
             memorySplittingService,
             memoryTaggingService,
             memoryInsightsService,
+            appProperties,
             memoryEnrichmentWebhookService,
             memoryChatService
         );
@@ -84,7 +88,9 @@ class SupabaseMemoryServiceTests {
         CreateMemoryRequest request = new CreateMemoryRequest(
             new MockMultipartFile("audio", "moment.webm", "audio/webm", "audio-data".getBytes()),
             recordedAt,
-            " child-1 "
+            " child-1 ",
+            false,
+            8
         );
 
         when(supabaseGatewayService.createProcessingMemory("Bearer token", "child-1", recordedAt))
@@ -154,7 +160,9 @@ class SupabaseMemoryServiceTests {
         CreateMemoryRequest request = new CreateMemoryRequest(
             new MockMultipartFile("audio", "moment.webm", "audio/webm", "audio-data".getBytes()),
             recordedAt,
-            "child-1"
+            "child-1",
+            false,
+            8
         );
 
         when(supabaseGatewayService.createProcessingMemory("Bearer token", "child-1", recordedAt))
@@ -190,7 +198,11 @@ class SupabaseMemoryServiceTests {
             eq("Later he climbed the ladder alone."),
             eq("Climbed ladder alone"),
             eq("Strong independent climbing."),
-            org.mockito.ArgumentMatchers.<List<String>>any()
+            org.mockito.ArgumentMatchers.<List<String>>any(),
+            isNull(),
+            isNull(),
+            isNull(),
+            isNull()
         )).thenReturn(json("""
                 {
                   "id": "%s",
@@ -239,7 +251,9 @@ class SupabaseMemoryServiceTests {
         CreateMemoryRequest request = new CreateMemoryRequest(
             new MockMultipartFile("audio", "moment.webm", "audio/webm", "audio-data".getBytes()),
             recordedAt,
-            "child-1"
+            "child-1",
+            false,
+            8
         );
 
         when(supabaseGatewayService.createProcessingMemory("Bearer token", "child-1", recordedAt))
@@ -279,7 +293,13 @@ class SupabaseMemoryServiceTests {
 
     @Test
     void createMemoryReturnsBadRequestWhenAudioMissing() {
-        CreateMemoryRequest request = new CreateMemoryRequest(null, Instant.parse("2026-03-05T08:15:00Z"), "child-1");
+        CreateMemoryRequest request = new CreateMemoryRequest(
+            null,
+            Instant.parse("2026-03-05T08:15:00Z"),
+            "child-1",
+            false,
+            8
+        );
 
         ResponseStatusException exception = assertThrows(
             ResponseStatusException.class,
@@ -301,7 +321,9 @@ class SupabaseMemoryServiceTests {
         CreateMemoryRequest request = new CreateMemoryRequest(
             new MockMultipartFile("audio", "moment.webm", "audio/webm", "audio-data".getBytes()),
             Instant.parse("2026-03-05T08:15:00Z"),
-            "  "
+            "  ",
+            false,
+            8
         );
 
         ResponseStatusException exception = assertThrows(

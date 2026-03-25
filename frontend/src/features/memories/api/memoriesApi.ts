@@ -62,6 +62,7 @@ interface MemoryApiResponse {
   transcript: string | null
   errorMessage: string | null
   tags: string[] | null
+  audioAvailable: boolean
 }
 
 interface MemoryChatSourceApiResponse {
@@ -136,6 +137,7 @@ function mapMemory(payload: MemoryApiResponse): Memory {
     transcript: payload.transcript ?? null,
     errorMessage: payload.errorMessage ?? null,
     tags: normalizeTags(payload.tags),
+    audioAvailable: payload.audioAvailable === true,
   }
 }
 
@@ -164,15 +166,39 @@ function mapMemoryChatResponse(payload: MemoryChatApiResponse): MemoryChatRespon
   }
 }
 
+function inferAudioFileName(mimeType: string): string {
+  const normalized = mimeType.toLowerCase()
+  if (normalized.includes('audio/mp4')) {
+    return 'recording.mp4'
+  }
+  if (normalized.includes('audio/m4a')) {
+    return 'recording.m4a'
+  }
+  if (normalized.includes('audio/ogg') || normalized.includes('audio/opus')) {
+    return 'recording.ogg'
+  }
+  if (normalized.includes('audio/wav') || normalized.includes('audio/x-wav')) {
+    return 'recording.wav'
+  }
+  if (normalized.includes('audio/webm')) {
+    return 'recording.webm'
+  }
+  return 'recording.bin'
+}
+
 export async function createMemory(
   audioBlob: Blob,
   recordedAtIso: string,
   childId: string,
+  keepAudio: boolean,
+  durationSeconds: number,
 ): Promise<CreateMemoryResponse> {
   const formData = new FormData()
-  formData.append('audio', audioBlob, 'recording.webm')
+  formData.append('audio', audioBlob, inferAudioFileName(audioBlob.type || ''))
   formData.append('recordedAt', recordedAtIso)
   formData.append('childId', childId)
+  formData.append('keepAudio', keepAudio ? 'true' : 'false')
+  formData.append('durationSeconds', String(Math.max(1, Math.round(durationSeconds))))
 
   const payload = await backendRequestJson<CreateMemoryApiResponse>('/memories', {
     method: 'POST',
@@ -271,4 +297,15 @@ export async function askMemories(question: string, familyId?: string | null): P
     }),
   })
   return mapMemoryChatResponse(payload)
+}
+
+export async function getMemoryAudioUrl(memoryId: string): Promise<string> {
+  const payload = await backendRequestJson<{ audioSignedUrl?: string | null }>(
+    `/memories/${encodeURIComponent(memoryId)}/audio-url`,
+  )
+  const value = typeof payload.audioSignedUrl === 'string' ? payload.audioSignedUrl.trim() : ''
+  if (!value) {
+    throw new Error('Audio URL is not available.')
+  }
+  return value
 }

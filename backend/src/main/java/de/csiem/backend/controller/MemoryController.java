@@ -4,6 +4,7 @@ import de.csiem.backend.dto.CreateMemoryRequest;
 import de.csiem.backend.dto.CreateMemoryResponse;
 import de.csiem.backend.dto.MemoryChatRequest;
 import de.csiem.backend.dto.MemoryChatResponse;
+import de.csiem.backend.dto.MemoryAudioUrlResponse;
 import de.csiem.backend.dto.MemoryListResponse;
 import de.csiem.backend.dto.MemoryResponse;
 import de.csiem.backend.dto.UpdateMemoryRequest;
@@ -101,6 +102,19 @@ public class MemoryController {
             return supabaseMemoryService.chatWithMemories(requireAuthorizationHeader(authorizationHeader), request);
         }
         throw new ResponseStatusException(NOT_IMPLEMENTED, "Memory chat requires Supabase mode.");
+    }
+
+    @GetMapping("/{id}/audio-url")
+    public MemoryAudioUrlResponse getMemoryAudioUrl(
+        @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+        @PathVariable("id") UUID id
+    ) {
+        if (useSupabase()) {
+            return new MemoryAudioUrlResponse(
+                supabaseMemoryService.getMemoryAudioUrl(requireAuthorizationHeader(authorizationHeader), id)
+            );
+        }
+        return new MemoryAudioUrlResponse(memoryService.getMemoryAudioUrl(id));
     }
 
     @PatchMapping("/{id}")

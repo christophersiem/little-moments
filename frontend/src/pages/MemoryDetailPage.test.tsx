@@ -1,13 +1,14 @@
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryDetailPage } from './MemoryDetailPage'
 import { renderWithProviders } from '../test/renderWithProviders'
 import type { Memory } from '../features/memories/types'
 
-const { useMemoryDetailMock, useMemoryDetailEditorMock } = vi.hoisted(() => ({
+const { useMemoryDetailMock, useMemoryDetailEditorMock, getMemoryAudioUrlMock } = vi.hoisted(() => ({
   useMemoryDetailMock: vi.fn(),
   useMemoryDetailEditorMock: vi.fn(),
+  getMemoryAudioUrlMock: vi.fn(),
 }))
 
 vi.mock('../features/memories/hooks/useMemoryDetail', () => ({
@@ -16,6 +17,12 @@ vi.mock('../features/memories/hooks/useMemoryDetail', () => ({
 
 vi.mock('../features/memories/hooks/useMemoryDetailEditor', () => ({
   useMemoryDetailEditor: useMemoryDetailEditorMock,
+}))
+
+vi.mock('../features/memories/api', () => ({
+  deleteMemory: vi.fn(),
+  getMemoryAudioUrl: getMemoryAudioUrlMock,
+  updateMemory: vi.fn(),
 }))
 
 function buildMemory(overrides: Partial<Memory> = {}): Memory {
@@ -30,6 +37,7 @@ function buildMemory(overrides: Partial<Memory> = {}): Memory {
     transcript: overrides.transcript ?? 'Can I have more apples please?',
     errorMessage: overrides.errorMessage ?? null,
     tags: overrides.tags ?? ['Language'],
+    audioAvailable: overrides.audioAvailable ?? false,
   }
 }
 
@@ -81,6 +89,12 @@ describe('MemoryDetailPage', () => {
       reload: vi.fn(),
     })
     useMemoryDetailEditorMock.mockReturnValue(buildEditorState(null))
+    getMemoryAudioUrlMock.mockReset()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it('renders loading state', () => {
@@ -142,5 +156,51 @@ describe('MemoryDetailPage', () => {
 
     await user.click(screen.getByRole('button', { name: /back to memories/i }))
     expect(navigate).toHaveBeenCalledWith('/memories')
+  })
+
+  it('renders audio trigger icon when audio is available', () => {
+    const memory = buildMemory({ audioAvailable: true })
+
+    useMemoryDetailMock.mockReturnValue({
+      loading: false,
+      error: '',
+      memory,
+      reload: vi.fn(),
+    })
+
+    renderWithProviders(<MemoryDetailPage memoryId="memory-1" navigate={vi.fn()} canManageMemory={false} />)
+
+    expect(screen.getByRole('button', { name: /play audio/i })).toBeInTheDocument()
+    expect(screen.queryByRole('slider', { name: /audio playback position/i })).not.toBeInTheDocument()
+  })
+
+  it('opens audio playback panel after clicking audio icon', async () => {
+    const user = userEvent.setup()
+    const memory = buildMemory({ audioAvailable: true })
+    const playSpy = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
+
+    getMemoryAudioUrlMock.mockResolvedValue('https://example.com/audio.mp3')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        blob: vi.fn().mockResolvedValue(new Blob(['audio'], { type: 'audio/mpeg' })),
+      }),
+    )
+
+    useMemoryDetailMock.mockReturnValue({
+      loading: false,
+      error: '',
+      memory,
+      reload: vi.fn(),
+    })
+
+    renderWithProviders(<MemoryDetailPage memoryId="memory-1" navigate={vi.fn()} canManageMemory={false} />)
+
+    await user.click(screen.getByRole('button', { name: /play audio/i }))
+
+    expect(screen.getByRole('slider', { name: /audio playback position/i })).toBeInTheDocument()
+    expect(getMemoryAudioUrlMock).toHaveBeenCalledWith('memory-1')
+    expect(playSpy).toHaveBeenCalled()
   })
 })

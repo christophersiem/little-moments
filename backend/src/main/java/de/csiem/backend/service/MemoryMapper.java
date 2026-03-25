@@ -37,7 +37,8 @@ final class MemoryMapper {
             memory.getSummary(),
             memory.getTranscript(),
             memory.getErrorMessage(),
-            toTagLabels(memory)
+            toTagLabels(memory),
+            false
         );
     }
 
