@@ -91,6 +91,42 @@ Response (`MemoryResponse`):
 }
 ```
 
+### POST `/memories/chat`
+Asks a grounded question over the authenticated user’s own memories.
+
+Request JSON:
+```json
+{
+  "question": "When were his first steps?",
+  "familyId": "uuid-or-null"
+}
+```
+
+Response:
+```json
+{
+  "answer": "The earliest matching memory I found is from March 2026.",
+  "confidence": "low | medium | high",
+  "status": "success | insufficient_evidence | out_of_scope | unsafe",
+  "notes": "string | null",
+  "sourceMemoryIds": ["uuid"],
+  "sources": [
+    {
+      "id": "uuid",
+      "recordedAt": "2026-03-01T10:00:00Z",
+      "title": "First climb",
+      "snippet": "string",
+      "tags": ["Language", "Milestone"]
+    }
+  ]
+}
+```
+
+Notes:
+- This is a memory retrieval assistant, not a general chatbot.
+- Retrieval is server-side scoped to the authenticated user and optional `familyId`.
+- In legacy (non-Supabase) mode the endpoint returns `501 Not Implemented`.
+
 ### PATCH `/memories/{id}`
 Updates memory fields.
 

@@ -592,6 +592,20 @@ public class SupabaseGatewayService {
         return rows.size();
     }
 
+    public JsonNode searchMemoriesForChat(
+        String authorizationHeader,
+        String familyId,
+        String queryEmbeddingVector,
+        int limit
+    ) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("p_query_embedding_text", queryEmbeddingVector);
+        payload.put("p_match_count", Math.max(limit, 1));
+        payload.put("p_family_id", StringUtils.hasText(familyId) ? familyId.trim() : null);
+        JsonNode rows = callRpc("rpc_memory_chat_search", payload, authorizationHeader);
+        return rows.isArray() ? rows : objectMapper.createArrayNode();
+    }
+
     public void deleteMemoryById(String authorizationHeader, String memoryId) {
         String uri = UriComponentsBuilder
             .fromPath("/rest/v1/memories")

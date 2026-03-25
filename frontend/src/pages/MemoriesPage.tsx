@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import styled from 'styled-components'
 import { APP_ROUTES, toMemoryDetailPath } from '../app/routes'
 import { Button } from '../components/Button'
@@ -6,6 +6,7 @@ import { PageContainer } from '../components/PageContainer'
 import { MemoriesEmptyState } from '../features/memories/components/MemoriesEmptyState'
 import { MemoriesFilterSheet } from '../features/memories/components/MemoriesFilterSheet'
 import { MemoriesHeader } from '../features/memories/components/MemoriesHeader'
+import { MemoryChatSheet } from '../features/memories/components/MemoryChatSheet'
 import { MemoriesTimeline } from '../features/memories/components/MemoriesTimeline'
 import { ProcessingBanner } from '../features/memories/components/ProcessingBanner'
 import { useMemories } from '../features/memories/hooks/useMemories'
@@ -63,6 +64,7 @@ function toMonthLabel(month: string, monthOptions: Array<{ key: string; label: s
 }
 
 export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
+  const [memoryChatOpen, setMemoryChatOpen] = useState(false)
   const filters = useMemoriesFilter()
   const {
     memories: items,
@@ -156,6 +158,7 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
       hasActiveFilters={filters.hasActiveFilters}
       activeFilterCount={filters.activeFilterCount}
       filterSummary={filterSummary}
+      onOpenMemoryChat={() => setMemoryChatOpen(true)}
       onOpenFilters={filters.openFilters}
     />
   )
@@ -255,6 +258,12 @@ export function MemoriesPage({ navigate, familyId }: MemoriesPageProps) {
           onSelectDraftMonth={filters.selectDraftMonth}
           onToggleDraftTag={filters.toggleDraftTag}
           onToggleDraftHighlightsOnly={filters.toggleDraftHighlightsOnly}
+        />
+        <MemoryChatSheet
+          open={memoryChatOpen}
+          familyId={familyId}
+          onClose={() => setMemoryChatOpen(false)}
+          onOpenMemory={(id) => navigate(toMemoryDetailPath(id))}
         />
       </PageShell>
     </PageContainer>

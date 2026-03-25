@@ -37,7 +37,8 @@ Memory create path:
 10. n8n triggers backend internal endpoint `POST /api/internal/embeddings/run`.
 11. Backend embedding runner processes `pending` enrichment rows and writes vectors to `public.embeddings`.
 12. Backend embedding runner marks enrichment rows `ready`/`failed` and writes DLQ entries for triage.
-13. Frontend polls memory status from `/api/memories/{id}` while needed.
+13. Memory Chat V1 retrieves scoped candidates from embeddings via `rpc_memory_chat_search` and composes grounded answers.
+14. Frontend polls memory status from `/api/memories/{id}` while needed.
 
 Audio handling:
 - Audio is ephemeral in backend request flow; no storage bucket in default path.
@@ -87,6 +88,13 @@ Backend:
 - `EMBEDDING_MAX_RETRIES` (default `3`)
 - `EMBEDDING_TIMEOUT_MS` (default `30000`)
 - `EMBEDDING_COST_PER_TOKEN` (default `0.00000002`)
+- `MEMORY_CHAT_ENABLED` (default `true`)
+- `MEMORY_CHAT_API_KEY` (fallback to OpenAI key chain)
+- `MEMORY_CHAT_MODEL` (default `gpt-4o-mini`)
+- `MEMORY_CHAT_EMBEDDING_MODEL` (default `text-embedding-3-small`)
+- `MEMORY_CHAT_RETRIEVAL_LIMIT` (default `12`)
+- `MEMORY_CHAT_CONTEXT_LIMIT` (default `8`)
+- `MEMORY_CHAT_MIN_SIMILARITY` (default `0.18`)
 
 Embedding worker:
 - `DATABASE_URL`

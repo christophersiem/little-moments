@@ -6,6 +6,8 @@ import de.csiem.backend.dto.CreateMemoryRequest;
 import de.csiem.backend.dto.CreateMemoryResponse;
 import de.csiem.backend.dto.MemoryListItemResponse;
 import de.csiem.backend.dto.MemoryListResponse;
+import de.csiem.backend.dto.MemoryChatRequest;
+import de.csiem.backend.dto.MemoryChatResponse;
 import de.csiem.backend.dto.MemoryResponse;
 import de.csiem.backend.dto.UpdateMemoryRequest;
 import de.csiem.backend.model.MemoryStatus;
@@ -45,6 +47,7 @@ public class SupabaseMemoryService {
     private final MemoryInsightsService memoryInsightsService;
     private final AppProperties appProperties;
     private final MemoryEnrichmentWebhookService memoryEnrichmentWebhookService;
+    private final MemoryChatService memoryChatService;
 
     public SupabaseMemoryService(
         SupabaseGatewayService supabaseGatewayService,
@@ -53,7 +56,8 @@ public class SupabaseMemoryService {
         MemoryTaggingService memoryTaggingService,
         MemoryInsightsService memoryInsightsService,
         AppProperties appProperties,
-        MemoryEnrichmentWebhookService memoryEnrichmentWebhookService
+        MemoryEnrichmentWebhookService memoryEnrichmentWebhookService,
+        MemoryChatService memoryChatService
     ) {
         this.supabaseGatewayService = supabaseGatewayService;
         this.transcriptionService = transcriptionService;
@@ -62,6 +66,7 @@ public class SupabaseMemoryService {
         this.memoryInsightsService = memoryInsightsService;
         this.appProperties = appProperties;
         this.memoryEnrichmentWebhookService = memoryEnrichmentWebhookService;
+        this.memoryChatService = memoryChatService;
     }
 
     public boolean isEnabled() {
@@ -229,6 +234,10 @@ public class SupabaseMemoryService {
     public MemoryResponse getMemory(String authorizationHeader, UUID id) {
         JsonNode row = supabaseGatewayService.getMemoryById(authorizationHeader, id.toString());
         return toMemoryResponse(row);
+    }
+
+    public MemoryChatResponse chatWithMemories(String authorizationHeader, MemoryChatRequest request) {
+        return memoryChatService.ask(authorizationHeader, request);
     }
 
     public String getMemoryAudioUrl(String authorizationHeader, UUID id) {

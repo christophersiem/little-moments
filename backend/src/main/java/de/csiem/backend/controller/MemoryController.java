@@ -2,6 +2,8 @@ package de.csiem.backend.controller;
 
 import de.csiem.backend.dto.CreateMemoryRequest;
 import de.csiem.backend.dto.CreateMemoryResponse;
+import de.csiem.backend.dto.MemoryChatRequest;
+import de.csiem.backend.dto.MemoryChatResponse;
 import de.csiem.backend.dto.MemoryAudioUrlResponse;
 import de.csiem.backend.dto.MemoryListResponse;
 import de.csiem.backend.dto.MemoryResponse;
@@ -28,6 +30,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.springframework.http.HttpStatus.CREATED;
+import static org.springframework.http.HttpStatus.NOT_IMPLEMENTED;
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
 @RestController
@@ -88,6 +91,17 @@ public class MemoryController {
             return supabaseMemoryService.getMemory(requireAuthorizationHeader(authorizationHeader), id);
         }
         return memoryService.getMemory(id);
+    }
+
+    @PostMapping("/chat")
+    public MemoryChatResponse chatWithMemories(
+        @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+        @Valid @RequestBody MemoryChatRequest request
+    ) {
+        if (useSupabase()) {
+            return supabaseMemoryService.chatWithMemories(requireAuthorizationHeader(authorizationHeader), request);
+        }
+        throw new ResponseStatusException(NOT_IMPLEMENTED, "Memory chat requires Supabase mode.");
     }
 
     @GetMapping("/{id}/audio-url")
