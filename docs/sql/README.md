@@ -18,6 +18,7 @@ Recommended order:
 12. `step13_memory_enrichments.sql`
 13. `step13_embeddings_pgvector.sql`
 14. `step14_embedding_dlq.sql`
+15. `step15_rls_hardening_internal_tables.sql`
 
 `step10_memories_owner_only_insert.sql` should be applied once the family/member/child RLS helpers are already present (from step5+). It tightens memory writes so only `OWNER` can insert and delete memories.
 
