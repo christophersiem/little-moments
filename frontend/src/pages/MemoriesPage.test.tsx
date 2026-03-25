@@ -152,6 +152,18 @@ describe('MemoriesPage', () => {
     expect(screen.getAllByRole('heading', { level: 3 }).length).toBeGreaterThanOrEqual(2)
   })
 
+  it('opens memory chat sheet from header action', async () => {
+    const user = userEvent.setup()
+
+    setDefaultHookState([buildItem({ id: 'memory-feb', title: 'February memory', recordedAt: '2026-02-10T10:00:00Z' })])
+
+    renderWithProviders(<MemoriesPage navigate={vi.fn()} familyId="family-1" />)
+
+    await user.click(screen.getByRole('button', { name: /ask your memories/i }))
+
+    expect(screen.getByRole('textbox', { name: /ask your memories/i })).toBeInTheDocument()
+  })
+
   it('renders empty state when no memories are returned', () => {
     setDefaultHookState([])
 

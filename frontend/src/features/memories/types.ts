@@ -75,3 +75,23 @@ export interface UpdateMemoryRequest {
   recordedAt?: string
   isHighlight?: boolean
 }
+
+export type MemoryChatConfidence = 'low' | 'medium' | 'high'
+export type MemoryChatStatus = 'success' | 'insufficient_evidence' | 'out_of_scope' | 'unsafe'
+
+export interface MemoryChatSource {
+  id: string
+  recordedAt: string
+  title: string
+  snippet: string
+  tags: string[]
+}
+
+export interface MemoryChatResponse {
+  answer: string
+  confidence: MemoryChatConfidence
+  status: MemoryChatStatus
+  notes: string | null
+  sourceMemoryIds: string[]
+  sources: MemoryChatSource[]
+}

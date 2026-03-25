@@ -36,10 +36,15 @@
 - Reverse chronological, grouped by month.
 - Editorial two-column timeline: compact month rail on the left, memory entries on the right.
 - Sticky compact header with inline filter chips:
+  - Ask your memories (opens bottom sheet)
   - Month (single select)
   - Tags (multi-select)
   - Clear (shown only when active)
 - Infinite scroll with load-more sentinel.
+- Memory Chat sheet:
+  - accepts short natural-language memory questions
+  - returns grounded answer + linked source memories
+  - shows clear out-of-scope / low-evidence guidance
 - Empty states:
   - no memories
   - no matches for active filters

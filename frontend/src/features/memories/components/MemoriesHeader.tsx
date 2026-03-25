@@ -6,6 +6,7 @@ interface MemoriesHeaderProps {
   activeFilterCount: number
   filterSummary: string
   onOpenFilters: () => void
+  onOpenMemoryChat: () => void
 }
 
 const StickyHeader = styled.div`
@@ -27,6 +28,12 @@ const HeadingRow = styled.div`
   min-height: ${({ theme }) => theme.layout.minTouchTarget};
 `
 
+const HeaderActions = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space.x2};
+`
+
 const Heading = styled.h2`
   margin: 0;
   font-size: 1.5rem;
@@ -39,12 +46,39 @@ const FilterSummary = styled.p`
   font-size: ${({ theme }) => theme.typography.secondarySize};
 `
 
-export function MemoriesHeader({ hasActiveFilters, activeFilterCount, filterSummary, onOpenFilters }: MemoriesHeaderProps) {
+const ChatButton = styled.button`
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.pill};
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  color: ${({ theme }) => theme.colors.textMuted};
+  min-height: ${({ theme }) => theme.layout.minTouchTarget};
+  padding: 0 ${({ theme }) => theme.space.x3};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
+    outline-offset: 2px;
+  }
+`
+
+export function MemoriesHeader({
+  hasActiveFilters,
+  activeFilterCount,
+  filterSummary,
+  onOpenFilters,
+  onOpenMemoryChat,
+}: MemoriesHeaderProps) {
   return (
     <StickyHeader>
       <HeadingRow>
         <Heading>Memories</Heading>
-        <MemoriesFilterButton active={hasActiveFilters} activeCount={activeFilterCount} onClick={onOpenFilters} />
+        <HeaderActions>
+          <ChatButton type="button" onClick={onOpenMemoryChat}>
+            Ask your memories
+          </ChatButton>
+          <MemoriesFilterButton active={hasActiveFilters} activeCount={activeFilterCount} onClick={onOpenFilters} />
+        </HeaderActions>
       </HeadingRow>
       <FilterSummary>{filterSummary}</FilterSummary>
     </StickyHeader>

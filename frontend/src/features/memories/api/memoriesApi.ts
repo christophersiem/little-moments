@@ -1,5 +1,6 @@
 import type {
   CreateMemoryResponse,
+  MemoryChatResponse,
   MemoriesListResponse,
   Memory,
   MemoryListItem,
@@ -63,6 +64,23 @@ interface MemoryApiResponse {
   tags: string[] | null
 }
 
+interface MemoryChatSourceApiResponse {
+  id: string
+  recordedAt: string
+  title: string
+  snippet: string
+  tags: string[] | null
+}
+
+interface MemoryChatApiResponse {
+  answer: string
+  confidence: 'low' | 'medium' | 'high'
+  status: 'success' | 'insufficient_evidence' | 'out_of_scope' | 'unsafe'
+  notes: string | null
+  sourceMemoryIds: string[] | null
+  sources: MemoryChatSourceApiResponse[] | null
+}
+
 const VALID_TAGS = new Set<string>(MEMORY_TAG_OPTIONS)
 
 function normalizeTags(tags: unknown): MemoryTag[] {
@@ -118,6 +136,31 @@ function mapMemory(payload: MemoryApiResponse): Memory {
     transcript: payload.transcript ?? null,
     errorMessage: payload.errorMessage ?? null,
     tags: normalizeTags(payload.tags),
+  }
+}
+
+function mapMemoryChatResponse(payload: MemoryChatApiResponse): MemoryChatResponse {
+  return {
+    answer: typeof payload.answer === 'string' ? payload.answer : '',
+    confidence: payload.confidence === 'high' || payload.confidence === 'low' ? payload.confidence : 'medium',
+    status:
+      payload.status === 'success' ||
+      payload.status === 'insufficient_evidence' ||
+      payload.status === 'out_of_scope' ||
+      payload.status === 'unsafe'
+        ? payload.status
+        : 'insufficient_evidence',
+    notes: typeof payload.notes === 'string' && payload.notes.trim().length > 0 ? payload.notes.trim() : null,
+    sourceMemoryIds: Array.isArray(payload.sourceMemoryIds) ? payload.sourceMemoryIds.map((id) => String(id)) : [],
+    sources: Array.isArray(payload.sources)
+      ? payload.sources.map((source) => ({
+          id: String(source.id),
+          recordedAt: String(source.recordedAt),
+          title: typeof source.title === 'string' && source.title.trim().length > 0 ? source.title.trim() : 'Memory',
+          snippet: typeof source.snippet === 'string' ? source.snippet : '',
+          tags: Array.isArray(source.tags) ? source.tags.filter((tag): tag is string => typeof tag === 'string') : [],
+        }))
+      : [],
   }
 }
 
@@ -217,4 +260,15 @@ export async function deleteMemory(memoryId: string): Promise<void> {
   await backendRequestVoid(`/memories/${encodeURIComponent(memoryId)}`, {
     method: 'DELETE',
   })
+}
+
+export async function askMemories(question: string, familyId?: string | null): Promise<MemoryChatResponse> {
+  const payload = await backendRequestJson<MemoryChatApiResponse>('/memories/chat', {
+    method: 'POST',
+    body: JSON.stringify({
+      question: question.trim(),
+      familyId: familyId && familyId.trim().length > 0 ? familyId.trim() : null,
+    }),
+  })
+  return mapMemoryChatResponse(payload)
 }
