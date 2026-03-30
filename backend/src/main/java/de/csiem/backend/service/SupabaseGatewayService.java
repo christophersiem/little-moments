@@ -528,8 +528,12 @@ public class SupabaseGatewayService {
         }
 
         try {
-            callPost(uri, payload, authorizationHeader, LEGACY_USER_UPSERT_PREFER_HEADER);
+            callPostWithServiceRole(uri, payload, LEGACY_USER_UPSERT_PREFER_HEADER);
         } catch (ResponseStatusException ex) {
+            if (ex.getReason() != null && ex.getReason().contains("SUPABASE_SERVICE_ROLE_KEY is not configured")) {
+                callPost(uri, payload, authorizationHeader, LEGACY_USER_UPSERT_PREFER_HEADER);
+                return;
+            }
             if (ex.getStatusCode().value() != NOT_FOUND.value()) {
                 throw ex;
             }
