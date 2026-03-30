@@ -92,6 +92,7 @@ public class SupabaseMemoryService {
                 "Recording exceeds max duration of %d seconds".formatted(maxRecordingSeconds)
             );
         }
+        AudioUploadGuardrails.validate(request.audio(), appProperties);
 
         String childId = request.childId().trim();
         supabaseGatewayService.assertOwnerCanCreateMemory(authorizationHeader, childId);

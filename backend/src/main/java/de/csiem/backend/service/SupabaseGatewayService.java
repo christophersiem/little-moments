@@ -33,6 +33,8 @@ import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 @Service
 public class SupabaseGatewayService {
 
+    private static final String LEGACY_USER_UPSERT_PREFER_HEADER = "resolution=ignore-duplicates,return=minimal";
+
     private final AppProperties appProperties;
     private final ObjectMapper objectMapper;
 
@@ -433,6 +435,7 @@ public class SupabaseGatewayService {
 
     public JsonNode createProcessingMemory(String authorizationHeader, String childId, Instant recordedAt) {
         SupabaseUser user = getCurrentUser(authorizationHeader);
+        ensureLegacyUserExists(authorizationHeader, user);
         String uri = UriComponentsBuilder
             .fromPath("/rest/v1/memories")
             .queryParam("select", memorySelect())
@@ -444,6 +447,7 @@ public class SupabaseGatewayService {
                 uri,
                 Map.of(
                     "child_id", childId,
+                    "user_id", user.id(),
                     "created_by", user.id(),
                     "recorded_at", recordedAt.toString(),
                     "status", "PROCESSING"
@@ -470,6 +474,7 @@ public class SupabaseGatewayService {
         Integer audioDurationSeconds
     ) {
         SupabaseUser user = getCurrentUser(authorizationHeader);
+        ensureLegacyUserExists(authorizationHeader, user);
         String uri = UriComponentsBuilder
             .fromPath("/rest/v1/memories")
             .queryParam("select", memorySelect())
@@ -478,6 +483,7 @@ public class SupabaseGatewayService {
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("child_id", childId);
+        payload.put("user_id", user.id());
         payload.put("created_by", user.id());
         payload.put("recorded_at", recordedAt.toString());
         payload.put("status", "READY");
@@ -502,6 +508,32 @@ public class SupabaseGatewayService {
             NOT_FOUND,
             "Could not create split memory"
         );
+    }
+
+    private void ensureLegacyUserExists(String authorizationHeader, SupabaseUser user) {
+        if (!StringUtils.hasText(user.id())) {
+            return;
+        }
+
+        String uri = UriComponentsBuilder
+            .fromPath("/rest/v1/users")
+            .queryParam("on_conflict", "id")
+            .build(true)
+            .toUriString();
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("id", user.id());
+        if (StringUtils.hasText(user.email())) {
+            payload.put("email", user.email());
+        }
+
+        try {
+            callPost(uri, payload, authorizationHeader, LEGACY_USER_UPSERT_PREFER_HEADER);
+        } catch (ResponseStatusException ex) {
+            if (ex.getStatusCode().value() != NOT_FOUND.value()) {
+                throw ex;
+            }
+        }
     }
 
     public JsonNode updateMemoryById(String authorizationHeader, String memoryId, Map<String, ?> updates) {

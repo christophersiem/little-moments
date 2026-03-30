@@ -341,6 +341,57 @@ class SupabaseMemoryServiceTests {
         );
     }
 
+    @Test
+    void createMemoryRejectsUnsupportedAudioType() {
+        CreateMemoryRequest request = new CreateMemoryRequest(
+            new MockMultipartFile("audio", "moment.txt", "text/plain", "audio-data".getBytes()),
+            Instant.parse("2026-03-05T08:15:00Z"),
+            "child-1",
+            false,
+            8
+        );
+
+        ResponseStatusException exception = assertThrows(
+            ResponseStatusException.class,
+            () -> supabaseMemoryService.createMemory("Bearer token", request)
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+        assertEquals("Unsupported audio type. Use WEBM, MP4, M4A, OGG, or WAV.", exception.getReason());
+        verifyNoInteractions(
+            supabaseGatewayService,
+            transcriptionService,
+            memorySplittingService,
+            memoryEnrichmentWebhookService
+        );
+    }
+
+    @Test
+    void createMemoryRejectsOversizedAudioFile() {
+        appProperties.getRecording().setMaxBytes(4);
+        CreateMemoryRequest request = new CreateMemoryRequest(
+            new MockMultipartFile("audio", "moment.webm", "audio/webm", "12345".getBytes()),
+            Instant.parse("2026-03-05T08:15:00Z"),
+            "child-1",
+            false,
+            8
+        );
+
+        ResponseStatusException exception = assertThrows(
+            ResponseStatusException.class,
+            () -> supabaseMemoryService.createMemory("Bearer token", request)
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+        assertEquals("Audio file exceeds max size of 4 bytes", exception.getReason());
+        verifyNoInteractions(
+            supabaseGatewayService,
+            transcriptionService,
+            memorySplittingService,
+            memoryEnrichmentWebhookService
+        );
+    }
+
     private JsonNode json(String payload) throws Exception {
         return objectMapper.readTree(payload);
     }
