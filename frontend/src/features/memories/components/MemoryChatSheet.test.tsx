@@ -19,8 +19,8 @@ describe('MemoryChatSheet', () => {
     )
 
     expect(screen.getByText('Answers are grounded in your saved memories only.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'When were his first steps?' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'What were the highlights from last month?' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'What happened recently?' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show me recent highlights.' })).toBeInTheDocument()
   })
 
   it('submits a question and opens source memory from response', async () => {
@@ -78,7 +78,7 @@ describe('MemoryChatSheet', () => {
       <MemoryChatSheet open familyId={null} onClose={vi.fn()} onOpenMemory={vi.fn()} />,
     )
 
-    await user.click(screen.getByRole('button', { name: 'When were his first steps?' }))
+    await user.click(screen.getByRole('button', { name: 'What happened recently?' }))
 
     await waitFor(() => {
       expect(screen.getByText('Try asking about your saved moments, milestones, or highlights.')).toBeInTheDocument()
@@ -89,7 +89,7 @@ describe('MemoryChatSheet', () => {
     const user = userEvent.setup()
 
     askMemoriesMock.mockResolvedValue({
-      answer: "I couldn't find a clear answer in your saved moments yet. Try a broader question or another wording.",
+      answer: 'insufficient_evidence',
       confidence: 'low',
       status: 'insufficient_evidence',
       notes: null,
@@ -101,12 +101,16 @@ describe('MemoryChatSheet', () => {
       <MemoryChatSheet open familyId={null} onClose={vi.fn()} onOpenMemory={vi.fn()} />,
     )
 
-    await user.click(screen.getByRole('button', { name: 'Show memories about sleep.' }))
+    await user.click(screen.getByRole('button', { name: 'What memories do we have about meals?' }))
 
     await waitFor(() => {
+      expect(screen.getByText("I couldn’t find a memory that answers that yet.")).toBeInTheDocument()
       expect(
-        screen.getByText("I couldn't find a clear match yet. Try asking more broadly or with a different timeframe."),
+        screen.getByText('Try a broader topic, a recent timeframe, or a theme like meals, sleep, or language.'),
       ).toBeInTheDocument()
+      expect(screen.getByText('Try one of these instead:')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'What happened recently?' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Show me recent highlights.' })).toBeInTheDocument()
     })
   })
 })

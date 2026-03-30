@@ -13,11 +13,18 @@ interface MemoryChatSheetProps {
   onOpenMemory: (memoryId: string) => void
 }
 
-const EXAMPLE_QUESTIONS = [
-  'When were his first steps?',
-  'What were the highlights from last month?',
-  'When did we first visit the zoo?',
-  'Show memories about sleep.',
+const INITIAL_QUESTIONS = [
+  'What happened recently?',
+  'Show me recent highlights.',
+  'What happy moments do we have?',
+  'What memories do we have about meals?',
+] as const
+
+const RECOVERY_QUESTIONS = [
+  'What happened recently?',
+  'Show me recent highlights.',
+  'What memories do we have about meals?',
+  'What language moments do we have?',
 ] as const
 
 const Content = styled.div`
@@ -157,6 +164,18 @@ const StatusHint = styled.p`
   font-size: 0.75rem;
 `
 
+const SuggestionSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.x2};
+`
+
+const SuggestionLabel = styled.p`
+  margin: 0;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+`
+
 export function MemoryChatSheet({ open, familyId, onClose, onOpenMemory }: MemoryChatSheetProps) {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const [question, setQuestion] = useState('')
@@ -185,12 +204,29 @@ export function MemoryChatSheet({ open, familyId, onClose, onOpenMemory }: Memor
       return 'Try asking about your saved moments, milestones, or highlights.'
     }
     if (result.status === 'insufficient_evidence') {
-      return "I couldn't find a clear match yet. Try asking more broadly or with a different timeframe."
+      return "Try a broader topic, a recent timeframe, or a theme like meals, sleep, or language."
     }
     if (result.confidence === 'low') {
       return 'Confidence is low, so treat this as a best effort summary.'
     }
     return ''
+  }, [result])
+
+  const suggestionQuestions = result?.status === 'insufficient_evidence' ? RECOVERY_QUESTIONS : INITIAL_QUESTIONS
+
+  const resultAnswer = useMemo(() => {
+    if (!result) {
+      return ''
+    }
+
+    const normalizedAnswer = result.answer.trim()
+    const answerMatchesStatus = normalizedAnswer.toLowerCase() === result.status
+
+    if (result.status === 'insufficient_evidence' && (!normalizedAnswer || answerMatchesStatus)) {
+      return "I couldn’t find a memory that answers that yet."
+    }
+
+    return normalizedAnswer
   }, [result])
 
   const submitQuestion = async (nextQuestion: string) => {
@@ -243,7 +279,7 @@ export function MemoryChatSheet({ open, familyId, onClose, onOpenMemory }: Memor
 
         {!result && (
           <ExampleList>
-            {EXAMPLE_QUESTIONS.map((example) => (
+            {INITIAL_QUESTIONS.map((example) => (
               <ExampleButton
                 type="button"
                 key={example}
@@ -264,10 +300,30 @@ export function MemoryChatSheet({ open, familyId, onClose, onOpenMemory }: Memor
           <>
             <ResultCard>
               <ResultLabel>Answer</ResultLabel>
-              <ResultAnswer>{result.answer}</ResultAnswer>
+              <ResultAnswer>{resultAnswer}</ResultAnswer>
               {result.notes ? <ResultNotes>{result.notes}</ResultNotes> : null}
               {statusHint ? <StatusHint>{statusHint}</StatusHint> : null}
             </ResultCard>
+
+            {result.status === 'insufficient_evidence' ? (
+              <SuggestionSection>
+                <SuggestionLabel>Try one of these instead:</SuggestionLabel>
+                <ExampleList>
+                  {suggestionQuestions.map((example) => (
+                    <ExampleButton
+                      type="button"
+                      key={example}
+                      onClick={() => {
+                        setQuestion(example)
+                        void submitQuestion(example)
+                      }}
+                    >
+                      {example}
+                    </ExampleButton>
+                  ))}
+                </ExampleList>
+              </SuggestionSection>
+            ) : null}
 
             {result.sources.length > 0 ? (
               <SourceList>

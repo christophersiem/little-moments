@@ -51,15 +51,31 @@ const ChatButton = styled.button`
   border-radius: ${({ theme }) => theme.radii.pill};
   background: ${({ theme }) => theme.colors.surfaceStrong};
   color: ${({ theme }) => theme.colors.textMuted};
+  width: ${({ theme }) => theme.layout.minTouchTarget};
+  min-width: ${({ theme }) => theme.layout.minTouchTarget};
   min-height: ${({ theme }) => theme.layout.minTouchTarget};
-  padding: 0 ${({ theme }) => theme.space.x3};
-  font-size: ${({ theme }) => theme.typography.secondarySize};
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  transition: color 180ms ease, border-color 180ms ease, background-color 180ms ease;
+
+  &:hover {
+    color: ${({ theme }) => theme.colors.text};
+    border-color: ${({ theme }) => theme.colors.borderStrong};
+    background: ${({ theme }) => theme.colors.surface};
+  }
 
   &:focus-visible {
     outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
     outline-offset: 2px;
   }
+`
+
+const ChatIcon = styled.svg`
+  width: 19px;
+  height: 19px;
 `
 
 export function MemoriesHeader({
@@ -74,8 +90,18 @@ export function MemoriesHeader({
       <HeadingRow>
         <Heading>Memories</Heading>
         <HeaderActions>
-          <ChatButton type="button" onClick={onOpenMemoryChat}>
-            Ask your memories
+          <ChatButton type="button" aria-label="Open memory chat" title="Open memory chat" onClick={onOpenMemoryChat}>
+            <ChatIcon viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path
+                d="M7 16.5L4 19V6.5C4 5.67 4.67 5 5.5 5H18.5C19.33 5 20 5.67 20 6.5V15.5C20 16.33 19.33 17 18.5 17H7Z"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path d="M8 9H16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              <path d="M8 12.5H13.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </ChatIcon>
           </ChatButton>
           <MemoriesFilterButton active={hasActiveFilters} activeCount={activeFilterCount} onClick={onOpenFilters} />
         </HeaderActions>
