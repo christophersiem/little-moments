@@ -159,7 +159,7 @@ describe('MemoriesPage', () => {
 
     renderWithProviders(<MemoriesPage navigate={vi.fn()} familyId="family-1" />)
 
-    await user.click(screen.getByRole('button', { name: /ask your memories/i }))
+    await user.click(screen.getByRole('button', { name: /open memory chat/i }))
 
     expect(screen.getByRole('textbox', { name: /ask your memories/i })).toBeInTheDocument()
   })
