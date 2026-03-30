@@ -514,6 +514,9 @@ public class SupabaseGatewayService {
         if (!StringUtils.hasText(user.id())) {
             return;
         }
+        if (legacyUserExists(authorizationHeader, user.id())) {
+            return;
+        }
 
         String uri = UriComponentsBuilder
             .fromPath("/rest/v1/users")
@@ -535,9 +538,25 @@ public class SupabaseGatewayService {
                 return;
             }
             if (ex.getStatusCode().value() != NOT_FOUND.value()) {
-                throw ex;
+                throw new ResponseStatusException(
+                    INTERNAL_SERVER_ERROR,
+                    firstNonBlank(ex.getReason(), "Could not ensure legacy user row for memory save")
+                );
             }
         }
+    }
+
+    private boolean legacyUserExists(String authorizationHeader, String userId) {
+        String uri = UriComponentsBuilder
+            .fromPath("/rest/v1/users")
+            .queryParam("select", "id")
+            .queryParam("id", "eq." + userId)
+            .queryParam("limit", 1)
+            .build(true)
+            .toUriString();
+
+        JsonNode rows = callGet(uri, authorizationHeader);
+        return rows.isArray() && !rows.isEmpty();
     }
 
     public JsonNode updateMemoryById(String authorizationHeader, String memoryId, Map<String, ?> updates) {
