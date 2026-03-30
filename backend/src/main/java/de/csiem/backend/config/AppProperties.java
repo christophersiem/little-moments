@@ -77,6 +77,7 @@ public class AppProperties {
 
     public static class Recording {
         private int maxSeconds = 60;
+        private long maxBytes = 10 * 1024 * 1024L;
 
         public int getMaxSeconds() {
             return maxSeconds;
@@ -84,6 +85,14 @@ public class AppProperties {
 
         public void setMaxSeconds(int maxSeconds) {
             this.maxSeconds = maxSeconds;
+        }
+
+        public long getMaxBytes() {
+            return maxBytes;
+        }
+
+        public void setMaxBytes(long maxBytes) {
+            this.maxBytes = maxBytes;
         }
     }
 

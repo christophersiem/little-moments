@@ -22,6 +22,9 @@ Request:
 - `audio` (required file)
 - `childId` (required uuid)
 - `recordedAt` (optional ISO timestamp)
+- accepted audio types: `audio/webm`, `audio/mp4`, `audio/m4a`, `audio/ogg`, `audio/wav`
+- max duration: `60s` by default (`MAX_RECORDING_SECONDS`)
+- max upload size: `10 MB` by default (`MAX_RECORDING_BYTES`)
 
 Response (`CreateMemoryResponse`):
 ```json

@@ -90,6 +90,7 @@ public class MemoryService {
                 "Recording exceeds max duration of %d seconds".formatted(maxRecordingSeconds)
             );
         }
+        AudioUploadGuardrails.validate(audio, appProperties);
 
         UserEntity user = getOrCreateDefaultUser();
         MemoryEntity memory = new MemoryEntity(

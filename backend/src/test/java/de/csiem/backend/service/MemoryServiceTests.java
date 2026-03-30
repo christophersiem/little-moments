@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -161,5 +162,52 @@ class MemoryServiceTests {
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
         assertEquals("Audio file is required", exception.getReason());
         verify(memoryRepository, org.mockito.Mockito.never()).save(any(MemoryEntity.class));
+    }
+
+    @Test
+    void createMemoryRejectsUnsupportedAudioType() {
+        MockMultipartFile audio = new MockMultipartFile(
+            "audio",
+            "memory.txt",
+            "text/plain",
+            "not-audio".getBytes()
+        );
+        CreateMemoryRequest request = new CreateMemoryRequest(
+            audio,
+            Instant.parse("2026-02-20T10:15:00Z"),
+            "child-1",
+            false,
+            8
+        );
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> memoryService.createMemory(request));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+        assertEquals("Unsupported audio type. Use WEBM, MP4, M4A, OGG, or WAV.", exception.getReason());
+        verify(memoryRepository, never()).save(any(MemoryEntity.class));
+    }
+
+    @Test
+    void createMemoryRejectsOversizedAudioFile() {
+        appProperties.getRecording().setMaxBytes(4);
+        MockMultipartFile audio = new MockMultipartFile(
+            "audio",
+            "memory.webm",
+            "audio/webm",
+            "12345".getBytes()
+        );
+        CreateMemoryRequest request = new CreateMemoryRequest(
+            audio,
+            Instant.parse("2026-02-20T10:15:00Z"),
+            "child-1",
+            false,
+            8
+        );
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> memoryService.createMemory(request));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+        assertEquals("Audio file exceeds max size of 4 bytes", exception.getReason());
+        verify(memoryRepository, never()).save(any(MemoryEntity.class));
     }
 }
