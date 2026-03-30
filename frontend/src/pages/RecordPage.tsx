@@ -4,7 +4,6 @@ import { APP_ROUTES } from '../app/routes'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
 import { RecordButton } from '../components/RecordButton'
-import { ToggleSwitch } from '../components/ToggleSwitch'
 import { MAX_RECORDING_SECONDS, SHORT_TRANSCRIPT_MESSAGE } from '../features/memories/constants'
 import { startMemoryUpload } from '../features/memories/hooks/uploadSessionStore'
 import {
@@ -54,6 +53,7 @@ const Stage = styled.section`
 `
 
 const CenterStage = styled(Stage)`
+  position: relative;
   justify-content: center;
 `
 
@@ -201,9 +201,136 @@ const SheetValidationText = styled.p`
   font-size: ${({ theme }) => theme.typography.secondarySize};
 `
 
-const PreferenceRow = styled(ToggleSwitch)`
-  width: min(320px, calc(100vw - 48px));
-  margin-top: clamp(36px, 6vh, 44px);
+const UtilityRegion = styled.div`
+  position: absolute;
+  top: clamp(14px, 3.2vh, 24px);
+  right: clamp(12px, 3.8vw, 20px);
+  width: min(304px, calc(100vw - 36px));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: ${({ theme }) => theme.space.x2};
+  z-index: 7;
+`
+
+const UtilityBar = styled.div`
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+`
+
+const UtilityButton = styled.button`
+  width: 34px;
+  height: 34px;
+  border-radius: ${({ theme }) => theme.radii.pill};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  background: ${({ theme }) => `color-mix(in srgb, ${theme.colors.surfaceStrong} 72%, transparent)`};
+  color: ${({ theme }) => theme.colors.textMuted};
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: none;
+  opacity: 0.76;
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+
+  &:hover {
+    color: ${({ theme }) => theme.colors.text};
+    border-color: ${({ theme }) => theme.colors.border};
+    background: ${({ theme }) => `color-mix(in srgb, ${theme.colors.surfaceStrong} 82%, transparent)`};
+    opacity: 0.95;
+  }
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
+    outline-offset: 2px;
+    opacity: 1;
+  }
+`
+
+const UtilityIcon = styled.svg`
+  width: 18px;
+  height: 18px;
+`
+
+const UtilityMenu = styled.section`
+  width: 100%;
+  border-radius: ${({ theme }) => theme.radii.lg};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  background: ${({ theme }) => theme.colors.surface};
+  box-shadow: ${({ theme }) => theme.shadows.sm};
+  padding: ${({ theme }) => theme.space.x2};
+`
+
+const UtilityMenuTitle = styled.p`
+  margin: 0 0 ${({ theme }) => theme.space.x1};
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: 0.73rem;
+  letter-spacing: 0.02em;
+`
+
+const PreferenceRow = styled.button<{ $checked: boolean }>`
+  width: 100%;
+  min-height: 56px;
+  border: 1px solid ${({ theme, $checked }) => ($checked ? theme.colors.accentStrong : theme.colors.border)};
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  border-radius: ${({ theme }) => theme.radii.md};
+  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x2}`};
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: ${({ theme }) => theme.space.x2};
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 180ms ease, background-color 180ms ease;
+
+  &:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.accentStrong};
+    outline-offset: 2px;
+  }
+`
+
+const PreferenceText = styled.span`
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+`
+
+const PreferenceLabel = styled.span`
+  color: ${({ theme }) => theme.colors.text};
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.2;
+`
+
+const PreferenceDescription = styled.span`
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: 0.76rem;
+  line-height: 1.35;
+`
+
+const PreferenceTrack = styled.span<{ $checked: boolean }>`
+  flex-shrink: 0;
+  width: 46px;
+  height: 26px;
+  border-radius: ${({ theme }) => theme.radii.pill};
+  border: 1px solid ${({ theme, $checked }) => ($checked ? theme.colors.accentStrong : theme.colors.border)};
+  background: ${({ theme, $checked }) => ($checked ? theme.colors.accent : theme.colors.border)};
+  position: relative;
+  transition: background-color 200ms ease, border-color 200ms ease;
+`
+
+const PreferenceThumb = styled.span<{ $checked: boolean }>`
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: ${({ theme }) => theme.radii.pill};
+  background: ${({ theme, $checked }) => ($checked ? theme.colors.onAccent : theme.colors.surfaceStrong)};
+  box-shadow: 0 1px 2px rgba(48, 39, 33, 0.2);
+  transform: translateX(${({ $checked }) => ($checked ? '20px' : '0')});
+  transition: transform 220ms cubic-bezier(0.22, 0.9, 0.35, 1), background-color 200ms ease;
 `
 
 export function RecordPage({ navigate, childId, onNavigationLockChange }: RecordPageProps) {
@@ -213,6 +340,7 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
   const latestRecordingRef = useRef<RecordingPayload | null>(null)
   const intervalRef = useRef<number | null>(null)
   const elapsedRef = useRef(0)
+  const preferenceMenuRef = useRef<HTMLDivElement | null>(null)
 
   const [phase, setPhase] = useState<RecordPhase>('idle')
   const [stopDecisionState, setStopDecisionState] = useState<StopDecisionState>('hidden')
@@ -220,6 +348,7 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
   const [errorMessage, setErrorMessage] = useState('')
   const [recordingNotice, setRecordingNotice] = useState('')
   const [keepAudio, setKeepAudio] = useState(false)
+  const [showRecordingOptions, setShowRecordingOptions] = useState(false)
   const [viewportWidth, setViewportWidth] = useState(
     typeof window === 'undefined' ? 390 : window.innerWidth,
   )
@@ -298,6 +427,42 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
   useEffect(() => {
     onNavigationLockChange?.(phase === 'recording')
   }, [onNavigationLockChange, phase])
+
+  useEffect(() => {
+    if (phase !== 'idle') {
+      setShowRecordingOptions(false)
+    }
+  }, [phase])
+
+  useEffect(() => {
+    if (!showRecordingOptions) {
+      return
+    }
+
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) {
+        return
+      }
+      if (preferenceMenuRef.current?.contains(target)) {
+        return
+      }
+      setShowRecordingOptions(false)
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowRecordingOptions(false)
+      }
+    }
+
+    window.addEventListener('mousedown', onPointerDown)
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('mousedown', onPointerDown)
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [showRecordingOptions])
 
   useEffect(() => {
     elapsedRef.current = elapsedSeconds
@@ -584,6 +749,55 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
   return (
     <CenterStage>
       <CenterHero>
+        <UtilityRegion ref={preferenceMenuRef}>
+          <UtilityBar>
+            <UtilityButton
+              type="button"
+              aria-label="Recording options"
+              aria-expanded={showRecordingOptions}
+              aria-haspopup="dialog"
+              onClick={() => setShowRecordingOptions((current) => !current)}
+            >
+              <UtilityIcon viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path
+                  d="M12 8.75C10.21 8.75 8.75 10.21 8.75 12C8.75 13.79 10.21 15.25 12 15.25C13.79 15.25 15.25 13.79 15.25 12C15.25 10.21 13.79 8.75 12 8.75Z"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M19 12C19 11.48 18.95 10.98 18.84 10.5L20.5 9.21L18.79 6.29L16.77 7.03C16.02 6.39 15.13 5.92 14.16 5.67L13.85 3.5H10.15L9.84 5.67C8.87 5.92 7.98 6.39 7.23 7.03L5.21 6.29L3.5 9.21L5.16 10.5C5.05 10.98 5 11.48 5 12C5 12.52 5.05 13.02 5.16 13.5L3.5 14.79L5.21 17.71L7.23 16.97C7.98 17.61 8.87 18.08 9.84 18.33L10.15 20.5H13.85L14.16 18.33C15.13 18.08 16.02 17.61 16.77 16.97L18.79 17.71L20.5 14.79L18.84 13.5C18.95 13.02 19 12.52 19 12Z"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </UtilityIcon>
+            </UtilityButton>
+          </UtilityBar>
+          {showRecordingOptions ? (
+            <UtilityMenu role="region" aria-label="Recording options">
+              <UtilityMenuTitle>Recording options</UtilityMenuTitle>
+              <PreferenceRow
+                type="button"
+                role="switch"
+                aria-checked={keepAudio}
+                aria-label="Keep original audio"
+                $checked={keepAudio}
+                onClick={() => setKeepAudio((current) => !current)}
+              >
+                <PreferenceText>
+                  <PreferenceLabel>Keep original audio</PreferenceLabel>
+                  <PreferenceDescription>Optional. Keep the voice note so you can replay it later.</PreferenceDescription>
+                </PreferenceText>
+                <PreferenceTrack $checked={keepAudio} aria-hidden>
+                  <PreferenceThumb $checked={keepAudio} />
+                </PreferenceTrack>
+              </PreferenceRow>
+            </UtilityMenu>
+          ) : null}
+        </UtilityRegion>
         <RecordButton
           status="idle"
           elapsedSec={0}
@@ -591,12 +805,6 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
           onStart={() => void startRecording()}
           onStop={NOOP}
           diameter={largeButtonDiameter}
-        />
-        <PreferenceRow
-          checked={keepAudio}
-          onChange={setKeepAudio}
-          label="Keep audio"
-          description={`Max ${MAX_RECORDING_SECONDS} seconds. Keeps the original voice so you can replay it later.`}
         />
         {recordingNotice && <InlineNotice role="status">{recordingNotice}</InlineNotice>}
         {errorMessage && <HintBanner role="status">{errorMessage}</HintBanner>}
