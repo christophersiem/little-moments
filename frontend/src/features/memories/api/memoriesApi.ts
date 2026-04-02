@@ -208,6 +208,27 @@ export async function createMemory(
   return mapCreateResponse(payload)
 }
 
+export async function createDemoMemory(
+  demoTranscript: string,
+  recordedAtIso: string,
+  childId: string,
+  durationSeconds: number,
+): Promise<CreateMemoryResponse> {
+  const formData = new FormData()
+  formData.append('recordedAt', recordedAtIso)
+  formData.append('childId', childId)
+  formData.append('keepAudio', 'false')
+  formData.append('durationSeconds', String(Math.max(1, Math.round(durationSeconds))))
+  formData.append('demoTranscript', demoTranscript.trim())
+
+  const payload = await backendRequestJson<CreateMemoryApiResponse>('/memories', {
+    method: 'POST',
+    body: formData,
+  })
+
+  return mapCreateResponse(payload)
+}
+
 export async function listMemories({
   page = 0,
   size = 5,

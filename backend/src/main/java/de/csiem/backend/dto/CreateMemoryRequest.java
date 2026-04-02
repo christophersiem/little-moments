@@ -10,6 +10,7 @@ public record CreateMemoryRequest(
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant recordedAt,
     String childId,
     Boolean keepAudio,
-    Integer durationSeconds
+    Integer durationSeconds,
+    String demoTranscript
 ) {
 }

@@ -74,11 +74,13 @@ public class SupabaseMemoryService {
     }
 
     public CreateMemoryResponse createMemory(String authorizationHeader, CreateMemoryRequest request) {
-        if (request.audio() == null || request.audio().isEmpty()) {
-            throw new ResponseStatusException(BAD_REQUEST, "Audio file is required");
-        }
         if (!StringUtils.hasText(request.childId())) {
             throw new ResponseStatusException(BAD_REQUEST, "childId is required");
+        }
+        String demoTranscript = normalizeOptionalDemoTranscript(request.demoTranscript());
+        boolean demoMode = StringUtils.hasText(demoTranscript);
+        if (!demoMode && (request.audio() == null || request.audio().isEmpty())) {
+            throw new ResponseStatusException(BAD_REQUEST, "Audio file is required");
         }
 
         int maxRecordingSeconds = Math.max(appProperties.getRecording().getMaxSeconds(), 1);
@@ -92,7 +94,9 @@ public class SupabaseMemoryService {
                 "Recording exceeds max duration of %d seconds".formatted(maxRecordingSeconds)
             );
         }
-        AudioUploadGuardrails.validate(request.audio(), appProperties);
+        if (!demoMode) {
+            AudioUploadGuardrails.validate(request.audio(), appProperties);
+        }
 
         String childId = request.childId().trim();
         supabaseGatewayService.assertOwnerCanCreateMemory(authorizationHeader, childId);
@@ -107,23 +111,28 @@ public class SupabaseMemoryService {
         String memoryId = text(processingRow.get("id"));
 
         try {
-            String fileName = Optional.ofNullable(request.audio().getOriginalFilename()).orElse("recording.webm");
-            String mimeType = Optional.ofNullable(request.audio().getContentType()).orElse(MediaType.APPLICATION_OCTET_STREAM_VALUE);
-            byte[] audioBytes = request.audio().getBytes();
             AudioMetadata audioMetadata = null;
+            String transcript;
+            if (demoMode) {
+                transcript = demoTranscript;
+            } else {
+                String fileName = Optional.ofNullable(request.audio().getOriginalFilename()).orElse("recording.webm");
+                String mimeType = Optional.ofNullable(request.audio().getContentType()).orElse(MediaType.APPLICATION_OCTET_STREAM_VALUE);
+                byte[] audioBytes = request.audio().getBytes();
 
-            if (Boolean.TRUE.equals(request.keepAudio())) {
-                String objectPath = buildAudioObjectPath(familyId, childId, memoryId, fileName, mimeType);
-                supabaseGatewayService.uploadMemoryAudio(objectPath, audioBytes, mimeType);
-                audioMetadata = new AudioMetadata(objectPath, mimeType, (long) audioBytes.length, durationSeconds);
-                supabaseGatewayService.updateMemoryById(authorizationHeader, memoryId, audioPatch(audioMetadata));
+                if (Boolean.TRUE.equals(request.keepAudio())) {
+                    String objectPath = buildAudioObjectPath(familyId, childId, memoryId, fileName, mimeType);
+                    supabaseGatewayService.uploadMemoryAudio(objectPath, audioBytes, mimeType);
+                    audioMetadata = new AudioMetadata(objectPath, mimeType, (long) audioBytes.length, durationSeconds);
+                    supabaseGatewayService.updateMemoryById(authorizationHeader, memoryId, audioPatch(audioMetadata));
+                }
+
+                transcript = transcriptionService.transcribe(
+                    audioBytes,
+                    fileName,
+                    mimeType
+                );
             }
-
-            String transcript = transcriptionService.transcribe(
-                audioBytes,
-                fileName,
-                mimeType
-            );
 
             List<SplitMemory> splitMemories = memorySplittingService.split(transcript, uploadTimestamp);
             if (splitMemories.size() <= 1) {
@@ -160,6 +169,17 @@ public class SupabaseMemoryService {
                 List.of()
             );
         }
+    }
+
+    private String normalizeOptionalDemoTranscript(String demoTranscript) {
+        if (!StringUtils.hasText(demoTranscript)) {
+            return null;
+        }
+        String normalized = normalizeTranscript(demoTranscript);
+        if (!StringUtils.hasText(normalized)) {
+            throw new ResponseStatusException(BAD_REQUEST, "demoTranscript must not be blank");
+        }
+        return normalized;
     }
 
     public MemoryListResponse getMemories(

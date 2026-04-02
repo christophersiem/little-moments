@@ -85,7 +85,7 @@ class MemoryServiceTests {
             "audio/webm",
             "audio-data".getBytes()
         );
-        CreateMemoryRequest request = new CreateMemoryRequest(audio, recordedAt, "child-1", false, 8);
+        CreateMemoryRequest request = new CreateMemoryRequest(audio, recordedAt, "child-1", false, 8, null);
 
         List<MemoryStatus> statuses = new ArrayList<>();
         when(memoryRepository.save(any(MemoryEntity.class))).thenAnswer(invocation -> {
@@ -122,7 +122,7 @@ class MemoryServiceTests {
             "audio/webm",
             "audio-data".getBytes()
         );
-        CreateMemoryRequest request = new CreateMemoryRequest(audio, recordedAt, "child-1", false, 8);
+        CreateMemoryRequest request = new CreateMemoryRequest(audio, recordedAt, "child-1", false, 8, null);
 
         List<MemoryStatus> statuses = new ArrayList<>();
         when(memoryRepository.save(any(MemoryEntity.class))).thenAnswer(invocation -> {
@@ -142,6 +142,34 @@ class MemoryServiceTests {
     }
 
     @Test
+    void createMemorySupportsDemoTranscriptWithoutAudio() {
+        when(userRepository.findById(appProperties.getDefaultUserId())).thenReturn(Optional.of(defaultUser));
+
+        Instant recordedAt = Instant.parse("2026-02-20T10:15:00Z");
+        String transcript = "He asked for more apples in a full sentence.";
+        CreateMemoryRequest request = new CreateMemoryRequest(null, recordedAt, "child-1", false, 8, transcript);
+
+        List<MemoryStatus> statuses = new ArrayList<>();
+        when(memoryRepository.save(any(MemoryEntity.class))).thenAnswer(invocation -> {
+            MemoryEntity entity = invocation.getArgument(0);
+            statuses.add(entity.getStatus());
+            return entity;
+        });
+        when(memorySplittingService.split(transcript, recordedAt))
+            .thenReturn(List.of(new SplitMemory(transcript, recordedAt, 0.9)));
+        when(memoryTaggingService.detectTags(transcript)).thenReturn(Set.of(MemoryTag.LANGUAGE));
+        when(memoryInsightsService.generate(transcript))
+            .thenReturn(new MemoryInsightsService.MemoryInsights("Asked for more apples", "Language milestone."));
+
+        CreateMemoryResponse response = memoryService.createMemory(request);
+
+        assertEquals(MemoryStatus.READY, response.status());
+        assertEquals(1, response.count());
+        verify(transcriptionService, never()).transcribe(any(), any(), any());
+        assertEquals(List.of(MemoryStatus.PROCESSING, MemoryStatus.READY), statuses);
+    }
+
+    @Test
     void createMemoryReturnsBadRequestWhenAudioIsMissing() {
         MockMultipartFile emptyAudio = new MockMultipartFile(
             "audio",
@@ -154,7 +182,8 @@ class MemoryServiceTests {
             Instant.parse("2026-02-20T10:15:00Z"),
             "child-1",
             false,
-            8
+            8,
+            null
         );
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> memoryService.createMemory(request));
@@ -177,7 +206,8 @@ class MemoryServiceTests {
             Instant.parse("2026-02-20T10:15:00Z"),
             "child-1",
             false,
-            8
+            8,
+            null
         );
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> memoryService.createMemory(request));
@@ -201,7 +231,8 @@ class MemoryServiceTests {
             Instant.parse("2026-02-20T10:15:00Z"),
             "child-1",
             false,
-            8
+            8,
+            null
         );
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> memoryService.createMemory(request));

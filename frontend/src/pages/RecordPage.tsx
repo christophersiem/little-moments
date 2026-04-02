@@ -5,7 +5,7 @@ import { Button } from '../components/Button'
 import { Card } from '../components/Card'
 import { RecordButton } from '../components/RecordButton'
 import { MAX_RECORDING_SECONDS, SHORT_TRANSCRIPT_MESSAGE } from '../features/memories/constants'
-import { startMemoryUpload } from '../features/memories/hooks/uploadSessionStore'
+import { startDemoMemoryUpload, startMemoryUpload } from '../features/memories/hooks/uploadSessionStore'
 import {
   transitionStopDecision,
   type StopDecisionEvent,
@@ -32,6 +32,9 @@ const MIN_RECORDING_SECONDS = 3
 const MIN_RECORDING_BYTES = 10000
 const SHORT_HINT_DISPLAY_MS = 5200
 const MAX_DURATION_HINT = `Max ${MAX_RECORDING_SECONDS}s`
+const DEMO_DURATION_SECONDS = 8
+const DEMO_TRANSCRIPT_TEMPLATE =
+  'During bedtime, he remembered the story from yesterday and corrected me when I changed one part. Then he added his own ending and asked me to repeat it with his words. He noticed small details I had forgotten, like the color of the blanket and the name of the little fox in the story, and he smiled every time I got it right. After that, he acted out a few scenes with his stuffed bear and used clear full sentences to explain what should happen next. The whole routine felt calm and connected, and it showed strong memory, language growth, and growing confidence in expressing his ideas.'
 const RECORDER_MIME_PREFERENCES = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus']
 function pickRecorderMimeType(): string | undefined {
   if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
@@ -309,6 +312,35 @@ const PreferenceDescription = styled.span`
   line-height: 1.35;
 `
 
+const DemoSection = styled.div`
+  margin-top: ${({ theme }) => theme.space.x2};
+  padding-top: ${({ theme }) => theme.space.x2};
+  border-top: 1px solid ${({ theme }) => theme.colors.border};
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.space.x2};
+`
+
+const DemoLabel = styled.span`
+  color: ${({ theme }) => theme.colors.text};
+  font-size: 0.86rem;
+  font-weight: 500;
+`
+
+const DemoTextArea = styled.textarea`
+  width: 100%;
+  min-height: 108px;
+  resize: vertical;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.md};
+  background: ${({ theme }) => theme.colors.surfaceStrong};
+  color: ${({ theme }) => theme.colors.text};
+  font: inherit;
+  font-size: ${({ theme }) => theme.typography.secondarySize};
+  line-height: ${({ theme }) => theme.typography.relaxedLineHeight};
+  padding: ${({ theme }) => `${theme.space.x2} ${theme.space.x3}`};
+`
+
 const PreferenceTrack = styled.span<{ $checked: boolean }>`
   flex-shrink: 0;
   width: 46px;
@@ -348,6 +380,8 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
   const [errorMessage, setErrorMessage] = useState('')
   const [recordingNotice, setRecordingNotice] = useState('')
   const [keepAudio, setKeepAudio] = useState(false)
+  const [demoModeEnabled, setDemoModeEnabled] = useState(false)
+  const [demoTranscript, setDemoTranscript] = useState(DEMO_TRANSCRIPT_TEMPLATE)
   const [showRecordingOptions, setShowRecordingOptions] = useState(false)
   const [viewportWidth, setViewportWidth] = useState(
     typeof window === 'undefined' ? 390 : window.innerWidth,
@@ -631,6 +665,34 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
     Boolean(latestRecordingRef.current) &&
     isLikelyTooShort(latestRecordingRef.current.blob, elapsedSeconds)
 
+  const onSubmitDemoTranscript = () => {
+    const normalizedTranscript = demoTranscript.trim()
+    if (!normalizedTranscript) {
+      setErrorMessage('Demo transcript is empty.')
+      return
+    }
+    if (!childId) {
+      setErrorMessage('No child selected for this memory.')
+      return
+    }
+
+    setErrorMessage('')
+    setRecordingNotice('')
+    const recordedAt = new Date().toISOString()
+    const session = startDemoMemoryUpload(
+      normalizedTranscript,
+      recordedAt,
+      childId,
+      DEMO_DURATION_SECONDS,
+    )
+    navigate(APP_ROUTES.memories)
+    window.history.replaceState(
+      {},
+      '',
+      `${APP_ROUTES.memories}?pending=${encodeURIComponent(session.clientId)}`,
+    )
+  }
+
   if (phase === 'error') {
     return (
       <Card>
@@ -795,6 +857,37 @@ export function RecordPage({ navigate, childId, onNavigationLockChange }: Record
                   <PreferenceThumb $checked={keepAudio} />
                 </PreferenceTrack>
               </PreferenceRow>
+              <DemoSection>
+                <PreferenceRow
+                  type="button"
+                  role="switch"
+                  aria-checked={demoModeEnabled}
+                  aria-label="Demo mode"
+                  $checked={demoModeEnabled}
+                  onClick={() => setDemoModeEnabled((current) => !current)}
+                >
+                  <PreferenceText>
+                    <PreferenceLabel>Demo mode</PreferenceLabel>
+                    <PreferenceDescription>Send a prepared transcript without recording audio.</PreferenceDescription>
+                  </PreferenceText>
+                  <PreferenceTrack $checked={demoModeEnabled} aria-hidden>
+                    <PreferenceThumb $checked={demoModeEnabled} />
+                  </PreferenceTrack>
+                </PreferenceRow>
+                {demoModeEnabled ? (
+                  <>
+                    <DemoLabel>Demo transcript</DemoLabel>
+                    <DemoTextArea
+                      value={demoTranscript}
+                      onChange={(event) => setDemoTranscript(event.target.value)}
+                      aria-label="Demo transcript"
+                    />
+                    <Button type="button" variant="primary" fullWidth onClick={onSubmitDemoTranscript}>
+                      Send demo transcript
+                    </Button>
+                  </>
+                ) : null}
+              </DemoSection>
             </UtilityMenu>
           ) : null}
         </UtilityRegion>

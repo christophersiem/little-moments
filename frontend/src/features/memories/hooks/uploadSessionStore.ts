@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { createMemory } from '../api'
+import { createDemoMemory, createMemory } from '../api'
 import type { CreateMemoryResponse, MemoryStatus } from '../types'
 
 export type ActiveUploadStatus = 'uploading' | 'processing' | 'ready' | 'failed'
@@ -20,6 +20,7 @@ export interface ActiveUploadSession {
 
 let activeSession: ActiveUploadSession | null = null
 let activeBlob: Blob | null = null
+let activeDemoTranscript = ''
 let activeRecordedAt = ''
 let activeChildId = ''
 let activeKeepAudio = false
@@ -112,6 +113,34 @@ function runUpload(
     })
 }
 
+function runDemoUpload(
+  version: number,
+  demoTranscript: string,
+  recordedAtIso: string,
+  childId: string,
+  durationSeconds: number,
+): void {
+  void createDemoMemory(demoTranscript, recordedAtIso, childId, durationSeconds)
+    .then((response) => {
+      if (version !== requestVersion || !activeSession) {
+        return
+      }
+      activeSession = applyResponseToSession(activeSession, response)
+      emit()
+    })
+    .catch((error) => {
+      if (version !== requestVersion || !activeSession) {
+        return
+      }
+      activeSession = {
+        ...activeSession,
+        status: 'failed',
+        errorMessage: toErrorMessage(error),
+      }
+      emit()
+    })
+}
+
 export function startMemoryUpload(
   audioBlob: Blob,
   recordedAtIso: string,
@@ -134,6 +163,7 @@ export function startMemoryUpload(
 
   activeSession = nextSession
   activeBlob = audioBlob
+  activeDemoTranscript = ''
   activeRecordedAt = recordedAtIso
   activeChildId = childId
   activeKeepAudio = keepAudio
@@ -144,8 +174,43 @@ export function startMemoryUpload(
   return nextSession
 }
 
+export function startDemoMemoryUpload(
+  demoTranscript: string,
+  recordedAtIso: string,
+  childId: string,
+  durationSeconds: number,
+): ActiveUploadSession {
+  requestVersion += 1
+  const nextSession: ActiveUploadSession = {
+    clientId: makeClientId(),
+    startedAt: new Date().toISOString(),
+    recordedAt: recordedAtIso,
+    childId,
+    keepAudio: false,
+    durationSeconds,
+    status: 'uploading',
+    ids: [],
+    count: 0,
+  }
+
+  activeSession = nextSession
+  activeBlob = null
+  activeDemoTranscript = demoTranscript
+  activeRecordedAt = recordedAtIso
+  activeChildId = childId
+  activeKeepAudio = false
+  activeDurationSeconds = durationSeconds
+  emit()
+  runDemoUpload(requestVersion, demoTranscript, recordedAtIso, childId, durationSeconds)
+
+  return nextSession
+}
+
 export function retryActiveMemoryUpload(): boolean {
-  if (!activeSession || !activeBlob || !activeRecordedAt || !activeChildId) {
+  if (!activeSession || !activeRecordedAt || !activeChildId) {
+    return false
+  }
+  if (!activeBlob && !activeDemoTranscript) {
     return false
   }
   if (activeSession.status === 'uploading') {
@@ -163,7 +228,12 @@ export function retryActiveMemoryUpload(): boolean {
     count: 0,
   }
   emit()
-  runUpload(requestVersion, activeBlob, activeRecordedAt, activeChildId, activeKeepAudio, activeDurationSeconds)
+
+  if (activeBlob) {
+    runUpload(requestVersion, activeBlob, activeRecordedAt, activeChildId, activeKeepAudio, activeDurationSeconds)
+  } else {
+    runDemoUpload(requestVersion, activeDemoTranscript, activeRecordedAt, activeChildId, activeDurationSeconds)
+  }
   return true
 }
 
@@ -196,6 +266,7 @@ export function setActiveUploadStatusFromPolling(status: MemoryStatus, errorMess
 export function clearActiveUploadSession(): void {
   activeSession = null
   activeBlob = null
+  activeDemoTranscript = ''
   activeRecordedAt = ''
   activeChildId = ''
   activeKeepAudio = false
