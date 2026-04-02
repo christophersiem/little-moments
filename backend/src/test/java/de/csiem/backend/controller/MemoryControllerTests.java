@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -92,6 +93,44 @@ class MemoryControllerTests {
             .andExpect(jsonPath("$.status").value("READY"));
 
         verify(memoryService).createMemory(any(CreateMemoryRequest.class));
+    }
+
+    @Test
+    void createMemoryPassesDemoTranscriptFromRequestParam() throws Exception {
+        UUID memoryId = UUID.fromString("12121212-1212-1212-1212-121212121212");
+        when(supabaseMemoryService.isEnabled()).thenReturn(true);
+        when(supabaseMemoryService.createMemory(eq("Bearer token"), any(CreateMemoryRequest.class))).thenReturn(
+            new CreateMemoryResponse(
+                memoryId,
+                List.of(memoryId),
+                1,
+                MemoryStatus.READY,
+                null,
+                "Demo transcript",
+                "Demo title",
+                "Demo summary",
+                List.of("Language")
+            )
+        );
+
+        String demoTranscript = "Yesterday he asked for more apples in a full sentence.";
+        mockMvc.perform(
+                multipart("/api/memories")
+                    .param("recordedAt", "2026-03-01T12:00:00Z")
+                    .param("childId", "child-1")
+                    .param("durationSeconds", "8")
+                    .param("demoTranscript", demoTranscript)
+                    .header("Authorization", "Bearer token")
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.id").value(memoryId.toString()))
+            .andExpect(jsonPath("$.status").value("READY"));
+
+        org.mockito.ArgumentCaptor<CreateMemoryRequest> captor =
+            org.mockito.ArgumentCaptor.forClass(CreateMemoryRequest.class);
+        verify(supabaseMemoryService).createMemory(eq("Bearer token"), captor.capture());
+        assertEquals(demoTranscript, captor.getValue().demoTranscript());
     }
 
     @Test

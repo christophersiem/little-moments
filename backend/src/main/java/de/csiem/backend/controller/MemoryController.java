@@ -48,14 +48,23 @@ public class MemoryController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<CreateMemoryResponse> createMemory(
         @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
-        @Valid @ModelAttribute CreateMemoryRequest request
+        @Valid @ModelAttribute CreateMemoryRequest request,
+        @RequestParam(value = "demoTranscript", required = false) String demoTranscript
     ) {
+        CreateMemoryRequest effectiveRequest = new CreateMemoryRequest(
+            request.audio(),
+            request.recordedAt(),
+            request.childId(),
+            request.keepAudio(),
+            request.durationSeconds(),
+            request.demoTranscript() != null ? request.demoTranscript() : demoTranscript
+        );
         if (useSupabase()) {
             return ResponseEntity.status(CREATED).body(
-                supabaseMemoryService.createMemory(requireAuthorizationHeader(authorizationHeader), request)
+                supabaseMemoryService.createMemory(requireAuthorizationHeader(authorizationHeader), effectiveRequest)
             );
         }
-        return ResponseEntity.status(CREATED).body(memoryService.createMemory(request));
+        return ResponseEntity.status(CREATED).body(memoryService.createMemory(effectiveRequest));
     }
 
     @GetMapping

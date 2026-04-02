@@ -90,7 +90,8 @@ class SupabaseMemoryServiceTests {
             recordedAt,
             " child-1 ",
             false,
-            8
+            8,
+            null
         );
 
         when(supabaseGatewayService.createProcessingMemory("Bearer token", "child-1", recordedAt))
@@ -149,6 +150,62 @@ class SupabaseMemoryServiceTests {
     }
 
     @Test
+    void createMemorySupportsDemoTranscriptWithoutAudio() throws Exception {
+        UUID memoryId = UUID.fromString("99999999-9999-9999-9999-999999999999");
+        Instant recordedAt = Instant.parse("2026-03-05T08:15:00Z");
+        String transcript = "At breakfast he asked for more apples in a full sentence.";
+        CreateMemoryRequest request = new CreateMemoryRequest(
+            null,
+            recordedAt,
+            "child-1",
+            false,
+            8,
+            transcript
+        );
+
+        when(supabaseGatewayService.createProcessingMemory("Bearer token", "child-1", recordedAt))
+            .thenReturn(json("""
+                {
+                  "id": "%s"
+                }
+                """.formatted(memoryId)));
+        when(memorySplittingService.split(transcript, recordedAt))
+            .thenReturn(List.of(new SplitMemory(transcript, recordedAt, 0.95)));
+        when(memoryInsightsService.generate(transcript))
+            .thenReturn(new MemoryInsightsService.MemoryInsights("Asked for more apples", "Breakfast language leap."));
+        when(memoryTaggingService.detectTags(transcript)).thenReturn(Set.of(MemoryTag.LANGUAGE));
+        when(supabaseGatewayService.updateMemoryById(eq("Bearer token"), eq(memoryId.toString()), any(Map.class)))
+            .thenReturn(json("""
+                {
+                  "id": "%s",
+                  "created_at": "2026-03-05T08:15:00Z",
+                  "status": "READY",
+                  "error_message": null,
+                  "transcript": "At breakfast he asked for more apples in a full sentence.",
+                  "title": "Asked for more apples",
+                  "summary": "Breakfast language leap.",
+                  "tags": ["Language"]
+                }
+                """.formatted(memoryId)));
+
+        CreateMemoryResponse response = supabaseMemoryService.createMemory("Bearer token", request);
+
+        assertEquals(MemoryStatus.READY, response.status());
+        assertEquals(1, response.count());
+        verifyNoInteractions(transcriptionService);
+        verify(memoryEnrichmentWebhookService).publishCreatedEntry(
+            eq(memoryId),
+            eq("child-1"),
+            eq(transcript),
+            eq("Breakfast language leap."),
+            eq("Asked for more apples"),
+            eq(Instant.parse("2026-03-05T08:15:00Z")),
+            isNull(),
+            isNull()
+        );
+    }
+
+    @Test
     void createMemoryPublishesWebhookForEachSplitEntry() throws Exception {
         UUID firstId = UUID.fromString("77777777-7777-7777-7777-777777777777");
         UUID secondId = UUID.fromString("88888888-8888-8888-8888-888888888888");
@@ -162,7 +219,8 @@ class SupabaseMemoryServiceTests {
             recordedAt,
             "child-1",
             false,
-            8
+            8,
+            null
         );
 
         when(supabaseGatewayService.createProcessingMemory("Bearer token", "child-1", recordedAt))
@@ -253,7 +311,8 @@ class SupabaseMemoryServiceTests {
             recordedAt,
             "child-1",
             false,
-            8
+            8,
+            null
         );
 
         when(supabaseGatewayService.createProcessingMemory("Bearer token", "child-1", recordedAt))
@@ -298,7 +357,8 @@ class SupabaseMemoryServiceTests {
             Instant.parse("2026-03-05T08:15:00Z"),
             "child-1",
             false,
-            8
+            8,
+            null
         );
 
         ResponseStatusException exception = assertThrows(
@@ -323,7 +383,8 @@ class SupabaseMemoryServiceTests {
             Instant.parse("2026-03-05T08:15:00Z"),
             "  ",
             false,
-            8
+            8,
+            null
         );
 
         ResponseStatusException exception = assertThrows(
@@ -348,7 +409,8 @@ class SupabaseMemoryServiceTests {
             Instant.parse("2026-03-05T08:15:00Z"),
             "child-1",
             false,
-            8
+            8,
+            null
         );
 
         ResponseStatusException exception = assertThrows(
@@ -374,7 +436,8 @@ class SupabaseMemoryServiceTests {
             Instant.parse("2026-03-05T08:15:00Z"),
             "child-1",
             false,
-            8
+            8,
+            null
         );
 
         ResponseStatusException exception = assertThrows(

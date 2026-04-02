@@ -76,7 +76,9 @@ public class MemoryService {
     public CreateMemoryResponse createMemory(CreateMemoryRequest request) {
         var audio = request.audio();
         Instant uploadTimestamp = request.recordedAt() != null ? request.recordedAt() : Instant.now();
-        if (audio == null || audio.isEmpty()) {
+        String demoTranscript = normalizeOptionalDemoTranscript(request.demoTranscript());
+        boolean demoMode = demoTranscript != null;
+        if (!demoMode && (audio == null || audio.isEmpty())) {
             throw new ResponseStatusException(BAD_REQUEST, "Audio file is required");
         }
         int maxRecordingSeconds = Math.max(appProperties.getRecording().getMaxSeconds(), 1);
@@ -90,7 +92,9 @@ public class MemoryService {
                 "Recording exceeds max duration of %d seconds".formatted(maxRecordingSeconds)
             );
         }
-        AudioUploadGuardrails.validate(audio, appProperties);
+        if (!demoMode) {
+            AudioUploadGuardrails.validate(audio, appProperties);
+        }
 
         UserEntity user = getOrCreateDefaultUser();
         MemoryEntity memory = new MemoryEntity(
@@ -102,11 +106,16 @@ public class MemoryService {
         memoryRepository.save(memory);
 
         try {
-            String transcript = transcriptionService.transcribe(
-                audio.getBytes(),
-                Optional.ofNullable(audio.getOriginalFilename()).orElse("recording.webm"),
-                Optional.ofNullable(audio.getContentType()).orElse(MediaType.APPLICATION_OCTET_STREAM_VALUE)
-            );
+            String transcript;
+            if (demoMode) {
+                transcript = demoTranscript;
+            } else {
+                transcript = transcriptionService.transcribe(
+                    audio.getBytes(),
+                    Optional.ofNullable(audio.getOriginalFilename()).orElse("recording.webm"),
+                    Optional.ofNullable(audio.getContentType()).orElse(MediaType.APPLICATION_OCTET_STREAM_VALUE)
+                );
+            }
 
             List<SplitMemory> splitMemories = memorySplittingService.split(transcript, uploadTimestamp);
             if (splitMemories.size() <= 1) {
@@ -132,6 +141,17 @@ public class MemoryService {
                 List.of()
             );
         }
+    }
+
+    private String normalizeOptionalDemoTranscript(String demoTranscript) {
+        if (demoTranscript == null || demoTranscript.isBlank()) {
+            return null;
+        }
+        String normalized = normalizeTranscript(demoTranscript);
+        if (normalized == null || normalized.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, "demoTranscript must not be blank");
+        }
+        return normalized;
     }
 
     @Transactional(readOnly = true)

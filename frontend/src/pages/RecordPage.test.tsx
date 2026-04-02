@@ -5,11 +5,13 @@ import { RecordPage } from './RecordPage'
 import { renderWithProviders } from '../test/renderWithProviders'
 import { SHORT_TRANSCRIPT_MESSAGE } from '../features/memories/constants'
 
-const { startMemoryUploadMock } = vi.hoisted(() => ({
+const { startDemoMemoryUploadMock, startMemoryUploadMock } = vi.hoisted(() => ({
+  startDemoMemoryUploadMock: vi.fn(() => ({ clientId: 'demo-client-123' })),
   startMemoryUploadMock: vi.fn(() => ({ clientId: 'client-123' })),
 }))
 
 vi.mock('../features/memories/hooks/uploadSessionStore', () => ({
+  startDemoMemoryUpload: startDemoMemoryUploadMock,
   startMemoryUpload: startMemoryUploadMock,
 }))
 
@@ -32,6 +34,7 @@ class MockMediaRecorder {
 
 describe('RecordPage', () => {
   beforeEach(() => {
+    startDemoMemoryUploadMock.mockClear()
     startMemoryUploadMock.mockClear()
     vi.stubGlobal('MediaRecorder', MockMediaRecorder)
     Object.defineProperty(window.navigator, 'mediaDevices', {
@@ -144,5 +147,24 @@ describe('RecordPage', () => {
     expect(startMemoryUploadMock).not.toHaveBeenCalled()
     expect(navigate).not.toHaveBeenCalled()
     expect(screen.getByText('Save this recording?')).toBeInTheDocument()
+  })
+
+  it('sends demo transcript when demo mode is enabled', async () => {
+    const user = userEvent.setup()
+    const navigate = vi.fn()
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState')
+
+    renderWithProviders(<RecordPage navigate={navigate} childId="child-1" />)
+
+    await user.click(screen.getByRole('button', { name: /recording options/i }))
+    await user.click(screen.getByRole('switch', { name: /demo mode/i }))
+    await user.click(screen.getByRole('button', { name: /send demo transcript/i }))
+
+    await waitFor(() => {
+      expect(startDemoMemoryUploadMock).toHaveBeenCalledTimes(1)
+      expect(startMemoryUploadMock).not.toHaveBeenCalled()
+      expect(navigate).toHaveBeenCalledWith('/memories')
+      expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/memories?pending=demo-client-123')
+    })
   })
 })

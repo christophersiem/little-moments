@@ -1,5 +1,6 @@
 export {
   askMemories,
+  createDemoMemory,
   createMemory,
   deleteMemory,
   getMemory,
